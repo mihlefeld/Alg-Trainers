@@ -1,0 +1,37 @@
+<svg id="142" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 505 505">
+<style>
+polygon { stroke: black; stroke-width: 5px; stroke-linejoin: round;}
+.green {fill: #7cfc00;}
+.orange {fill: #ffa500;}
+.blue {fill: #00ffff;}
+.beige {fill: #fffacd;}
+.pink {fill: #ffc0cb;}
+.grey {fill: #222;}
+</style>
+<polygon class="pink" points="402 483 302 483 272 442 372 442"/>
+<polygon class="green" points="302 483 202 483 233 442 272 442"/>
+<polygon class="blue" points="202 483 102 483 132 442 233 442"/>
+<polygon class="beige" points="102 483 71 388 101 346 132 442"/>
+<polygon class="pink" points="71 388 40 293 89 309 101 346"/>
+<polygon class="orange" points="40 293 10 198 58 213 89 309"/>
+<polygon class="blue" points="10 198 90 139 139 154 58 213"/>
+<polygon class="beige" points="90 139 171 80 171 131 139 154"/>
+<polygon class="green" points="171 80 252 21 252 72 171 131"/>
+<polygon class="orange" points="252 21 333 80 334 131 252 72"/>
+<polygon class="blue" points="333 80 414 139 365 154 334 131"/>
+<polygon class="pink" points="414 139 495 198 446 213 365 154"/>
+<polygon class="green" points="495 198 464 293 415 309 446 213"/>
+<polygon class="orange" points="464 293 433 388 403 346 415 309"/>
+<polygon class="beige" points="433 388 402 483 372 442 403 346"/>
+<polygon class="grey" points="372 442 272 442 302 345 403 346"/>
+<polygon class="grey" points="272 442 233 442 202 345 302 345"/>
+<polygon class="grey" points="132 442 101 346 202 345 233 442"/>
+<polygon class="grey" points="101 346 89 309 171 250 202 345"/>
+<polygon class="grey" points="58 213 139 154 171 250 89 309"/>
+<polygon class="grey" points="139 154 171 131 252 192 171 250"/>
+<polygon class="grey" points="252 72 334 131 252 192 171 131"/>
+<polygon class="grey" points="334 131 365 154 333 250 252 192"/>
+<polygon class="grey" points="446 213 415 309 333 250 365 154"/>
+<polygon class="grey" points="415 309 403 346 302 345 333 250"/>
+<polygon class="grey" points="302 345 202 345 171 250 252 192 333 250"/>
+</svg>

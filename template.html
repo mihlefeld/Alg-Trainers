@@ -1,0 +1,177 @@
+<body id="bodyid" class="niceBody">
+	<div id='practiceLayout' class="colFlex" style="display: none;">
+		<div id="casesBox" class="borderedContainer pad rowFlex center">
+			<span onclick="window.history.go(-1)" class="material-symbols-outlined abutton mbutton">arrow_back</span>
+			<span id='selInfo' style="font-size: 2em;"></span>
+			<span onclick="openDialog('settings')" style="padding: 0.2em; font-size: 2em; height: 1em; width: 1em;"
+				class="material-symbols-outlined abutton">
+				settings
+		</div>
+		<div class="borderedContainer pad center rowFlex">
+			<div id="scramble"></div>
+		</div>
+		<div id="timer_and_stats" class="rowFlex grow">
+			<div id="timerDiv" class="borderedContainer">
+				<span id="timer" style="text-align: center;">loading, please wait...</span>
+			</div>
+			<div id="stats" class="borderedContainer colFlex pad" style="gap: 0.3em;">
+				<div class="timeEntry rowFlex" style="justify-content: space-between;">
+					<div class="colFlex">
+						<span>Times <span id='infoHeader'></span></span>
+						<span>Cases <span id="numCases"></span></span>
+					</div>
+					<span onclick="confirmClear();" class="material-symbols-outlined inlineButton">delete</span>
+				</div>
+				<div id="times" class="colFlex" style="gap: 0.3em;">
+				</div>
+			</div>
+		</div>
+		<!-- case description box -->
+		<div class="borderedContainer pad rowFlex center"
+			style="justify-content: space-between; flex-direction: row-reverse;">
+			<div id='last_scramble' class="rowFlex" style="width: 100%;">
+				<span>Last Scramble</span>
+				<span class='material-symbols-outlined inlineButton'
+					onclick='window.alert("No case to unselect.")'>close</span>
+			</div>
+		</div>
+	</div> <!-- practice_layout -->
+
+	<div id='selectionLayout' class="colFlex scroller" style="margin: 0.5em; max-width: 70em; display: none;">
+		<div class="colFlex">
+			<div class="rowFlex center" style="justify-content: space-between;">
+				<h1 id="trainerTitle">Some Trainer</h1>
+				<div class="colFlex">
+					<div id="settingsButton">
+						<button onclick="openDialog('settings')" class="material-symbols-outlined abutton largeButton">
+							settings
+						</button>
+					</div>
+					<div id="modeButtons" class="colFlex">
+						<button class="material-symbols-outlined abutton largeButton"
+							onclick="changeMode('recap')">send</button>
+					</div>
+				</div>
+			</div>
+		</div>
+		<div class="borderedContainer colFlex pad center" style="background-color: var(--backgroundDarker);">
+			<div class="colFlex" style="width: fit-content;">
+				<!-- <div class="settingsEntry">
+					<span>
+						All trainers:
+						<a href="/Megaminx-PLL-Trainer/index.html">Mega PLL Trainer</a>,
+						<a href="/Megaminx-OLL-Trainer/index.html">Mega OLL Trainer</a>,
+						<a href="/Pyraminx-L4E-Trainer/index.html">Pyra L4E Trainer</a>,
+						<a href="/Skewb-NS2-Trainer/index.html">Skewb L2L Trainer</a>
+					</span>
+				</div> -->
+				<div id="presetsSettings" class="colFlex"></div>
+			</div>
+		</div>
+		<div id="cases_selection" class="colFlex">
+		</div>
+	</div> <!-- selection layout -->
+
+
+	<dialog id='hintWindow' class="colFlex borderedContainer" onclick="dialogClick(event, this)" autofocus=''>
+		<div class="borderedContainer rowFlex pad center" style="justify-content: space-between;">
+			<span id='prevButton' onclick="previousCase()"
+				class="material-symbols-outlined abutton prevNext">arrow_back</span>
+			<span id='boxTitle'>
+			</span>
+			<span id='nextButton' onclick="nextCase()"
+				class="material-symbols-outlined abutton prevNext">arrow_forward</span>
+		</div>
+		<div class="borderedContainer colFlex center" style="background-color: var(--secondary);">
+			<img id='boxImg' />
+		</div>
+		<div class="borderedContainer grow rowFlex center pad">
+			<div id='boxsetup'>
+			</div>
+		</div>
+		<div class="borderedContainer grow rowFlex pad" style="min-height: 5em;">
+			<div id='boxalg'>
+			</div>
+		</div>
+	</dialog>
+
+	<dialog id="settings" class='colFlex borderedContainer' onclick="dialogClick(event, this)" autofocus="">
+		<div class="settingsEntry">
+			<div>Weighted choice</div>
+			<!-- Rounded switch -->
+			<label class="switch">
+				<input onclick="toggleWeightedChoice(this);" type="checkbox" id="weighted_choice_on_off" value="using">
+				<span class="slider round"></span>
+			</label>
+		</div>
+		<div class="settingsEntry">
+			<div>Base size</div>
+			<div class="plusMinus">
+				<button onclick="adjustSize('body', 0.1);" type="button" class="abutton">+</button>
+				<button onclick="adjustSize('body', -0.1);" type="button" class="abutton">-</button>
+			</div>
+		</div>
+		<div class="settingsEntry">
+			<div>Timer size</div>
+			<div class="plusMinus">
+				<button onclick="adjustSize('timer', 0.1);" type="button" class="abutton">+</button>
+				<button onclick="adjustSize('timer', -0.1);" type="button" class="abutton">-</button>
+			</div>
+		</div>
+		<div class="settingsEntry">
+			<div>Scramble size</div>
+			<div class="plusMinus">
+				<button onclick="adjustSize('scramble', 0.1);" type="button" class="abutton">+</button>
+				<button onclick="adjustSize('scramble', -0.1);" type="button" class="abutton">-</button>
+			</div>
+		</div>
+		<div class="settingsEntry">
+			<div>Theme</div>
+			<div class="plusMinus">
+				<span onclick="resetStyle('light')" class="material-symbols-outlined abutton">
+					light_mode
+				</span>
+				<span onclick="resetStyle('dark')" class="material-symbols-outlined abutton">
+					dark_mode
+				</span>
+			</div>
+		</div>
+		<div class="settingsEntry">
+			<div>Background</div><input type='text' value='#222222' class='settinginput' id='--background'
+				onchange="changeColor(event);" placeholder='#222222' />
+		</div>
+		<div class="settingsEntry">
+			<div>Text</div>
+			<div style="background-color: var(--text);"></div><input type='text' value='#ffffff' class='settinginput'
+				id='--text' onchange="changeColor(event);" placeholder='oklch(1 0 360)'
+				style="background-color: var(--text); color: var(--background);" />
+		</div>
+		<div class="settingsEntry">
+			<div>primary</div> <input type='text' value='#ffd700' class='settinginput' id='--primary'
+				onchange="changeColor(event);" placeholder='lch(0.87 86 88)'
+				style="background-color: var(--primary); color: var(--primaryText)" />
+		</div>
+		<div class="settingsEntry">
+			<div>secondary</div> <input type='text' value='#ffd700' class='settinginput' id='--secondary'
+				onchange="changeColor(event);" placeholder='rgb(1 0.5 1)'
+				style="background-color: var(--secondary); color: var(--secondaryText);" />
+		</div>
+		<div class="settingsEntry">
+			<div>Accent</div> <input type='text' value='#ffd700' class='settinginput' id='--accent'
+				onchange="changeColor(event);" placeholder='#ffd700'
+				style="background-color: var(--accent); color: var(--accentText)" />
+		</div>
+	</dialog>
+	<dialog id="aboutDialog">
+		<div>
+			<div>
+				<h3>This trainer is based on Reinier Schippers'
+					<a href="https://reinierschippers.nl/oll_trainer-master/">OLL Trainer.</a>
+					<br>
+					The source code is avaiable on <a href="https://github.com/mihlefeld/Alg-Trainers">GitHub.</a>
+				</h3>
+			</div>
+		</div>
+	</dialog>
+</body>
+</body>

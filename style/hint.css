@@ -1,0 +1,15 @@
+img#boxImg {
+    width: 100%;
+    max-width: 15em;
+    margin: 0.4em;
+}
+
+dialog#hintWindow {
+    width: 31em;
+}
+
+.prevNext {
+    font-size: 1.5em !important;
+    padding: 0em;
+    width: 2em;
+}

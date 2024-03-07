@@ -1,0 +1,82 @@
+div.timeEntry {
+    margin-bottom: 0.1em;
+    border-bottom-width: 0.05em;
+    border-bottom-style: solid;
+}
+
+div#timerDiv {
+    width: 70%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    font-weight: 800;
+}
+
+div#stats {
+    width: 30%;
+}
+
+div#times {
+    overflow-y: scroll;
+    overflow-x: hidden;
+}
+
+div#timer_and_stats {
+    min-height: 1em;
+}
+
+div#practiceLayout {
+    width: 100%;
+    height: 100%;
+    padding: 0.5em;
+    box-sizing: border-box;    
+    touch-action: manipulation;
+    user-select: none;
+}
+
+div#casesBox {
+    justify-content: space-between;
+    padding: 0.3em;
+}
+
+input {
+    border-style: solid;
+    border-radius: 0.2em;
+}
+
+span.timeResult {
+    cursor: pointer;
+}
+
+span.timeResultBold {
+    cursor: pointer;
+    color: var(--primaryBG);
+}
+
+div#scramble span {
+    cursor: pointer;
+}
+
+div#scramble span:hover {
+    color: var(--secondary);
+}
+
+div#last_scramble {
+    align-items: center;
+    gap: 0.3em;
+    justify-content: space-between;
+}
+
+
+.caseNameStats:hover {
+    color: var(--primaryBGHover);
+}
+
+.timeResultBold:hover {
+    color: var(--primaryBGHover);
+}
+
+
+.groupNameDiv {
+    box-sizing: border-box;
+}

@@ -1,0 +1,37 @@
+<svg id="1" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 520 520">
+<style>
+polygon { stroke: black; stroke-width: 5px; stroke-linejoin: round;}
+.green {fill: #59a14f;}
+.red {fill: #e15759;}
+.blue {fill: #4e79a7;}
+.yellow {fill: #f1ce63;}
+.grey {fill: #aaa;}
+</style>
+<polygon class="grey" points="343 476 426 433 510 476"/>
+<polygon class="grey" points="260 433 343 476 426 433"/>
+<polygon class="green" points="176 476 260 433 343 476"/>
+<polygon class="grey" points="93 433 176 476 260 433"/>
+<polygon class="grey" points="10 476 93 433 176 476"/>
+<polygon class="grey" points="176 187 260 144 260 43"/>
+<polygon class="grey" points="176 288 176 187 260 144"/>
+<polygon class="grey" points="93 332 176 288 176 187"/>
+<polygon class="grey" points="93 433 93 332 176 288"/>
+<polygon class="grey" points="10 476 93 433 93 332"/>
+<polygon class="grey" points="343 187 260 144 260 43"/>
+<polygon class="grey" points="343 288 343 187 260 144"/>
+<polygon class="grey" points="426 332 343 288 343 187"/>
+<polygon class="grey" points="426 433 426 332 343 288"/>
+<polygon class="grey" points="426 433 510 476 426 332"/>
+<polygon class="blue" points="426 433 343 389 260 433"/>
+<polygon class="green" points="260 433 176 389 343 389"/>
+<polygon class="blue" points="93 433 176 389 260 433"/>
+<polygon class="green" points="176 288 93 433 176 389"/>
+<polygon class="red" points="176 288 260 245 176 389"/>
+<polygon class="green" points="176 288 260 144 260 245"/>
+<polygon class="red" points="260 144 343 288 260 245"/>
+<polygon class="blue" points="343 288 260 245 343 389"/>
+<polygon class="red" points="343 288 426 433 343 389"/>
+<polygon class="grey" points="343 389 260 346 176 389"/>
+<polygon class="grey" points="176 389 260 245 260 346"/>
+<polygon class="grey" points="343 389 260 245 260 346"/>
+</svg>
