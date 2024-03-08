@@ -231,7 +231,7 @@ function addPreset(name_) {
         return;
     }
     selectionPresets[name] = {
-        'selCases': {},
+        'selCases': [],
         'selectedAlgSets': {}
     };
     Object.assign(selectionPresets[name]['selCases'], selCases);
@@ -242,7 +242,7 @@ function addPreset(name_) {
 
 function updatePreset(name) {
     selectionPresets[name] = {
-        'selCases': {},
+        'selCases': [],
         'selectedAlgSets': {}
     };
     Object.assign(selectionPresets[name]['selCases'], selCases);
@@ -257,7 +257,7 @@ function deletePreset(name) {
 }
 
 function usePreset(name) {
-    Object.assign(selCases, selectionPresets[name]['selCases']);
+    selCases = [...selectionPresets[name]['selCases']];
     Object.assign(selectedAlgSets, selectionPresets[name]['selectedAlgSets']);
     renderSelection();
 }
