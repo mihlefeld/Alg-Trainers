@@ -6,18 +6,15 @@ function resize(event) {
     }
     var vpWidth = document.documentElement.clientWidth;
     var gnds = document.getElementsByClassName('groupNameDiv');
-    var gap = parseFloat(getComputedStyle(gnds[0].nextSibling).gap);
     var maxWidth = document.getElementById('allSelector').getBoundingClientRect().width;
-    var itemWidth = gnds[0].nextSibling.firstChild.getBoundingClientRect().width;
     maxWidth = Math.min(maxWidth, maxAlgsPerRow * (itemWidth + gap) - gap);
-    document.getElementById('selectionLayout').style.maxWidth = maxAlgsPerRow * (itemWidth + gap) - gap + 0.04 + "px";
-    for (var i = 0; i < gnds.length; i++) {
-        var gnd = gnds[i];
-        var num_items = Math.floor((maxWidth - itemWidth) / (itemWidth + gap) + 1e-4) + 1;
-        var new_width = num_items * itemWidth + gap * (num_items - 1);
-        gnd.style.maxWidth = new_width + "px";
-    }
-
+    var fontSize = parseFloat(getComputedStyle(document.body).fontSize);
+    var itemWidth = 5*fontSize + 0.26*fontSize;
+    var gap = 0.2*fontSize;
+    var margin = fontSize;
+    var numItemsFitInVP = Math.floor((vpWidth - margin - itemWidth) / (itemWidth + gap)) + 1;
+    var algsPerRow = Math.min(numItemsFitInVP, maxAlgsPerRow);
+    document.getElementById('selectionLayout').style.width = algsPerRow * (itemWidth + gap) - gap + 0.04 + "px";
 
     var right = (vpWidth - maxWidth) / 2;
     var marginTop = parseFloat(getComputedStyle(document.getElementById('selectionLayout')).marginTop);

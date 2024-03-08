@@ -15,7 +15,7 @@ var defaultColors = {
     }  
 }
 var defaultSettings = {
-    'baseSize': isMobile() ? 1.0 : 1.3,
+    'baseSize': 1.0,
     'timerSize': 5.0,
     'scrambleSize': 2,
     'weightedChoice': true,
