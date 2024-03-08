@@ -105,11 +105,12 @@ function itemClicked(i) {
 }
 
 function selectAllNone() {
-    var algs = getAllValid().length;
+    var validAlgs = getAllValid();
+    var algs = validAlgs.length;
     var allSelected = selCases.length == algs;
     if (!allSelected) {
         selCases = [];
-        for (var i = 1; i <= algs; ++i)
+        for (const i of validAlgs)
             selCases.push(i);
     } else {
         selCases = [];
