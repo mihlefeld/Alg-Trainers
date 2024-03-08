@@ -1,0 +1,23 @@
+{
+    "name": "ALLG Trainer",
+    "short_name": "ALLG",
+    "start_url": "/Alg-Trainers/index.html",
+    "description": "Alg trainer for all types of algs!",
+    "display": "standalone",
+    "background_color": "#353535",
+    "icons": [
+      {
+        "src": "icon.png",
+        "sizes": "512x512",
+        "type": "image/png",
+        "purpose": "any"
+      },
+      {
+        "src": "mobile.png",
+        "sizes": "512x512",
+        "type": "image/png",
+        "purpose": "maskable"
+      }
+    ]
+  }
+  
