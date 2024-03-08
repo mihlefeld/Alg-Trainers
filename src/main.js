@@ -37,7 +37,7 @@ function main() {
     applySettings();
     timer = document.getElementById('timer');
     timer.innerHTML = "ready";
-    document.getElementById("trainerTitle").innerHTML = trainerTitle + ' | <a href="/index.html">Back</a>';
+    document.getElementById("trainerTitle").innerHTML = trainerTitle + ' | <a href="../index.html">Back</a>';
     var splitUrl = window.location.href.split('?');
     baseUrl = splitUrl[0];
     var startState = splitUrl.length > 1 ? splitUrl[1] : 'select';
