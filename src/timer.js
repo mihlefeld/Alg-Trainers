@@ -18,8 +18,8 @@ function showScramble() {
         s = generateScramble();
         window.allowStartingTimer = true;
     }
-
-    document.getElementById("scramble").innerHTML = "<span onclick='showHint(this, " + window.lastCase + ")'>" + s + "</span>";
+    var onclickS = `onclick='showHint(this, ${window.lastCase})'`;
+    document.getElementById("scramble").innerHTML = `<span ${onclickS}> ${s} </span><span class='inlineButton' style='font-size: 1em !important;' ${onclickS}>?</span>`;
 }
 
 function randomElement(arr) {
@@ -349,7 +349,7 @@ function displayStats() {
             meanForCase *= i / (i + 1);
             meanForCase += resultsByCase[case_][i]["ms"] / (i + 1);
         }
-        s += "<div class='timeEntry'><div><span class='caseNameStats' onclick='showHint(this," + keys[j] + ")'>" + algsInfo[case_]["name"] + "</span>: " + msToHumanReadable(meanForCase) + "</div>" + timesString + "</div>";
+        s += `<div class='timeEntry'><div><span class='caseNameStats' onclick='showHint(this," + keys[j] + ")'>${algsInfo[case_]["name"]}</span> (⌀${msToHumanReadable(meanForCase)}):</div> ${timesString} </div>`;
     }
     el.innerHTML = s;
     

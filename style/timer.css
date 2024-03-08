@@ -53,12 +53,18 @@ span.timeResultBold {
     color: var(--primaryBG);
 }
 
+div#scramble {
+    justify-content: space-between;
+    display: flex;
+    width: 100%;
+}
+
 div#scramble span {
     cursor: pointer;
 }
 
 div#scramble span:hover {
-    color: var(--secondary);
+    color: var(--primaryBGHover);
 }
 
 div#last_scramble {
