@@ -133,7 +133,7 @@ function main() {
     document.body.style.display = "unset !important";
 }
 
-fetch("/template.html")
+fetch("../template.html")
     .then((response) => response.text())
     .then((bodyHTML) => {
         loadSettings();
