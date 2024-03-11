@@ -101,15 +101,15 @@ function generateScramble() {
         recapArray.splice(index, 1);
     }
     var alg = randomElement(window.scramblesMap[caseNum]);
-    var rotation = randomElement(preRotations);
+    var preMove = randomElement(preMoves);
+    if (preMove != "") preMove += " ";
+    var postMove = randomElement(postMoves);
+    if (postMove != "") postMove = " " + postMove;
     var preRotation = randomElement(preRotations);
-    if (rotation != ""){
-        rotation = " " + rotation;
-    } 
-    if (preRotation != "") {
-        preRotation += " "
-    }
-    var finalAlg = preRotation + alg + rotation;
+    if (preRotation != "") preRotation += " ";
+    var postRotation = randomElement(postRotations);
+    if (postRotation != "") postRotation += " ";
+    var finalAlg = preRotation + preMove + alg + postMove + postRotation;
 
     window.lastScramble = finalAlg;
     window.lastCase = caseNum;

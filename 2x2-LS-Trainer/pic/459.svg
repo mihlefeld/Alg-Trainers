@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100.0 100.0">
+<style>
+polygon { stroke: black; stroke-width: 0.5px; stroke-linejoin: round;}
+</style><polygon fill='#F28E2B' points='14.00 50.00 14.00 14.00 50.00 14.00 50.00 50.00'/>
+<polygon fill='#F1CE63' points='50.00 14.00 86.00 14.00 86.00 50.00 50.00 50.00'/>
+<polygon fill='#F1CE63' points='86.00 50.00 86.00 86.00 50.00 86.00 50.00 50.00'/>
+<polygon fill='#F1CE63' points='50.00 86.00 14.00 86.00 14.00 50.00 50.00 50.00'/>
+<polygon fill='#59A14F' points='14.00 14.00 21.20 6.80 42.80 6.80 50.00 14.00'/>
+<polygon fill='#E15759' points='50.00 14.00 57.20 6.80 78.80 6.80 86.00 14.00'/>
+<polygon fill='#4E79A7' points='86.00 14.00 93.20 21.20 93.20 42.80 86.00 50.00'/>
+<polygon fill='#F28E2B' points='86.00 50.00 93.20 57.20 93.20 78.80 86.00 86.00'/>
+<polygon fill='#59A14F' points='86.00 86.00 78.80 93.20 57.20 93.20 50.00 86.00'/>
+<polygon fill='#4E79A7' points='50.00 86.00 42.80 93.20 21.20 93.20 14.00 86.00'/>
+<polygon fill='#F28E2B' points='14.00 86.00 6.80 78.80 6.80 57.20 14.00 50.00'/>
+<polygon fill='#fafafa' points='14.00 50.00 6.80 42.80 6.80 21.20 14.00 14.00'/>
+</svg>

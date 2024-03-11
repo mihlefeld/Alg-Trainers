@@ -1,7 +1,10 @@
 const timesArrayKey = "pllTimesArray";
 const selectionArrayKey = "pllSelection";
 var trainerTitle = "Megaminx PLL Trainer";
-var preRotations = ['', 'U', "U'", "U2", "U2'"];
+var preRotations = [''];
+var postRotations = [''];
+var preMoves = ["", "U", "U'", "U2", "U2'"];
+var postMoves = preMoves;
 var selCases = [];
 var selectedAlgSets = {
     "PLL": true
