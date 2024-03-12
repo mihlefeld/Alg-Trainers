@@ -157,6 +157,25 @@ function selectCaseGroup(name) {
     updateTitle();
 }
 
+var touchholdtimer;
+var touchduration = 1000; //length of time we want the user to touch before we do something
+
+function touchstart(e, func) {
+    // e.preventDefault();
+    if (!touchholdtimer) {
+        touchholdtimer = setTimeout(func, touchduration);
+    }
+}
+
+function touchend(i) {
+    //stops short touches from firing the event
+    if (touchholdtimer) {
+        clearTimeout(touchholdtimer);
+        // itemClicked(i);
+        touchholdtimer = null;
+    }
+}
+
 function makeDivNormal(groupname) {
     var s = "";
     var indeces = algsGroups[groupname];
@@ -168,10 +187,10 @@ function makeDivNormal(groupname) {
     for (var j = 0; j < indeces.length; j++) {
         var i = indeces[j]; // case number
         var sel = (selCases.indexOf(i) != -1);
-        var dblclick = isMobile() ? "" : "ondblclick='showHint(this, " + i + ")'";
+        var dblclick = isMobile() ? ` ontouchstart='touchstart(event, () => {console.log("test"); showHint(null, ${i})})' ontouchend='touchend(${i})' ` : "ondblclick='showHint(this, " + i + ")'";
         allSelected &= sel;
-        s += "<div id='itemTd" + i + "' " + dblclick + " onclick='itemClicked(" + i + ")' class='" + (sel ? "itemSel" : "itemUnsel") + " borderedContainer' title='" + algsInfo[i]["name"] + "'>" +
-            "<img class='caseImage' id='sel" + i + "' src='pic/" + i + ".svg' ></div>";
+        s += "<div id='itemTd" + i + "' " + dblclick  + " onclick='itemClicked(" + i + ")' class='" + (sel ? "itemSel" : "itemUnsel") + " borderedContainer' title='" + algsInfo[i]["name"] + "'>" +
+            "<img oncontextmenu='return false;' class='caseImage' id='sel" + i + "' src='pic/" + i + ".svg' ></div>";
     }
     s = "<div class='colFlex' style='width: fit-content'> <div class='borderedContainer " + (allSelected ? "itemSel" : "itemUnsel") + " pad groupNameDiv'" + s;
     s += "</div></div>";
