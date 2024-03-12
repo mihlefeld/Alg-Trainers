@@ -52,7 +52,7 @@ function displayPracticeInfo() {
 
 function generateScramble() {
     if (window.lastScramble != "")
-        document.getElementById("last_scramble").innerHTML = "<span>last scramble: ${window.lastScramble}" +
+        document.getElementById("last_scramble").innerHTML = `<span>last scramble: ${window.lastScramble}` +
             ` <span onclick='showHint(this,${lastCase})' class='caseNameStats'>(${algsInfo[lastCase]["name"]})</span></span><span class='material-symbols-outlined inlineButton' onclick='confirmUnsel(${lastCase})'>close</span>`;
     displayPracticeInfo();
     // get random case
