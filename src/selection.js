@@ -209,10 +209,10 @@ function selectAlgset(algset) {
 }
 
 function makeAlgsetTitle(algset, enabled) {
-    var width = (95 / Object.keys(algsets).length) + "%";
+    // var width = Math.max((95 / Object.keys(algsets).length), 20) + "%";
     return `<div id='${algset}Selector' class='borderedContainer\
      ${(enabled ? "itemSel" : "itemUnsel")} pad' 
-     style='width: ${width}; opacity: ${enabled ? 1.0 : 0.5}' 
+     style='width: 7em; opacity: ${enabled ? 1.0 : 0.5}' 
      onclick='selectAlgset("${algset}")'><b>${algset} 
      (<span id='${algset}csi'>${enabled ? "0" : "-"}</span>/${getAlgsetIds(algset).length})</b></div>`;
 }
@@ -287,7 +287,7 @@ function renderSelection() {
     var s = "";
     s += `<div id='allSelector' class='borderedContainer  ${(selCases.length == algs ? "itemSel" : "itemUnsel")} pad' onclick='selectAllNone()'><b>All Cases (<span id='csi'></span>/${algs})</b></div>`;
     if (Object.keys(selectedAlgSets).length > 1) {
-        s += "<div class='rowFlex' style='justify-content: space-between;'>"
+        s += "<div class='rowFlex' style='flex-wrap: wrap;'>"
         for (const [algset, isShown] of Object.entries(selectedAlgSets)) {
             s += makeAlgsetTitle(algset, isShown);
         }

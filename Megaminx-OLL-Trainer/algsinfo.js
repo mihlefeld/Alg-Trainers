@@ -8,8 +8,8 @@ var preMoves = ["", "U", "U'", "U2", "U2'"];
 var postMoves = preMoves;
 var selCases = [];
 var selectedAlgSets = {
-    "Non-dot": true,
-    "Dot": false
+    "ND": true,
+    "D": false
 }
 
 var algsGroups = {
@@ -70,7 +70,7 @@ var algsGroups = {
 };
 
 var algsets = {
-    "Non-dot": [
+    "ND": [
         "Group 1",
         "Group 2",
         "Group 3",
@@ -109,7 +109,7 @@ var algsets = {
         "Group 36",
         "Group 37",
     ],
-    "Dot": [
+    "D": [
         "Group 1C",
         "Group 38",
         "Group 39",

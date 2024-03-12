@@ -6,6 +6,7 @@ div.itemSel {
     color: var(--accentText);
 }
 
+
 div.itemUnsel {
     background-color: transparent;
     cursor: pointer;
@@ -17,6 +18,7 @@ div.itemUnsel {
 
 div#cases_selection {
     width: fit-content;
+    padding-bottom: 5em;
 }
 
 img.caseImage {
