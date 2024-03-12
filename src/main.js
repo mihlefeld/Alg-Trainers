@@ -9,7 +9,7 @@ function resize(event) {
     var maxWidth = document.getElementById('allSelector').getBoundingClientRect().width;
     maxWidth = Math.min(maxWidth, maxAlgsPerRow * (itemWidth + gap) - gap);
     var fontSize = parseFloat(getComputedStyle(document.body).fontSize);
-    var itemWidth = 5*fontSize + 0.26*fontSize;
+    var itemWidth = 5*fontSize + 2* Math.floor(0.13*fontSize);
     var gap = 0.2*fontSize;
     var margin = fontSize;
     var numItemsFitInVP = Math.floor((vpWidth - margin - itemWidth) / (itemWidth + gap)) + 1;
