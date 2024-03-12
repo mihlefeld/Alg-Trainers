@@ -55,18 +55,8 @@
 			</div>
 		</div>
 		<div class="borderedContainer colFlex pad center" style="background-color: var(--backgroundDarker);">
-			<div class="colFlex" style="width: fit-content;">
-				<!-- <div class="settingsEntry">
-					<span>
-						All trainers:
-						<a href="/Megaminx-PLL-Trainer/index.html">Mega PLL Trainer</a>,
-						<a href="/Megaminx-OLL-Trainer/index.html">Mega OLL Trainer</a>,
-						<a href="/Pyraminx-L4E-Trainer/index.html">Pyra L4E Trainer</a>,
-						<a href="/Skewb-NS2-Trainer/index.html">Skewb L2L Trainer</a>
-					</span>
-				</div> -->
-				<div id="presetsSettings" class="colFlex"></div>
-			</div>
+			<div id="presetsSettings" class="colFlex"></div>
+			<div style="width: 100%; text-align: right;"><a onclick="openDialog('aboutDialog')">credits</a></div>
 		</div>
 		<div id="cases_selection" style="width: 100%;" class="colFlex">
 		</div>
@@ -162,14 +152,23 @@
 				style="background-color: var(--accent); color: var(--accentText)" />
 		</div>
 	</dialog>
-	<dialog id="aboutDialog">
-		<div>
-			<div>
-				<h3>This trainer is based on Reinier Schippers'
-					<a href="https://reinierschippers.nl/oll_trainer-master/">OLL Trainer.</a>
-					<br>
-					The source code is avaiable on <a href="https://github.com/mihlefeld/Alg-Trainers">GitHub.</a>
-				</h3>
+	<dialog id="aboutDialog" onclick="dialogClick(event, this)" autofocus=''>
+		<div class="borderedContainer pad rowFlex" style="flex-wrap: wrap; gap: 2em">
+			<div class="colFlex">
+				<span>Alg-sheets</span>
+				<a href="https://docs.google.com/spreadsheets/d/1j-SGlgZk20D3d2TyeiXhMWzeyTBuuix3Owgj9Q8rNbo/edit#gid=1373252438">Skewb Resources</a>
+				<a href="https://docs.google.com/spreadsheets/d/175ZOo4a9MwglJCnoJ3bWkPOhLhG__kPX4uVSkJMHwio/edit#gid=0">Skewb Algs</a>
+				<a href="https://docs.google.com/spreadsheets/d/12FH8MswpdBJxLJ_Eu_gopoxTCySPk9H_o7_yjN8_ECw/edit#gid=566431744">The Pyraminx Sheet</a>
+				<a href="https://docs.google.com/spreadsheets/d/1lVODoMORbDdVXwTG4RUZPWCSrx8uPx2bvwvXg5tuQYE/edit#gid=165427832">James' Megaminx Algs</a>
+				<a href="https://docs.google.com/spreadsheets/d/17Ym3zUyYXX9NzFcPw5iCs-3fXAjfqCezK-Dsofv8A2Y/edit#gid=288801998">Ore's Mega Dot OLLs</a>
+				<a href="https://docs.google.com/spreadsheets/d/1OFXakCV85Mp2zsQBXMxiMX9a506JeAcLnUXZr8FgXAY/edit#gid=1684065307">Best 2x2 Algs</a>
+			</div>
+			<div class="colFlex">
+				<span>Other</span>
+				<a href="https://reinierschippers.nl/oll_trainer-master/">Reinier's OLL Trainer</a>
+				<a href="https://bestsiteever.ru/oll/">Roman's OLL Trainer</a>
+				<a href="https://trangium.github.io/BatchSolver/">Batch Solver</a>
+				<a href="https://github.com/mihlefeld/Alg-Trainers">Github</a>
 			</div>
 		</div>
 	</dialog>
