@@ -168,8 +168,9 @@ function makeDivNormal(groupname) {
     for (var j = 0; j < indeces.length; j++) {
         var i = indeces[j]; // case number
         var sel = (selCases.indexOf(i) != -1);
+        var dblclick = isMobile() ? "" : "ondblclick='showHint(this, " + i + ")'";
         allSelected &= sel;
-        s += "<div id='itemTd" + i + "' ondblclick='showHint(this, " + i + ")' onclick='itemClicked(" + i + ")' class='" + (sel ? "itemSel" : "itemUnsel") + " borderedContainer' title='" + algsInfo[i]["name"] + "'>" +
+        s += "<div id='itemTd" + i + "' " + dblclick + " onclick='itemClicked(" + i + ")' class='" + (sel ? "itemSel" : "itemUnsel") + " borderedContainer' title='" + algsInfo[i]["name"] + "'>" +
             "<img class='caseImage' id='sel" + i + "' src='pic/" + i + ".svg' ></div>";
     }
     s = "<div class='colFlex' style='width: fit-content'> <div class='borderedContainer " + (allSelected ? "itemSel" : "itemUnsel") + " pad groupNameDiv'" + s;
