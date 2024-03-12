@@ -7,9 +7,9 @@ polygon { stroke: black; stroke-width: 0.5px; stroke-linejoin: round;}
 <polygon fill='#F28E2B' points='22.07 90.73 16.32 73.10 21.89 65.31 27.64 83.12'/>
 <polygon fill='#F28E2B' points='16.32 73.10 10.57 55.47 19.66 58.44 21.89 65.31'/>
 <polygon fill='#A0CBE8' points='10.57 55.47 5.00 37.85 13.91 40.63 19.66 58.44'/>
-<polygon fill='beige' points='5.00 37.85 19.85 26.90 28.94 29.68 13.91 40.63'/>
-<polygon fill='beige' points='19.85 26.90 34.88 15.95 34.88 25.41 28.94 29.68'/>
-<polygon fill='beige' points='34.88 15.95 49.91 5.00 49.91 14.46 34.88 25.41'/>
+<polygon fill='#f4f3aa' points='5.00 37.85 19.85 26.90 28.94 29.68 13.91 40.63'/>
+<polygon fill='#f4f3aa' points='19.85 26.90 34.88 15.95 34.88 25.41 28.94 29.68'/>
+<polygon fill='#f4f3aa' points='34.88 15.95 49.91 5.00 49.91 14.46 34.88 25.41'/>
 <polygon fill='#FF9D9A' points='49.91 5.00 64.94 15.95 65.12 25.41 49.91 14.46'/>
 <polygon fill='#FF9D9A' points='64.94 15.95 79.97 26.90 70.88 29.68 65.12 25.41'/>
 <polygon fill='#F28E2B' points='79.97 26.90 95.00 37.85 85.91 40.63 70.88 29.68'/>

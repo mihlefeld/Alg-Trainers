@@ -275,7 +275,7 @@ function renderPresets() {
         <span onclick='updatePreset("${name}")' class='abutton'>Set</span>\
         <span onclick='usePreset("${name}")' class='abutton'>Use</span></span></div></div>`;
     }
-    s += `<div class='settingsEntry'><input type='text' id='newPresetInput' value='${previousText}' placeholder='New Preset'/><span class='abutton' onclick='addPreset(null)'>Add</span></div>`;
+    s += `<div class='settingsEntry'><input type='text' id='newPresetInput' value='${previousText}' style='width: 100%' placeholder='New Preset'/><span class='abutton' onclick='addPreset(null)'>Add</span></div>`;
     document.getElementById('presetsSettings').innerHTML = s;
 }
 

@@ -7,14 +7,14 @@ function resize(event) {
     var vpWidth = document.documentElement.clientWidth;
     var gnds = document.getElementsByClassName('groupNameDiv');
     var maxWidth = document.getElementById('allSelector').getBoundingClientRect().width;
-    maxWidth = Math.min(maxWidth, maxAlgsPerRow * (itemWidth + gap) - gap);
     var fontSize = parseFloat(getComputedStyle(document.body).fontSize);
     var itemWidth = 5*fontSize + 2* Math.floor(0.13*fontSize);
     var gap = 0.2*fontSize;
     var margin = fontSize;
     var numItemsFitInVP = Math.floor((vpWidth - margin - itemWidth) / (itemWidth + gap)) + 1;
     var algsPerRow = Math.min(numItemsFitInVP, maxAlgsPerRow);
-    document.getElementById('selectionLayout').style.width = algsPerRow * (itemWidth + gap) - gap + 0.04 + "px";
+    maxWidth = algsPerRow * (itemWidth + gap) - gap + 0.04;
+    document.getElementById('selectionLayout').style.width = maxWidth + "px";
 
     var right = (vpWidth - maxWidth) / 2;
     var marginTop = parseFloat(getComputedStyle(document.getElementById('selectionLayout')).marginTop);
