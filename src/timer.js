@@ -52,8 +52,8 @@ function displayPracticeInfo() {
 
 function generateScramble() {
     if (window.lastScramble != "")
-        document.getElementById("last_scramble").innerHTML = "<span>last scramble: " + window.lastScramble +
-            " <span onclick='showHint(this," + lastCase + ")' class='caseNameStats'>(" + algsInfo[lastCase]["name"] + ")</span></span><span class='material-symbols-outlined inlineButton' onclick='confirmUnsel(" + lastCase + ")'>close</span>";
+        document.getElementById("last_scramble").innerHTML = "<span>last scramble: ${window.lastScramble}" +
+            ` <span onclick='showHint(this,${lastCase})' class='caseNameStats'>(${algsInfo[lastCase]["name"]})</span></span><span class='material-symbols-outlined inlineButton' onclick='confirmUnsel(${lastCase})'>close</span>`;
     displayPracticeInfo();
     // get random case
     var caseNum = 0;
@@ -266,7 +266,7 @@ function confirmClear() {
 }
 
 function renderHint(i) {
-    document.getElementById("boxTitle").innerHTML = '#' + i + " " + algsInfo[i]["name"];
+    document.getElementById("boxTitle").innerHTML = `${algsInfo[i]['algset']} ${algsInfo[i]['group']} ${algsInfo[i]['name']}`;
     var algsStr = "Algorithms:<br/>"
     for(const alg of algsInfo[i]["a"]) {
         algsStr += alg + "<br/>"
@@ -349,7 +349,7 @@ function displayStats() {
             meanForCase *= i / (i + 1);
             meanForCase += resultsByCase[case_][i]["ms"] / (i + 1);
         }
-        s += `<div class='timeEntry'><div><span class='caseNameStats' onclick='showHint(this," + keys[j] + ")'>${algsInfo[case_]["name"]}</span> (⌀${msToHumanReadable(meanForCase)}):</div> ${timesString} </div>`;
+        s += `<div class='timeEntry'><div><span class='caseNameStats' onclick='showHint(this, ${keys[j]})'>${algsInfo[case_]["algset"]} ${algsInfo[case_]["name"]}</span> (⌀${msToHumanReadable(meanForCase)}):</div> ${timesString} </div>`;
     }
     el.innerHTML = s;
     

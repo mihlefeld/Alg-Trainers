@@ -1,37 +1,30 @@
-<svg id="128" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 505 505">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100.0 95.73195876288659">
 <style>
-polygon { stroke: black; stroke-width: 5px; stroke-linejoin: round;}
-.green {fill: #7cfc00;}
-.orange {fill: #ffa500;}
-.blue {fill: #00ffff;}
-.beige {fill: #fffacd;}
-.pink {fill: #ffc0cb;}
-.grey {fill: #222;}
-</style>
-<polygon class="green" points="402 483 302 483 272 442 372 442"/>
-<polygon class="orange" points="302 483 202 483 233 442 272 442"/>
-<polygon class="orange" points="202 483 102 483 132 442 233 442"/>
-<polygon class="blue" points="102 483 71 388 101 346 132 442"/>
-<polygon class="pink" points="71 388 40 293 89 309 101 346"/>
-<polygon class="beige" points="40 293 10 198 58 213 89 309"/>
-<polygon class="pink" points="10 198 90 139 139 154 58 213"/>
-<polygon class="blue" points="90 139 171 80 171 131 139 154"/>
-<polygon class="blue" points="171 80 252 21 252 72 171 131"/>
-<polygon class="beige" points="252 21 333 80 334 131 252 72"/>
-<polygon class="beige" points="333 80 414 139 365 154 334 131"/>
-<polygon class="green" points="414 139 495 198 446 213 365 154"/>
-<polygon class="orange" points="495 198 464 293 415 309 446 213"/>
-<polygon class="green" points="464 293 433 388 403 346 415 309"/>
-<polygon class="pink" points="433 388 402 483 372 442 403 346"/>
-<polygon class="grey" points="372 442 272 442 302 345 403 346"/>
-<polygon class="grey" points="272 442 233 442 202 345 302 345"/>
-<polygon class="grey" points="132 442 101 346 202 345 233 442"/>
-<polygon class="grey" points="101 346 89 309 171 250 202 345"/>
-<polygon class="grey" points="58 213 139 154 171 250 89 309"/>
-<polygon class="grey" points="139 154 171 131 252 192 171 250"/>
-<polygon class="grey" points="252 72 334 131 252 192 171 131"/>
-<polygon class="grey" points="334 131 365 154 333 250 252 192"/>
-<polygon class="grey" points="446 213 415 309 333 250 365 154"/>
-<polygon class="grey" points="415 309 403 346 302 345 333 250"/>
-<polygon class="grey" points="302 345 202 345 171 250 252 192 333 250"/>
+polygon { stroke: black; stroke-width: 0.5px; stroke-linejoin: round;}
+</style><polygon fill='#F28E2B' points='77.74 90.73 59.19 90.73 53.62 83.12 72.18 83.12'/>
+<polygon fill='#FF9D9A' points='59.19 90.73 40.63 90.73 46.38 83.12 53.62 83.12'/>
+<polygon fill='#A0CBE8' points='40.63 90.73 22.07 90.73 27.64 83.12 46.38 83.12'/>
+<polygon fill='beige' points='22.07 90.73 16.32 73.10 21.89 65.31 27.64 83.12'/>
+<polygon fill='#F28E2B' points='16.32 73.10 10.57 55.47 19.66 58.44 21.89 65.31'/>
+<polygon fill='#F28E2B' points='10.57 55.47 5.00 37.85 13.91 40.63 19.66 58.44'/>
+<polygon fill='#A0CBE8' points='5.00 37.85 19.85 26.90 28.94 29.68 13.91 40.63'/>
+<polygon fill='#A0CBE8' points='19.85 26.90 34.88 15.95 34.88 25.41 28.94 29.68'/>
+<polygon fill='#FF9D9A' points='34.88 15.95 49.91 5.00 49.91 14.46 34.88 25.41'/>
+<polygon fill='#8CD17D' points='49.91 5.00 64.94 15.95 65.12 25.41 49.91 14.46'/>
+<polygon fill='#8CD17D' points='64.94 15.95 79.97 26.90 70.88 29.68 65.12 25.41'/>
+<polygon fill='beige' points='79.97 26.90 95.00 37.85 85.91 40.63 70.88 29.68'/>
+<polygon fill='#FF9D9A' points='95.00 37.85 89.25 55.47 80.15 58.44 85.91 40.63'/>
+<polygon fill='beige' points='89.25 55.47 83.49 73.10 77.93 65.31 80.15 58.44'/>
+<polygon fill='#8CD17D' points='83.49 73.10 77.74 90.73 72.18 83.12 77.93 65.31'/>
+<polygon fill='#222' points='72.18 83.12 53.62 83.12 59.19 65.12 77.93 65.31'/>
+<polygon fill='#222' points='53.62 83.12 46.38 83.12 40.63 65.12 59.19 65.12'/>
+<polygon fill='#222' points='27.64 83.12 21.89 65.31 40.63 65.12 46.38 83.12'/>
+<polygon fill='#222' points='21.89 65.31 19.66 58.44 34.88 47.49 40.63 65.12'/>
+<polygon fill='#222' points='13.91 40.63 28.94 29.68 34.88 47.49 19.66 58.44'/>
+<polygon fill='#222' points='28.94 29.68 34.88 25.41 49.91 36.73 34.88 47.49'/>
+<polygon fill='#222' points='49.91 14.46 65.12 25.41 49.91 36.73 34.88 25.41'/>
+<polygon fill='#222' points='65.12 25.41 70.88 29.68 64.94 47.49 49.91 36.73'/>
+<polygon fill='#222' points='85.91 40.63 80.15 58.44 64.94 47.49 70.88 29.68'/>
+<polygon fill='#222' points='80.15 58.44 77.93 65.31 59.19 65.12 64.94 47.49'/>
+<polygon fill='#222' points='59.19 65.12 40.63 65.12 34.88 47.49 49.91 36.73 64.94 47.49'/>
 </svg>
