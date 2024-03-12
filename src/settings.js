@@ -30,14 +30,14 @@ Object.assign(currentSettings['selectedAlgSets'], selectedAlgSets)
 
 
 function loadSettings() {
-    var loaded = localStorage.getItem('settings');
+    var loaded = localStorage.getItem('ALLGSettings');
     if (loaded != null) {    
-        currentSettings = JSON.parse(localStorage.getItem('settings'));
+        currentSettings = JSON.parse(localStorage.getItem('ALLGSettings'));
     };
 }
 
 function saveSettings() {
-    localStorage.setItem('settings', JSON.stringify(currentSettings));
+    localStorage.setItem('ALLGSettings', JSON.stringify(currentSettings));
 }
 
 
