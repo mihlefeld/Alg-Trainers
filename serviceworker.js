@@ -27,33 +27,60 @@ const putInCache = async (request, response) => {
     await cache.put(request, response);
 };
 
-const cacheFirst = async ({ request, fallbackUrl }) => {
-    console.log('trying to fetch ', request)
-    const responseFromCache = await caches.match(request);
-    if (responseFromCache) {
-        return responseFromCache;
-    }
-    console.log("cache didn't find ", request);
-    try {
-        const responseFromNetwork = await fetch(request);
-        putInCache(request, responseFromNetwork.clone());
-        return responseFromNetwork;
-    } catch (error) {
-        const fallbackResponse = await caches.match(fallbackUrl);
-        console.log('cacheFirst', fallbackUrl);
-        if (fallbackResponse) {
-            return fallbackResponse;
-        }
-        return new Response("Network error happened", {
-            status: 408,
-            headers: { "Content-Type": "text/plain" },
-        });
-    }
-};
+// const cacheFirst = async ({ request, fallbackUrl }) => {
+//     console.log('trying to fetch ', request)
+//     const responseFromCache = await caches.match(request);
+//     if (responseFromCache) {
+//         return responseFromCache;
+//     }
+//     console.log("cache didn't find ", request);
+//     try {
+//         const responseFromNetwork = await fetch(request);
+//         putInCache(request, responseFromNetwork.clone());
+//         return responseFromNetwork;
+//     } catch (error) {
+//         const fallbackResponse = await caches.match(fallbackUrl);
+//         console.log('cacheFirst', fallbackUrl);
+//         if (fallbackResponse) {
+//             return fallbackResponse;
+//         }
+//         return new Response("Network error happened", {
+//             status: 408,
+//             headers: { "Content-Type": "text/plain" },
+//         });
+//     }
+// };
 
-self.addEventListener("fetch", (event) => {
-    event.respondWith(cacheFirst({request: event.request, fallbackUrl: "/Alg-Trainers/error.html"}));
-});
+self.addEventListener('fetch', (event) => {
+    // Check if this is a request for an image
+    if (event.request.destination === 'image') {
+      event.respondWith(caches.open(trainerCache).then((cache) => {
+        // Go to the cache first
+        return cache.match(event.request.url).then((cachedResponse) => {
+          // Return a cached response if we have one
+          if (cachedResponse) {
+            return cachedResponse;
+          }
+  
+          // Otherwise, hit the network
+          return fetch(event.request).then((fetchedResponse) => {
+            // Add the network response to the cache for later visits
+            cache.put(event.request, fetchedResponse.clone());
+  
+            // Return the network response
+            return fetchedResponse;
+          });
+        });
+      }));
+    } else {
+      return;
+    }
+  });
+  
+
+// self.addEventListener("fetch", (event) => {
+//     event.respondWith(cacheFirst({request: event.request, fallbackUrl: "/Alg-Trainers/error.html"}));
+// });
 
 
 var algsInTrainers = {
