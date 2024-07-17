@@ -127,7 +127,7 @@ function main() {
     } else {
         showMode('select');
     }
-    document.body.style.display = "unset !important";
+    // document.body.style.display = "unset !important";
 }
 
 fetch("../template.html")
