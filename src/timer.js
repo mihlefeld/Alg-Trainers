@@ -27,14 +27,13 @@ function randomElement(arr) {
 }
 
 function confirmUnsel(i) {
-    if (confirm("Do you want to unselect this case?")) {
+    if (confirm("Do you want to unselect case " + algsInfo[i]['name']  + "?")) {
         var index = selCases.indexOf(i);
         if (index != -1)
             selCases.splice(index, 1);
         else
-            document.getElementById("last_scramble").innerHTML = "wasn\'t  removed lol";
-        document.getElementById("last_scramble").innerHTML = i + " was removed";
-        showScramble();
+            document.getElementById("last_scramble").firstChild.innerHTML = "Case already removed!";
+        document.getElementById("last_scramble").firstChild.innerHTML = "Removed case " + algsInfo[i]['name'] + "!";
     }
 }
 
@@ -52,7 +51,7 @@ function displayPracticeInfo() {
 
 function generateScramble() {
     if (window.lastScramble != "")
-        document.getElementById("last_scramble").innerHTML = `<span>last scramble: ${window.lastScramble}` +
+        document.getElementById("last_scramble").innerHTML = `<span>Last scramble: ${window.lastScramble}` +
             ` <span onclick='showHint(this,${lastCase})' class='caseNameStats'>(${algsInfo[lastCase]["name"]})</span></span><span class='material-symbols-outlined inlineButton' onclick='confirmUnsel(${lastCase})'>close</span>`;
     displayPracticeInfo();
     // get random case
