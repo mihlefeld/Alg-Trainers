@@ -20,74 +20,45 @@ var assets = [
   "https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200",
   "https://colorjs.io/dist/color.global.js"
 ];
-const trainerCache = "alg-trainer-cachev3";
+const trainerCache = "alg-trainer-cachev4";
 
 const putInCache = async (request, response) => {
     const cache = await caches.open(trainerCache);
     await cache.put(request, response);
 };
 
-// const cacheFirst = async ({ request, fallbackUrl }) => {
-//     console.log('trying to fetch ', request)
-//     const responseFromCache = await caches.match(request);
-//     if (responseFromCache) {
-//         return responseFromCache;
-//     }
-//     console.log("cache didn't find ", request);
-//     try {
-//         const responseFromNetwork = await fetch(request);
-//         putInCache(request, responseFromNetwork.clone());
-//         return responseFromNetwork;
-//     } catch (error) {
-//         const fallbackResponse = await caches.match(fallbackUrl);
-//         console.log('cacheFirst', fallbackUrl);
-//         if (fallbackResponse) {
-//             return fallbackResponse;
-//         }
-//         return new Response("Network error happened", {
-//             status: 408,
-//             headers: { "Content-Type": "text/plain" },
-//         });
-//     }
-// };
-
 self.addEventListener('fetch', (event) => {
-    // Check if this is a request for an image
-    if (event.request.destination === 'image') {
-      event.respondWith(caches.open(trainerCache).then((cache) => {
-        // Go to the cache first
-        return cache.match(event.request.url).then((cachedResponse) => {
-          // Return a cached response if we have one
-          if (cachedResponse) {
-            return cachedResponse;
-          }
-  
-          // Otherwise, hit the network
-          return fetch(event.request).then((fetchedResponse) => {
-            // Add the network response to the cache for later visits
-            cache.put(event.request, fetchedResponse.clone());
-  
-            // Return the network response
-            return fetchedResponse;
-          });
-        });
-      }));
-    } else {
-      return;
-    }
-  });
-  
+  event.respondWith(caches.open(trainerCache).then((cache) => {
+    // Go to the cache first
+    return cache.match(event.request.url).then((cachedResponse) => {
+      // Return a cached response if we have one
+      if (cachedResponse) {
+        return cachedResponse;
+      }
 
-// self.addEventListener("fetch", (event) => {
-//     event.respondWith(cacheFirst({request: event.request, fallbackUrl: "/Alg-Trainers/error.html"}));
-// });
+      // Otherwise, hit the network
+      return fetch(event.request).then((fetchedResponse) => {
+        // Add the network response to the cache for later visits
+        cache.put(event.request, fetchedResponse.clone());
 
+        // Return the network response
+        return fetchedResponse;
+      });
+    });
+  }));
+});
 
 var algsInTrainers = {
     'Megaminx-OLL-Trainer': 259, 
-    'Megaminx-PLL-Trainer': 152, 
+    'Megaminx-PLL-Trainer': 151, 
     'Pyraminx-L4E-Trainer': 35, 
-    'Skewb-NS2-Trainer': 267
+    'Skewb-NS2-Trainer': 267,
+    '2x2-TCLL-Trainer': 86,
+    '2x2-LS-Trainer': 486,
+    '2x2-FH-Trainer': 172,
+    '2x2-EG-Trainer': 160,
+    '3x3-OLL-Trainer': 57,
+    '3x3-PLL-Trainer': 21
 };
 
 for (const [trainer, algs] of Object.entries(algsInTrainers)) {
