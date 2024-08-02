@@ -58,7 +58,8 @@ var algsInTrainers = {
     '2x2-FH-Trainer': 172,
     '2x2-EG-Trainer': 160,
     '3x3-OLL-Trainer': 57,
-    '3x3-PLL-Trainer': 21
+    '3x3-PLL-Trainer': 21,
+    'Octaminx-TCP-Trainer': 18,
 };
 
 for (const [trainer, algs] of Object.entries(algsInTrainers)) {
