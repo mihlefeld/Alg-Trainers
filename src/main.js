@@ -119,6 +119,7 @@ function main() {
     window.addEventListener('resize', resize);
 
     loadSelection();
+    loadAlgs();
     displayStats();
     window.history.replaceState('select', '', "?select")
     document.getElementById('bodyid').style.display = "flex";

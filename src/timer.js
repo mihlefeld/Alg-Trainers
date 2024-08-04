@@ -5,6 +5,7 @@ if (timesArray == null) // todo fix when figure out why JSON.parse("[]") returns
 var lastScramble = "";
 var lastCase = 0;
 var hintCase = 0;
+var customAlgs = {};
 
 /// invokes generateScramble() and sets scramble string
 function showScramble() {
@@ -264,12 +265,52 @@ function confirmClear() {
     }
 }
 
-function renderHint(i) {
-    document.getElementById("boxTitle").innerHTML = `${algsInfo[i]['algset']} ${algsInfo[i]['group']} ${algsInfo[i]['name']}`;
-    var algsStr = "Algorithms:<br/>"
-    for(const alg of algsInfo[i]["a"]) {
-        algsStr += alg + "<br/>"
+function saveAlgs() {
+    return saveLocal(selectionArrayKey + "customAlgs", JSON.stringify(customAlgs));
+}
+
+function loadAlgs() {
+    customAlgs = JSON.parse(loadLocal(selectionArrayKey + "customAlgs", '{}'));
+    if (customAlgs == null)
+        customAlgs = {};
+    saveAlgs();
+}
+
+function editAlg() {
+    var textArea = document.getElementById('algorithmsInput')
+    if (textArea.disabled) {
+        document.getElementById('algorithmsInput').disabled = false
+        document.getElementById('editAlgButton').innerText = 'check'
+        return
+    } 
+    else {
+        document.getElementById('algorithmsInput').disabled = true
+        document.getElementById('editAlgButton').innerText = 'edit'
+        var caseAlgsInfo = JSON.parse(JSON.stringify(algsInfo[hintCase]));
+        caseAlgsInfo["a"] = textArea.value.split('\n').filter((line) => line.length > 0)
+        customAlgs[hintCase] = caseAlgsInfo
+        saveAlgs() 
+        return
     }
+
+}
+
+function renderHint(i) {
+    document.getElementById('editAlgButton').innerText = "edit"
+    document.getElementById("boxTitle").innerHTML = `${algsInfo[i]['algset']} ${algsInfo[i]['group']} ${algsInfo[i]['name']}`;
+    var longestAlgLength = 0;
+    var currentAlgs = algsInfo[i]["a"]
+    if (i in customAlgs) {
+        currentAlgs = customAlgs[i]["a"]
+    }
+    for (const alg of currentAlgs) {
+        longestAlgLength = Math.max(longestAlgLength, alg.length)
+    }
+    var algsStr = `<div class='colFlex'><label for='algorithmsInput'>Algorithms:</label><textarea id='algorithmsInput' disabled='true' rows='5' cols='${longestAlgLength}'>`
+    for(const alg of currentAlgs) {
+        algsStr += alg + "\n"
+    }
+    algsStr += "</textarea></div>"
     document.getElementById('prevButton').style.opacity = i == 1 ? 0 : 1;
     document.getElementById('nextButton').style.opacity = i == Object.keys(algsInfo).length ? 0 : 1;
     document.getElementById("boxalg").innerHTML = algsStr;
@@ -286,6 +327,46 @@ function showHint(element, i) {
 function previousCase() {
     hintCase = Math.max(hintCase - 1, 1);
     renderHint(hintCase);
+}
+
+function downloadCustomAlgs() {
+    const file = new File([JSON.stringify(customAlgs)], 'customAlgsExport.json', {
+        type: 'application/json',
+      })
+    const link = document.createElement('a')
+    const url = URL.createObjectURL(file)
+
+    link.href = url
+    link.download = file.name
+    document.body.appendChild(link)
+    link.click()
+
+    document.body.removeChild(link)
+    window.URL.revokeObjectURL(url)
+}
+
+function uploadCustomAlgs() {
+    var files = document.getElementById('uploadFile').files;
+    console.log(files);
+    if (files.length != 1) {
+        return false;
+    }
+    
+    var fr = new FileReader();
+    
+    fr.onload = function(e) { 
+        try {
+            var result = JSON.parse(e.target.result)
+            console.log(result)
+            customAlgs = result
+            renderHint(hintCase)
+        } catch (e) {
+            console.error(e);
+        }
+        
+    }
+
+    fr.readAsText(files.item(0));
 }
 
 function nextCase() {

@@ -63,118 +63,138 @@
 	</div> <!-- selection layout -->
 
 
-	<dialog id='hintWindow' class="colFlex borderedContainer" onclick="dialogClick(event, this)" autofocus=''>
-		<div class="borderedContainer rowFlex pad center" style="justify-content: space-between;">
-			<span id='prevButton' onclick="previousCase()"
-				class="material-symbols-outlined abutton prevNext">arrow_back</span>
-			<span id='boxTitle'>
-			</span>
-			<span id='nextButton' onclick="nextCase()"
-				class="material-symbols-outlined abutton prevNext">arrow_forward</span>
-		</div>
-		<div class="borderedContainer colFlex center" style="background-color: var(--secondary);">
-			<img id='boxImg' />
-		</div>
-		<div class="borderedContainer grow rowFlex center pad">
-			<div id='boxsetup'>
+	<dialog id='hintWindow' class="colFlex" onclick="dialogClick(event, this)" autofocus=''>
+		<div class="dialogDiv colFlex borderedContainer">
+			<div class="borderedContainer rowFlex pad center" style="justify-content: space-between;">
+				<span id='prevButton' onclick="previousCase()"
+					class="material-symbols-outlined abutton prevNext">arrow_back</span>
+				<span id='boxTitle'>
+				</span>
+				<span id='nextButton' onclick="nextCase()"
+					class="material-symbols-outlined abutton prevNext">arrow_forward</span>
 			</div>
-		</div>
-		<div class="borderedContainer grow rowFlex pad" style="min-height: 5em;">
-			<div id='boxalg'>
+			<div class="borderedContainer colFlex center" style="background-color: var(--secondary);">
+				<img id='boxImg' />
 			</div>
+			<div class="borderedContainer grow rowFlex center pad">
+				<div id='boxsetup'>
+				</div>
+			</div>
+			<div class="borderedContainer grow colFlex pad" style="min-height: 5em; justify-content: space-between;">
+				<div id='boxalg' class="rowFlex grow"></div>
+				<div class="rowFlex">
+					<span onclick="downloadCustomAlgs()" id="downloadButton" class="material-symbols-outlined abutton grow" >
+						download
+					</span>
+					<label id="uploadButton" for="uploadFile" class="material-symbols-outlined abutton grow" >
+						upload
+					</label><input type="file" id="uploadFile" style="display: none;" onchange="uploadCustomAlgs()">
+					<span onclick="editAlg()" id="editAlgButton" class="material-symbols-outlined abutton grow" >
+						edit
+					</span>
+				</div>
+			</div>
+
 		</div>
+		<div class="dialogBackground" onclick="document.getElementById('hintWindow').close()"></div>
 	</dialog>
 
-	<dialog id="settings" class='colFlex borderedContainer' onclick="dialogClick(event, this)" autofocus="">
-		<div class="settingsEntry">
-			<div>Weighted choice</div>
-			<!-- Rounded switch -->
-			<label class="switch">
-				<input onclick="toggleWeightedChoice(this);" type="checkbox" id="weighted_choice_on_off" value="using">
-				<span class="slider round"></span>
-			</label>
-		</div>
-		<div class="settingsEntry">
-			<div>Base size</div>
-			<div class="plusMinus">
-				<button onclick="adjustSize('body', 0.1);" type="button" class="abutton">+</button>
-				<button onclick="adjustSize('body', -0.1);" type="button" class="abutton">-</button>
+	<dialog id="settings" class='colFlex borderedContainer' autofocus="">
+		<div class="dialogDiv colFlex borderedContainer">
+			<div class="settingsEntry">
+				<div>Weighted choice</div>
+				<!-- Rounded switch -->
+				<label class="switch">
+					<input onclick="toggleWeightedChoice(this);" type="checkbox" id="weighted_choice_on_off" value="using">
+					<span class="slider round"></span>
+				</label>
+			</div>
+			<div class="settingsEntry">
+				<div>Base size</div>
+				<div class="plusMinus">
+					<button onclick="adjustSize('body', 0.1);" type="button" class="abutton">+</button>
+					<button onclick="adjustSize('body', -0.1);" type="button" class="abutton">-</button>
+				</div>
+			</div>
+			<div class="settingsEntry">
+				<div>Timer size</div>
+				<div class="plusMinus">
+					<button onclick="adjustSize('timer', 0.1);" type="button" class="abutton">+</button>
+					<button onclick="adjustSize('timer', -0.1);" type="button" class="abutton">-</button>
+				</div>
+			</div>
+			<div class="settingsEntry">
+				<div>Scramble size</div>
+				<div class="plusMinus">
+					<button onclick="adjustSize('scramble', 0.1);" type="button" class="abutton">+</button>
+					<button onclick="adjustSize('scramble', -0.1);" type="button" class="abutton">-</button>
+				</div>
+			</div>
+			<div class="settingsEntry">
+				<div>Theme</div>
+				<div class="plusMinus">
+					<span onclick="resetStyle('light')" class="material-symbols-outlined abutton">
+						light_mode
+					</span>
+					<span onclick="resetStyle('dark')" class="material-symbols-outlined abutton">
+						dark_mode
+					</span>
+				</div>
+			</div>
+			<div class="settingsEntry">
+				<div>Background</div><input type='text' value='#222222' class='settinginput' id='--background'
+					onchange="changeColor(event);" placeholder='#222222' />
+			</div>
+			<div class="settingsEntry">
+				<div>Text</div>
+				<div style="background-color: var(--text);"></div><input type='text' value='#ffffff' class='settinginput'
+					id='--text' onchange="changeColor(event);" placeholder='oklch(1 0 360)'
+					style="background-color: var(--text); color: var(--background);" />
+			</div>
+			<div class="settingsEntry">
+				<div>primary</div> <input type='text' value='#ffd700' class='settinginput' id='--primary'
+					onchange="changeColor(event);" placeholder='lch(0.87 86 88)'
+					style="background-color: var(--primary); color: var(--primaryText)" />
+			</div>
+			<div class="settingsEntry">
+				<div>secondary</div> <input type='text' value='#ffd700' class='settinginput' id='--secondary'
+					onchange="changeColor(event);" placeholder='rgb(1 0.5 1)'
+					style="background-color: var(--secondary); color: var(--secondaryText);" />
+			</div>
+			<div class="settingsEntry">
+				<div>Accent</div> <input type='text' value='#ffd700' class='settinginput' id='--accent'
+					onchange="changeColor(event);" placeholder='#ffd700'
+					style="background-color: var(--accent); color: var(--accentText)" />
 			</div>
 		</div>
-		<div class="settingsEntry">
-			<div>Timer size</div>
-			<div class="plusMinus">
-				<button onclick="adjustSize('timer', 0.1);" type="button" class="abutton">+</button>
-				<button onclick="adjustSize('timer', -0.1);" type="button" class="abutton">-</button>
-			</div>
-		</div>
-		<div class="settingsEntry">
-			<div>Scramble size</div>
-			<div class="plusMinus">
-				<button onclick="adjustSize('scramble', 0.1);" type="button" class="abutton">+</button>
-				<button onclick="adjustSize('scramble', -0.1);" type="button" class="abutton">-</button>
-			</div>
-		</div>
-		<div class="settingsEntry">
-			<div>Theme</div>
-			<div class="plusMinus">
-				<span onclick="resetStyle('light')" class="material-symbols-outlined abutton">
-					light_mode
-				</span>
-				<span onclick="resetStyle('dark')" class="material-symbols-outlined abutton">
-					dark_mode
-				</span>
-			</div>
-		</div>
-		<div class="settingsEntry">
-			<div>Background</div><input type='text' value='#222222' class='settinginput' id='--background'
-				onchange="changeColor(event);" placeholder='#222222' />
-		</div>
-		<div class="settingsEntry">
-			<div>Text</div>
-			<div style="background-color: var(--text);"></div><input type='text' value='#ffffff' class='settinginput'
-				id='--text' onchange="changeColor(event);" placeholder='oklch(1 0 360)'
-				style="background-color: var(--text); color: var(--background);" />
-		</div>
-		<div class="settingsEntry">
-			<div>primary</div> <input type='text' value='#ffd700' class='settinginput' id='--primary'
-				onchange="changeColor(event);" placeholder='lch(0.87 86 88)'
-				style="background-color: var(--primary); color: var(--primaryText)" />
-		</div>
-		<div class="settingsEntry">
-			<div>secondary</div> <input type='text' value='#ffd700' class='settinginput' id='--secondary'
-				onchange="changeColor(event);" placeholder='rgb(1 0.5 1)'
-				style="background-color: var(--secondary); color: var(--secondaryText);" />
-		</div>
-		<div class="settingsEntry">
-			<div>Accent</div> <input type='text' value='#ffd700' class='settinginput' id='--accent'
-				onchange="changeColor(event);" placeholder='#ffd700'
-				style="background-color: var(--accent); color: var(--accentText)" />
-		</div>
+		<div class="dialogBackground" onclick="document.getElementById('settings').close()"></div>
 	</dialog>
 	<dialog id="aboutDialog" onclick="dialogClick(event, this)" autofocus=''>
-		<div class="borderedContainer pad rowFlex" style="flex-wrap: wrap; gap: 2em">
-			<div class="colFlex">
-				<span>Alg-sheets</span>
-				<a href="https://docs.google.com/spreadsheets/d/1j-SGlgZk20D3d2TyeiXhMWzeyTBuuix3Owgj9Q8rNbo/edit#gid=1373252438">Skewb Resources</a>
-				<a href="https://docs.google.com/spreadsheets/d/175ZOo4a9MwglJCnoJ3bWkPOhLhG__kPX4uVSkJMHwio/edit#gid=0">Skewb Algs</a>
-				<a href="https://docs.google.com/spreadsheets/d/12FH8MswpdBJxLJ_Eu_gopoxTCySPk9H_o7_yjN8_ECw/edit#gid=566431744">The Pyraminx Sheet</a>
-				<a href="https://docs.google.com/spreadsheets/d/1lVODoMORbDdVXwTG4RUZPWCSrx8uPx2bvwvXg5tuQYE/edit#gid=165427832">James' Megaminx Algs</a>
-				<a href="https://docs.google.com/spreadsheets/d/17Ym3zUyYXX9NzFcPw5iCs-3fXAjfqCezK-Dsofv8A2Y/edit#gid=288801998">Ore's Mega Dot OLLs</a>
-				<a href="https://docs.google.com/spreadsheets/d/1OFXakCV85Mp2zsQBXMxiMX9a506JeAcLnUXZr8FgXAY/edit#gid=1684065307">Best 2x2 Algs</a>
-				<a href="https://crazymonkeyonspeed.github.io/">Frederik's FH Algs</a>
-				<a href="https://www.youtube.com/@BrinaSun">Brian Sun 3x3 Algs</a>
-				<a href="https://speedcubedb.com/">SpeedCubeDB</a>
-				<a href="https://docs.google.com/document/d/1nkgNFdAu9v6p871urGrdkKD-QGmftYhjqZjD75z4Wqo/edit#heading=h.zf1ib2cgt533">Octaminx TCP</a>
-			</div>
-			<div class="colFlex">
-				<span>Other</span>
-				<a href="https://reinierschippers.nl/oll_trainer-master/">Reinier's OLL Trainer</a>
-				<a href="https://bestsiteever.ru/oll/">Roman's OLL Trainer</a>
-				<a href="https://trangium.github.io/BatchSolver/">Batch Solver</a>
-				<a href="https://github.com/mihlefeld/Alg-Trainers">Github</a>
+		<div class="dialogDiv colFlex borderedContainer">
+			<div class="borderedContainer pad rowFlex" style="flex-wrap: wrap; gap: 2em">
+				<div class="colFlex">
+					<span>Alg-sheets</span>
+					<a href="https://docs.google.com/spreadsheets/d/1j-SGlgZk20D3d2TyeiXhMWzeyTBuuix3Owgj9Q8rNbo/edit#gid=1373252438">Skewb Resources</a>
+					<a href="https://docs.google.com/spreadsheets/d/175ZOo4a9MwglJCnoJ3bWkPOhLhG__kPX4uVSkJMHwio/edit#gid=0">Skewb Algs</a>
+					<a href="https://docs.google.com/spreadsheets/d/12FH8MswpdBJxLJ_Eu_gopoxTCySPk9H_o7_yjN8_ECw/edit#gid=566431744">The Pyraminx Sheet</a>
+					<a href="https://docs.google.com/spreadsheets/d/1lVODoMORbDdVXwTG4RUZPWCSrx8uPx2bvwvXg5tuQYE/edit#gid=165427832">James' Megaminx Algs</a>
+					<a href="https://docs.google.com/spreadsheets/d/17Ym3zUyYXX9NzFcPw5iCs-3fXAjfqCezK-Dsofv8A2Y/edit#gid=288801998">Ore's Mega Dot OLLs</a>
+					<a href="https://docs.google.com/spreadsheets/d/1OFXakCV85Mp2zsQBXMxiMX9a506JeAcLnUXZr8FgXAY/edit#gid=1684065307">Best 2x2 Algs</a>
+					<a href="https://crazymonkeyonspeed.github.io/">Frederik's FH Algs</a>
+					<a href="https://www.youtube.com/@BrinaSun">Brian Sun 3x3 Algs</a>
+					<a href="https://speedcubedb.com/">SpeedCubeDB</a>
+					<a href="https://docs.google.com/document/d/1nkgNFdAu9v6p871urGrdkKD-QGmftYhjqZjD75z4Wqo/edit#heading=h.zf1ib2cgt533">Octaminx TCP</a>
+				</div>
+				<div class="colFlex">
+					<span>Other</span>
+					<a href="https://reinierschippers.nl/oll_trainer-master/">Reinier's OLL Trainer</a>
+					<a href="https://bestsiteever.ru/oll/">Roman's OLL Trainer</a>
+					<a href="https://trangium.github.io/BatchSolver/">Batch Solver</a>
+					<a href="https://github.com/mihlefeld/Alg-Trainers">Github</a>
+				</div>
 			</div>
 		</div>
+		<div class="dialogBackground" onclick="document.getElementById('aboutDialog').close()"></div>
 	</dialog>
 </body>
 </body>

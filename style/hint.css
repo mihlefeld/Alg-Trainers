@@ -4,12 +4,33 @@ img#boxImg {
     margin: 0.4em;
 }
 
-dialog#hintWindow {
-    width: 31em;
-}
-
 .prevNext {
     font-size: 1.5em !important;
     padding: 0em;
     width: 2em;
+}
+
+textarea:disabled {
+    background-color: var(--background);
+    color: var(--text);
+    font: inherit;
+    overflow: hidden;
+    width: 100%;
+    height: fit-content;
+    resize: none;
+    border-radius: var(--borderRadius);
+    border-color: transparent;
+    border-width: var(--borderWidth);
+}
+
+textarea:enabled {
+    background-color: var(--backgroundDarker);
+    color: var(--text);
+    font: inherit;
+    width: 100%;
+    height: fit-content;
+    border-radius: var(--borderRadius);
+    border-color: var(--text);
+    border-width: var(--borderWidth);
+    outline: none;
 }

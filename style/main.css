@@ -94,21 +94,41 @@ dialog {
 }
 
 dialog[open] {
+    width: 100%;
+    height: 100%;
+    scale: 1;
+    opacity: 1;
+    margin: 0;
+    background-color: transparent;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    overflow: scroll;
+}
+
+.dialogBackground {
     position: fixed;
-    top: 20%;
-    left: 50%;
-    transform: translateX(-50%);
-    color: var(--text);
+    height: 100%;
+    width: 100%;
+    background: transparent;
+    z-index: -1;
+}
+
+.dialogBackground:hover {
+    cursor: pointer;
+}
+
+.dialogDiv {
     background-color: var(--backgroundDarker);
+    color: var(--text);
     border-radius: var(--borderRadius);
     margin: 0;
     padding: 0.3em;
-    scale: 1;
-    opacity: 1;
     box-shadow: 5px 5px 30px black;
     outline: none;
     border-color: transparent;
-    width: max-content;
+    width: 32em;
+    max-width: 95%;
 }
 
 dialog:focus {
