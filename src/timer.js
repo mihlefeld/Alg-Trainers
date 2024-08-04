@@ -306,7 +306,7 @@ function renderHint(i) {
     for (const alg of currentAlgs) {
         longestAlgLength = Math.max(longestAlgLength, alg.length)
     }
-    var algsStr = `<div class='colFlex'><label for='algorithmsInput'>Algorithms:</label><textarea id='algorithmsInput' disabled='true' rows='5' cols='${longestAlgLength}'>`
+    var algsStr = `<div class='colFlex' style='width: 100%'><label for='algorithmsInput'>Algorithms:</label><textarea id='algorithmsInput' disabled='true' rows='5' cols='${longestAlgLength}'>`
     for(const alg of currentAlgs) {
         algsStr += alg + "\n"
     }

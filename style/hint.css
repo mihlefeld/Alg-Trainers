@@ -15,7 +15,7 @@ textarea:disabled {
     color: var(--text);
     font: inherit;
     overflow: hidden;
-    width: 100%;
+    width: auto;
     height: fit-content;
     resize: none;
     border-radius: var(--borderRadius);
@@ -27,7 +27,7 @@ textarea:enabled {
     background-color: var(--backgroundDarker);
     color: var(--text);
     font: inherit;
-    width: 100%;
+    width: auto;
     height: fit-content;
     border-radius: var(--borderRadius);
     border-color: var(--text);

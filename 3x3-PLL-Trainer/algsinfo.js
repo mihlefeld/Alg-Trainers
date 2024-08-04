@@ -7,7 +7,7 @@ var preMoves = ["", "U", "U'", "U2"];
 var postMoves = preMoves;
 var selCases = [];
 var selectedAlgSets = {"PLL": true}
-var maxAlgsPerRow = 8;
+var maxAlgsPerRow = 6;
 var algsGroups = {
     "PLL Adjacent": [1, 2, 4, 5, 6, 7, 8, 10, 11, 14, 15, 16],
     "PLL Opposite": [3, 12, 13, 19, 20],

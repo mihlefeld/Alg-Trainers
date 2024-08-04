@@ -59,6 +59,9 @@ var algsInTrainers = {
     '2x2-EG-Trainer': 160,
     '3x3-OLL-Trainer': 57,
     '3x3-PLL-Trainer': 21,
+    '3x3-OH-PLL-Trainer': 21,
+    '3x3-CMLL-Trainer': 42,
+    '3x3-OH-CMLL-Trainer': 42,
     'Octaminx-TCP-Trainer': 18,
 };
 
