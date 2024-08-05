@@ -20,7 +20,7 @@ var assets = [
   "https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200",
   "https://colorjs.io/dist/color.global.js"
 ];
-const trainerCache = "alg-trainer-cache-1.1.2";
+const trainerCache = "alg-trainer-cache-1.1.3";
 
 const putInCache = async (request, response) => {
     const cache = await caches.open(trainerCache);
@@ -63,6 +63,8 @@ var algsInTrainers = {
     '3x3-CMLL-Trainer': 42,
     '3x3-OH-CMLL-Trainer': 42,
     'Octaminx-TCP-Trainer': 18,
+    '3x3-ZBLL-Trainer': 472,
+    '3x3-OH-ZBLL-Trainer': 472
 };
 
 for (const [trainer, algs] of Object.entries(algsInTrainers)) {
