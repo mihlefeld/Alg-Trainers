@@ -315,7 +315,7 @@ function renderHint(i) {
     document.getElementById('nextButton').style.opacity = i == Object.keys(algsInfo).length ? 0 : 1;
     document.getElementById("boxalg").innerHTML = algsStr;
     document.getElementById("boxsetup").innerHTML = "Setup:<br/>" + scramblesMap[i][0];
-    document.getElementById("boxImg").src = "pic/" + i + ".svg";
+    document.getElementById("boxImg").src = blobUrls[i];
 }
 
 function showHint(element, i) {

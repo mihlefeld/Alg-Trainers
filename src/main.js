@@ -1,4 +1,5 @@
 var baseUrl;
+var blobUrls = {};
 
 function resize(event) {
     if (window.history.state != 'select') {
@@ -42,6 +43,8 @@ function main() {
     window.addEventListener('popstate', (event) => {
         showMode(history.state);
     })
+
+    
 
     /// handles keypup and keydown events. Starts timer etc.
     document.getElementById("bodyid").addEventListener("keydown", function (event) {
@@ -131,11 +134,27 @@ function main() {
     // document.body.style.display = "unset !important";
 }
 
-fetch("../template.html")
-    .then((response) => response.text())
-    .then((bodyHTML) => {
-        loadSettings();
-        applySettings();
-        document.body.outerHTML = bodyHTML;
-        window.requestAnimationFrame(() => {window.requestAnimationFrame(main)})
-});
+fetch('combined.json')
+    .then((response) => response.json())
+    .then((combined) => {
+        Object.entries(combined).map((entry) => {
+            if (k in blobUrls) {
+                return;
+            }
+            var k = entry[0];
+            const svg = entry[1];
+            const blob = new Blob([svg], {type: 'image/svg+xml'});
+            const url = URL.createObjectURL(blob);
+            blobUrls[k] = url;
+        }
+        )
+    }).then((_) => {
+        fetch("../template.html")
+        .then((response) => response.text())
+        .then((bodyHTML) => {
+            loadSettings();
+            applySettings();
+            document.body.outerHTML = bodyHTML;
+            window.requestAnimationFrame(() => {window.requestAnimationFrame(main)})
+        });
+    })

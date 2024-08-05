@@ -190,7 +190,7 @@ function makeDivNormal(groupname) {
         var dblclick = isMobile() ? ` ontouchstart='touchstart(event, () => {console.log("test"); showHint(null, ${i})})' ontouchend='touchend(${i})' ` : "ondblclick='showHint(this, " + i + ")'";
         allSelected &= sel;
         s += "<div id='itemTd" + i + "' " + dblclick  + " onclick='itemClicked(" + i + ")' class='" + (sel ? "itemSel" : "itemUnsel") + " borderedContainer' title='" + algsInfo[i]["name"] + "'>" +
-            "<img oncontextmenu='return false;' class='caseImage' id='sel" + i + "' src='pic/" + i + ".svg' ></div>";
+            `<img oncontextmenu='return false;' class='caseImage' id='sel${i}' src='${blobUrls[i]}' ></div>`;
     }
     s = "<div class='colFlex' style='width: fit-content'> <div class='borderedContainer " + (allSelected ? "itemSel" : "itemUnsel") + " pad groupNameDiv'" + s;
     s += "</div></div>";

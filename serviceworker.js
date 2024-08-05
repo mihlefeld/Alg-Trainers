@@ -20,7 +20,7 @@ var assets = [
   "https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200",
   "https://colorjs.io/dist/color.global.js"
 ];
-const trainerCache = "alg-trainer-cache-1.1.3";
+const trainerCache = "alg-trainer-cache-1.1.4";
 
 const putInCache = async (request, response) => {
     const cache = await caches.open(trainerCache);
@@ -72,9 +72,7 @@ for (const [trainer, algs] of Object.entries(algsInTrainers)) {
     assets.push(`/Alg-Trainers/${trainer}/scrambles.js`);
     assets.push(`/Alg-Trainers/${trainer}/icon.png`);
     assets.push(`/Alg-Trainers/${trainer}/index.html`);
-    for (var i = 1; i <= algs; i++) {
-        assets.push(`/Alg-Trainers/${trainer}/pic/${i}.svg`);
-    }
+    assets.push(`/Alg-Trainers/${trainer}/combined.json`);
 }
 
 self.addEventListener("install", installEvent => {
