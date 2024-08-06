@@ -1,7 +1,7 @@
 const timesArrayKey = "ollTimesArray";
 const selectionArrayKey = "ollSelection";
 var trainerTitle = "Megaminx OLL Trainer"
-var maxAlgsPerRow = 6;
+var maxAlgsPerRow = 12;
 var preRotations = [''];
 var postRotations = [''];
 var preMoves = ["", "U", "U'", "U2", "U2'"];
