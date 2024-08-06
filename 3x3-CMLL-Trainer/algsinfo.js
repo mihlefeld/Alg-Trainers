@@ -7,7 +7,7 @@ var preMoves = ["", "U", "U'", "U2"];
 var postMoves = preMoves;
 var selCases = [];
 var selectedAlgSets = {"CMLL": true}
-var maxAlgsPerRow = 8;
+var maxAlgsPerRow = 6;
 var algsGroups = {"CMLL Sune": [1, 2, 3, 4, 5, 6], "CMLL Anti-Sune": [7, 8, 9, 10, 11, 12], "CMLL Pi": [13, 14, 15, 16, 17, 18], "CMLL U": [19, 20, 21, 22, 23, 24], "CMLL L": [25, 26, 27, 28, 29, 30], "CMLL T": [31, 32, 33, 34, 35, 36], "CMLL H": [37, 38, 39, 40], "CMLL O": [41, 42]}
 
 var algsets = {"CMLL": ["CMLL Sune", "CMLL Anti-Sune", "CMLL Pi", "CMLL U", "CMLL L", "CMLL T", "CMLL H", "CMLL O"]}
