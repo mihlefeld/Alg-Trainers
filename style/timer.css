@@ -10,6 +10,13 @@ div#timerDiv {
     justify-content: center;
     align-items: center;
     font-weight: 800;
+    position: relative;
+}
+
+span#undoButton {
+    position: absolute;
+    top: 0.3em;
+    right: 0.3em;
 }
 
 div#stats {

@@ -27,16 +27,19 @@ function showMode(m)
         // recap
         var casesAmount = selCases.length;
         recapArray = selCases.slice();
+        allowStartingTimer = true;
         showScramble();
     }
     else if (m == 'train') {
         // practice
         recapArray = [];
+        allowStartingTimer = true;
         showScramble();
     }
     else if (m == 'select') {
         // select
         recapArray = [];
+        allowStartingTimer = false;
         renderSelection();
     }
     resize('');

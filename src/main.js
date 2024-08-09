@@ -111,9 +111,19 @@ function main() {
     });
 
     timerDiv = document.getElementById("timerDiv")
-    timerDiv.addEventListener("touchstart", handleTouchStart, false);
+    timerDiv.addEventListener("touchstart", (e) => {
+        if(document.getElementById('undoButton').contains(e.target)) {
+            return;
+        }
+        handleTouchStart()
+    }, false);
     timerDiv.addEventListener("touchend", handleTouchEnd, false);
     window.addEventListener('keydown', function (e) {
+        if (e.code == 'Space' && (e.target == document.body || e.target.tagName == "DIALOG")) {
+            e.preventDefault();
+        }
+    });
+    window.addEventListener('keyup', function (e) {
         if (e.code == 'Space' && (e.target == document.body || e.target.tagName == "DIALOG")) {
             e.preventDefault();
         }

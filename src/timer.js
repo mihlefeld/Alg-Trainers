@@ -2,14 +2,16 @@ var allowStartingTimer;
 var timesArray = JSON.parse(loadLocal(timesArrayKey, "[]"));
 if (timesArray == null) // todo fix when figure out why JSON.parse("[]") returns 0
     timesArray = [];
-var lastScramble = "";
-var lastCase = 0;
+var lastScramble = null;
+var scramble = "";
+var lastCase = null;
+var currentCase = 0;
 var hintCase = 0;
 var customAlgs = {};
 
 /// invokes generateScramble() and sets scramble string
 function showScramble() {
-    window.allowStartingTimer = false;
+    allowStartingTimer = false;
     var s;
     if (selCases.length == 0) {
         s = "click \"select cases\" above and pick some olls to practice";
@@ -17,10 +19,16 @@ function showScramble() {
     }
     else {
         s = generateScramble();
-        window.allowStartingTimer = true;
+        setTimeout(() => {
+            if(window.history.state == 'train' || window.history.state == 'recap') {
+                allowStartingTimer = true;
+                timerAfterStop();
+            }
+        }, 200)
     }
-    var onclickS = `onclick='showHint(this, ${window.lastCase})'`;
+    var onclickS = `onclick='showHint(this, ${currentCase})'`;
     document.getElementById("scramble").innerHTML = `<span ${onclickS}> ${s} </span><span class='inlineButton' style='font-size: 1em !important;' ${onclickS}>?</span>`;
+    displayPracticeInfo();
 }
 
 function randomElement(arr) {
@@ -38,24 +46,41 @@ function confirmUnsel(i) {
     }
 }
 
+function undo() {
+    if (lastCase == null || timesArray.length < 1) {
+        return;
+    }
+    if (history.state == 'recap') {
+        recapArray.push(lastCase)
+    }
+    var onclickS = `onclick='showHint(this, ${lastCase})'`;
+    document.getElementById("scramble").innerHTML = `<span ${onclickS}> ${lastScramble} </span><span class='inlineButton' style='font-size: 1em !important;' ${onclickS}>?</span>`;
+    removeTime(timesArray.length - 1);
+    updateInstancesIndeces();
+    displayStats();
+    displayPracticeInfo();
+    document.getElementById("undoButton").style.scale = "0";
+}
+
 function displayPracticeInfo() {
     var caseCount = selCases.length;
     var s = "";
     if (recapArray.length == 0)
         s += "<b><a onclick='changeMode(\"recap\")'>Train</a> " + caseCount + " Cases</b>";
     else {
-        s += "<b><a onclick='changeMode(\"train\")'>Recap</a> " + recapArray.length + " Cases</b>";
+        s += "<b><a onclick='changeMode(\"train\")'>Recap</a> " + (recapArray.length + 1) + " Cases</b>";
     }
 
     document.getElementById("selInfo").innerHTML = s;
 }
 
 function generateScramble() {
-    if (window.lastScramble != "")
-        document.getElementById("last_scramble").innerHTML = `<span>Last scramble: ${window.lastScramble}` +
-            ` <span onclick='showHint(this,${lastCase})' class='caseNameStats'>(${algsInfo[lastCase]["name"]})</span></span><span class='material-symbols-outlined inlineButton' onclick='confirmUnsel(${lastCase})'>close</span>`;
-    displayPracticeInfo();
+    if (window.scramble != "")
+        document.getElementById("last_scramble").innerHTML = `<span>Last scramble: ${window.scramble}` +
+            ` <span onclick='showHint(this,${currentCase})' class='caseNameStats'>(${algsInfo[currentCase]["name"]})</span></span><span class='material-symbols-outlined inlineButton' onclick='confirmUnsel(${currentCase})'>close</span>`;
     // get random case
+    lastScramble = scramble;
+    lastCase = currentCase;
     var caseNum = 0;
     if (recapArray.length == 0) { // train
         if (window.history.state == 'recap') {
@@ -65,9 +90,9 @@ function generateScramble() {
             var selCasesCounts = []; // count how often each case has appeared already
             for (var i = 0; i < selCases.length; i++) {
                 var count = 0;
-                var currentCase = selCases[i];
+                var cCase = selCases[i];
                 for (var j = 0; j < window.timesArray.length; j++) {
-                    if (window.timesArray[j]["case"] == currentCase)
+                    if (window.timesArray[j]["case"] == cCase)
                         count += 1;
                 }
                 selCasesCounts.push(count);
@@ -111,8 +136,8 @@ function generateScramble() {
     if (postRotation != "") postRotation += " ";
     var finalAlg = preRotation + preMove + alg + postMove + postRotation;
 
-    window.lastScramble = finalAlg;
-    window.lastCase = caseNum;
+    scramble = finalAlg;
+    currentCase = caseNum;
 
     return finalAlg;
 }
@@ -174,6 +199,7 @@ function handleTouchStart() {
 }
 
 function timerStop() {
+    allowStartingTimer = false
     waiting = true;
     running = false;
     clearTimeout(timeout);
@@ -185,6 +211,7 @@ function timerStop() {
 
     appendStats();
     showScramble();
+    document.getElementById("undoButton").style.scale = "1"
 }
 
 function timerSetReady() {
@@ -261,6 +288,7 @@ function confirmClear() {
     if (confirm("Are you sure you want to clear session?")) {
         window.timesArray = [];
         document.getElementById('infoHeader').innerHTML = ('')
+        document.getElementById("undoButton").style.scale = "0"
         displayStats();
     }
 }
@@ -439,7 +467,7 @@ function displayStats() {
 
 function makeResultInstance() {
     var currentTime = document.getElementById("timer").innerHTML;
-    var details = window.lastScramble;
+    var details = window.scramble;
     var index = window.timesArray.length;
 
     return {
@@ -447,7 +475,7 @@ function makeResultInstance() {
         "ms": timeStringToMseconds(currentTime) * 10, // *10 because current time 1.23 display only hundreths, not thousandth of a second
         "details": details,
         "index": index,
-        "case": window.lastCase
+        "case": window.currentCase
     };
 }
 
