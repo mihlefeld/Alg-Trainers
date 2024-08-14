@@ -1,0 +1,16 @@
+https://mihlefeld.github.io/Alg-Trainers/Megaminx-OLL-Trainer/index.html
+https://mihlefeld.github.io/Alg-Trainers/Megaminx-PLL-Trainer/index.html
+https://mihlefeld.github.io/Alg-Trainers/Pyramixn-L4E-Trainer/index.html
+https://mihlefeld.github.io/Alg-Trainers/Skewb-NS2-Trainer/index.html
+https://mihlefeld.github.io/Alg-Trainers/2x2-TCLL-Trainer/index.html
+https://mihlefeld.github.io/Alg-Trainers/2x2-LS-Trainer/index.html
+https://mihlefeld.github.io/Alg-Trainers/2x2-FH-Trainer/index.html
+https://mihlefeld.github.io/Alg-Trainers/2x2-EG-Trainer/index.html
+https://mihlefeld.github.io/Alg-Trainers/3x3-OLL-Trainer/index.html
+https://mihlefeld.github.io/Alg-Trainers/3x3-PLL-Trainer/index.html
+https://mihlefeld.github.io/Alg-Trainers/3x3-CMLL-Trainer/index.html
+https://mihlefeld.github.io/Alg-Trainers/3x3-ZBLL-Trainer/index.html
+https://mihlefeld.github.io/Alg-Trainers/3x3-OH-PLL-Trainer/index.html
+https://mihlefeld.github.io/Alg-Trainers/3x3-OH-CMLL-Trainer/index.html
+https://mihlefeld.github.io/Alg-Trainers/3x3-OH-ZBLL-Trainer/index.html
+https://mihlefeld.github.io/Alg-Trainers/Octaminx-TCP-Trainer/index.html
