@@ -20,7 +20,7 @@ var defaultSettings = {
     'scrambleSize': 2,
     'weightedChoice': true,
     'colors': {},
-    'selectedAlgSets': {}
+    'selectedAlgSets': {},
 };
 
 var currentSettings = {};
