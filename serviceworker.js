@@ -20,7 +20,7 @@ var assets = [
   "https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200",
   "https://colorjs.io/dist/color.global.js"
 ];
-const trainerCache = "alg-trainer-cache-1.1.5";
+const trainerCache = "alg-trainer-cache-1.1.6";
 
 const putInCache = async (request, response) => {
     const cache = await caches.open(trainerCache);
@@ -57,6 +57,7 @@ var algsInTrainers = {
     '2x2-LS-Trainer': 486,
     '2x2-FH-Trainer': 172,
     '2x2-EG-Trainer': 160,
+    '2x2-TEG-Trainer': 516,
     '3x3-OLL-Trainer': 57,
     '3x3-PLL-Trainer': 21,
     '3x3-OH-PLL-Trainer': 21,
