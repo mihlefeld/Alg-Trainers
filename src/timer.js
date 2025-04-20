@@ -246,6 +246,7 @@ function confirmRem(i) {
     if (confirm("Are you sure you want to remove this time?\n\n" + inst["time"])) {
         removeTime(i);
         updateInstancesIndeces();
+        renderTimeDetails(inst["case"]);
         displayStats();
     }
 }
@@ -376,8 +377,7 @@ function nextCase() {
 }
 
 function showCaseTimeDetails(caseNum) {
-    var times = window.timesArray.filter((result) => result["case"] == caseNum);
-    renderTimeDetails(times);
+    renderTimeDetails(caseNum);
     openDialog('caseTimeDetails');
 }
 

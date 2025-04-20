@@ -19,7 +19,8 @@ var assets = [
   '/Alg-Trainers/error.html',
   "https://fonts.googleapis.com/css2?family=Titillium+Web:ital,wght@0,200;0,300;0,400;0,600;0,700;0,900;1,200;1,300;1,400;1,600;1,700&display=swap",
   "https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200",
-  "https://colorjs.io/dist/color.global.js"
+  "https://colorjs.io/dist/color.global.js",
+  "https://cdn.jsdelivr.net/npm/chart.js"
 ];
 const trainerCache = "alg-trainer-cache-1.1.6";
 

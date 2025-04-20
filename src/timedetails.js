@@ -1,8 +1,26 @@
 var outsideHistogram = null;
 
-function computeHistogram(times, bins) {
-    var max = Math.max(...times);
-    var min = Math.min(...times);
+function sumArray(times) {
+    return times.reduce((total, current) => total + current, 0);
+}
+
+function meanArray(times) {
+    return sumArray(times) / times.length;
+}
+
+function meanStdArray(times) {
+    var mean = meanArray(times);
+    var variance = sumArray(times.map((x) => (x - mean) * (x - mean))) / (times.length - 1)
+    return {"std": Math.sqrt(variance), "mean": mean};
+}
+
+function computeHistogram(times, maxBins) {
+    const bins = Math.min(maxBins, times.length);
+    var meanStd = meanStdArray(times);
+    var arrMax = Math.max(...times);
+    var arrMin = Math.min(...times);
+    var min = Math.max(meanStd.mean - meanStd.std, arrMin);
+    var max = Math.min(meanStd.mean + meanStd.std, arrMax);
     var diff = max - min;
     var counts = new Array(bins).fill(0);
     var binLeftEdges = [...counts.keys()].map((index) => {return min + diff / bins * index});
@@ -14,7 +32,12 @@ function computeHistogram(times, bins) {
     return {"leftEdges": binLeftEdges, "counts": counts}
 }
 // Function to render a histogram and a list of times into the caseTimeDetails histogramDiv
-function renderTimeDetails(times) {
+function renderTimeDetails(caseNum) {
+    if (caseNum < 0) {
+        var times = window.timesArray;
+    } else {
+        var times = window.timesArray.filter((result) => result["case"] == caseNum);
+    }
     var timesMs = times.map(time => time.ms); // Extract milliseconds from the times array
 
     // Calculate histogram data
@@ -35,7 +58,6 @@ function renderTimeDetails(times) {
     });
 
     Chart.defaults.color = window.getComputedStyle(document.body).getPropertyValue("--text");
-    console.log(Chart.defaults.color)
     Chart.defaults.backgroundColor = window.getComputedStyle(document.body).getPropertyValue("--primaryBGHover");
     Chart.defaults.borderColor = window.getComputedStyle(document.body).getPropertyValue("--primaryBG");
     const ctx = document.getElementById("timeHistogram");
@@ -81,33 +103,6 @@ function renderTimeDetails(times) {
     });
     outsideHistogram.update();
 
-    // const labels = document.createElement('div');
-    // labels.style.width = '3em';
-    // histogram.counts.forEach((count, index) => {
-    //     const labelBar = document.createElement('div');
-    //     labelBar.classList = ["rowFlex"];
-    //     const label = document.createElement('span');
-    //     label.style.width = '4em';
-    //     var leftEdge = histogram.leftEdges[index];
-    //     label.textContent = `≥${Math.round(leftEdge) / 1000}`
-    //     const bar = document.createElement('div');
-    //     var count = count; // Convert milliseconds to seconds
-    //     bar.style.width = `${count * scaleFactor}em`;
-    //     bar.style.height = '1em';
-    //     bar.style.backgroundColor = 'var(--primary)';
-    //     bar.title = `Time ${index + 1}: ${count}`;
-    //     labelBar.appendChild(label);
-    //     labelBar.appendChild(bar);
-    //     const countText = document.createElement("span");
-    //     ratio = Math.round(count / total * 100) / 100
-    //     countText.textContent = ``
-    //     histogramContainer.appendChild(labelBar);
-    // });
-
-    
-
-    // Append histogram to histogramDiv
-    // histogramDiv.appendChild(histogramContainer);
 
     var timeList = document.getElementById("caseTimeDetailsTimes");
 
