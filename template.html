@@ -99,6 +99,19 @@
 		<div class="dialogBackground" onclick="document.getElementById('hintWindow').close()"></div>
 	</dialog>
 
+	<dialog id="caseTimeDetails" class="colFlex" onclick="dialogClick(event, this)" autofocus="">
+		<div class="dialogDiv colFlex borderedContainer">
+			<div class="borderedContainer pad">
+				<canvas id="timeHistogram"></canvas>
+			</div>
+			<div class="rowFlex borderedContainer pad">
+				<div>Times: </div>
+				<div id="caseTimeDetailsTimes"></div>
+			</div>
+		</div>
+		<div class="dialogBackground" onclick="document.getElementById('caseTimeDetails').close()"></div>
+	</dialog>
+
 	<dialog id="settings" class='colFlex borderedContainer' autofocus="">
 		<div class="dialogDiv colFlex borderedContainer">
 			<div class="settingsEntry">

@@ -13,6 +13,7 @@ var assets = [
   "/Alg-Trainers/src/saveload.js",
   "/Alg-Trainers/src/selection.js",
   "/Alg-Trainers/src/settings.js",
+  "/Alg-Trainers/src/timedetails.js",
   "/Alg-Trainers/src/timer.js",
   "/Alg-Trainers/src/utils.js",
   '/Alg-Trainers/error.html',

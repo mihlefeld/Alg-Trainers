@@ -374,15 +374,11 @@ function nextCase() {
     hintCase = Math.min(hintCase + 1, length);
     renderHint(hintCase);
 }
-/// \param r - result instance (see makeResultInstance)
-/// \returns html code for displaying the instance
-function makeHtmlDisplayableTime(r) {
-    var isMostRecent = (r == window.timesArray[window.timesArray.length - 1]);
-    var classname = isMostRecent ? "timeResultBold" : "timeResult";
-    resultString = "<span class='" + classname + "' title='" +
-        escapeHtml(r["details"]) + "' onclick='confirmRem("
-        + r["index"] + ")' >" + r["time"] + "</span>";
-    return resultString;
+
+function showCaseTimeDetails(caseNum) {
+    var times = window.timesArray.filter((result) => result["case"] == caseNum);
+    renderTimeDetails(times);
+    openDialog('caseTimeDetails');
 }
 
 /// fills resultInfo container with info about given result instance
@@ -429,7 +425,9 @@ function displayStats() {
             meanForCase *= i / (i + 1);
             meanForCase += resultsByCase[case_][i]["ms"] / (i + 1);
         }
-        s += `<div class='timeEntry'><div><span class='caseNameStats' onclick='showHint(this, ${keys[j]})'>${algsInfo[case_]["algset"]} ${algsInfo[case_]["name"]}</span> (⌀${msToHumanReadable(meanForCase)}):</div> ${timesString} </div>`;
+        // s += `<div class='timeEntry'><div><span class='caseNameStats' onclick='showHint(this, ${keys[j]})'>${algsInfo[case_]["algset"]} ${algsInfo[case_]["name"]}</span> (⌀${msToHumanReadable(meanForCase)}):</div> ${timesString} </div>`;
+        s += `<div class='timeEntry'><span class='caseNameStats' onclick='showHint(this, ${keys[j]})'>${algsInfo[case_]["algset"]} ${algsInfo[case_]["name"]}</span>`
+        s += ` <span onclick=(showCaseTimeDetails(${case_}))>(#${resultsByCase[case_].length}, ⌀${msToHumanReadable(meanForCase)})</span></div>`;
     }
     el.innerHTML = s;
     
