@@ -2,6 +2,8 @@ div.timeEntry {
     margin-bottom: 0.1em;
     border-bottom-width: 0.05em;
     border-bottom-style: solid;
+    display: flex;
+    justify-content: space-between;
 }
 
 div#timerDiv {

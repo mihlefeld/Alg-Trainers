@@ -38,3 +38,14 @@ function loadLocal(key, fallback) {
 function saveLocal(key, value) {
     localStorage.setItem(key, value);
 }
+
+/// \param r - result instance (see makeResultInstance)
+/// \returns html code for displaying the instance
+function makeHtmlDisplayableTime(r) {
+    var isMostRecent = (r == window.timesArray[window.timesArray.length - 1]);
+    var classname = isMostRecent ? "timeResultBold" : "timeResult";
+    resultString = "<span class='" + classname + "' title='" +
+        escapeHtml(r["details"]) + "' onclick='confirmRem("
+        + r["index"] + ")' >" + r["time"] + "</span>";
+    return resultString;
+}
