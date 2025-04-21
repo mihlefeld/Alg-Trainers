@@ -1,4 +1,5 @@
 var outsideHistogram = null;
+var outsideTimePlot = null;
 
 function sumArray(times) {
     return times.reduce((total, current) => total + current, 0);
@@ -31,6 +32,15 @@ function computeHistogram(times, maxBins) {
     })
     return {"leftEdges": binLeftEdges, "counts": counts}
 }
+
+function ema(times, factor) {
+    var values = [times[0]];
+    for (var i = 1; i < times.length; i++) {
+        values.push((1-factor)*values[i-1] + factor * times[i]);
+    }
+    return values;
+}
+
 // Function to render a histogram and a list of times into the caseTimeDetails histogramDiv
 function renderTimeDetails(caseNum) {
     if (caseNum < 0) {
@@ -59,18 +69,18 @@ function renderTimeDetails(caseNum) {
 
     Chart.defaults.color = window.getComputedStyle(document.body).getPropertyValue("--text");
     Chart.defaults.backgroundColor = window.getComputedStyle(document.body).getPropertyValue("--primaryBGHover");
-    Chart.defaults.borderColor = window.getComputedStyle(document.body).getPropertyValue("--primaryBG");
+    Chart.defaults.borderColor = window.getComputedStyle(document.body).getPropertyValue("--text");
     const ctx = document.getElementById("timeHistogram");
     if (outsideHistogram === null) {        
         outsideHistogram = new Chart(ctx, {
             type: 'bar',
             data: {
-            labels: [],
-            datasets: [{
-                label: 'Count',
-                data: [],
-                borderWidth: 1,
-            }]
+                labels: [],
+                datasets: [{
+                    label: 'Count',
+                    data: [],
+                    borderWidth: 1,
+                }]
             },
             options: {
             scales: {
@@ -96,12 +106,74 @@ function renderTimeDetails(caseNum) {
             }
         });
     } 
-
     outsideHistogram.data.labels = labels;
     outsideHistogram.data.datasets.forEach((dataset) => {
+        dataset.backgroundColor = window.getComputedStyle(document.body).getPropertyValue("--primaryBGHover");
+        dataset.borderColor = window.getComputedStyle(document.body).getPropertyValue("--primaryBG");
         dataset.data = histogram.counts;
     });
     outsideHistogram.update();
+
+    const ctxTP = document.getElementById("timePlot");
+    if (outsideTimePlot === null) {        
+        outsideTimePlot = new Chart(ctxTP, {
+            type: 'line',
+            labels: [],
+            data: {
+            datasets: [
+                {
+                    label: 'Time',
+                    data: [],
+                    borderWidth: 3,
+                },
+                {
+                    label: 'Time EMA',
+                    data: [],
+                    borderWidth: 3,
+                },
+            ]
+            },
+            options: {
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    grid: {
+                        display: false
+                    }
+                },
+                x: {
+                    grid: {
+                        display: false
+                    }
+                }
+            }
+            }
+        });
+    } 
+    var timesS = timesMs.map((x) => x / 1000);
+    outsideTimePlot.data.labels = [...timesMs.keys()];
+    var linePlots = [
+        {
+            y: timesS,
+            backgroundColor: window.getComputedStyle(document.body).getPropertyValue("--primaryBGHover"),
+            borderColor: window.getComputedStyle(document.body).getPropertyValue("--primaryBG")
+        },
+        {
+            y: ema(timesS, 0.2),
+            backgroundColor: window.getComputedStyle(document.body).getPropertyValue("--secondaryHover"),
+            borderColor : window.getComputedStyle(document.body).getPropertyValue("--secondary")
+        },
+    ]
+    outsideTimePlot.data.datasets.forEach((dataset, index) => {
+        var plt = linePlots[index];
+        dataset.backgroundColor = plt.backgroundColor;
+        dataset.borderColor = plt.borderColor;
+        dataset.data = plt.y;
+        console.log(plt.backgroundColor);
+        console.log(plt.borderColor);
+        console.log(plt.y);
+    });
+    outsideTimePlot.update();
 
 
     var timeList = document.getElementById("caseTimeDetailsTimes");

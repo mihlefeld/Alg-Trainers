@@ -427,7 +427,7 @@ function displayStats() {
         }
         // s += `<div class='timeEntry'><div><span class='caseNameStats' onclick='showHint(this, ${keys[j]})'>${algsInfo[case_]["algset"]} ${algsInfo[case_]["name"]}</span> (⌀${msToHumanReadable(meanForCase)}):</div> ${timesString} </div>`;
         s += `<div class='timeEntry'><span class='caseNameStats' onclick='showHint(this, ${keys[j]})'>${algsInfo[case_]["algset"]} ${algsInfo[case_]["name"]}</span>`
-        s += ` <span onclick=(showCaseTimeDetails(${case_}))>(#${resultsByCase[case_].length}, ⌀${msToHumanReadable(meanForCase)})</span></div>`;
+        s += ` <span class='caseNameStats' onclick=(showCaseTimeDetails(${case_}))>(#${resultsByCase[case_].length}, ⌀${msToHumanReadable(meanForCase)})</span></div>`;
     }
     el.innerHTML = s;
     
