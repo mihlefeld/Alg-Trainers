@@ -22,7 +22,7 @@ var assets = [
   "https://colorjs.io/dist/color.global.js",
   "https://cdn.jsdelivr.net/npm/chart.js"
 ];
-const trainerCache = "alg-trainer-cache-1.2";
+const trainerCache = "alg-trainer-cache-1.2.1";
 
 const putInCache = async (request, response) => {
     const cache = await caches.open(trainerCache);
