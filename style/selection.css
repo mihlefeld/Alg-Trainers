@@ -25,6 +25,11 @@ img.caseImage {
     width: 5em;
 }
 
+.version {
+    opacity: 0.8;
+    font-size: 0.5em;
+}
+
 div#modeButtons {
     position: fixed;
     bottom: 0.5em;
