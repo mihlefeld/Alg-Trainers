@@ -49,7 +49,7 @@ function loadSettings() {
     if (loaded != null) {    
         currentSettings = JSON.parse(localStorage.getItem('ALLGSettings'));
         for (const [key, value] of Object.entries(defaultSettings)) {
-            if (!(key in defaultSettings)) {
+            if (!(key in currentSettings)) {
                 currentSettings[key] = value;
             }
         }
