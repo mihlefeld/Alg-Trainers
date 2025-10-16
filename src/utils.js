@@ -1,6 +1,13 @@
 var dialogOpen = false;
 
 function openDialog(id) {
+    if (id == 'settings') {
+        for (const [key, value] of Object.entries(currentSettings['cubecolors'])) {
+            var target = document.getElementById(`cc-${key}`);
+            console.log(key, value);
+            changeUiElementColor(target, value);
+        }   
+    }
     document.getElementById(id).showModal();
     dialogOpen = true;
     window.allowStartingTimer = false;

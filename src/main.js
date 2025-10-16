@@ -137,12 +137,20 @@ function main() {
 fetch('combined.json')
     .then((response) => response.json())
     .then((combined) => {
+        loadSettings();
         Object.entries(combined).map((entry) => {
             if (k in blobUrls) {
                 return;
             }
             var k = entry[0];
-            const svg = entry[1];
+            var svg = entry[1];
+            for (const [key, value] of Object.entries(defaultSettings['cubecolors'])) {
+                svg = svg.replaceAll(value, `cc-${key}`)
+            }
+            for (const [key, value] of Object.entries(currentSettings['cubecolors'])) {
+                svg = svg.replaceAll(`cc-${key}`, value)
+
+            }
             const blob = new Blob([svg], {type: 'image/svg+xml'});
             const url = URL.createObjectURL(blob);
             blobUrls[k] = url;
@@ -152,7 +160,6 @@ fetch('combined.json')
         fetch("../template.html")
         .then((response) => response.text())
         .then((bodyHTML) => {
-            loadSettings();
             applySettings();
             document.body.outerHTML = bodyHTML;
             window.requestAnimationFrame(() => {window.requestAnimationFrame(main)})

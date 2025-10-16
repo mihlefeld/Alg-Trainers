@@ -20,6 +20,21 @@ var defaultSettings = {
     'scrambleSize': 2,
     'weightedChoice': true,
     'colors': {},
+    'cubecolors': {
+        "white": "#fafafa",
+        "ignore": "#777",
+        "black": "#222",
+        "lightblue": "#A0CBE8",
+        "blue": "#4E79A7",
+        "red": "#E15759",
+        "pink": "#FF9D9A",
+        "beige": "#f4f3aa",
+        "yellow": "#F1CE63",
+        "green": "#59A14F",
+        "lightgreen": "#8CD17D",
+        "purple": "#B07AA1",
+        "orange": "#F28E2B"
+    },
     'selectedAlgSets': {}
 };
 
@@ -33,6 +48,11 @@ function loadSettings() {
     var loaded = localStorage.getItem('ALLGSettings');
     if (loaded != null) {    
         currentSettings = JSON.parse(localStorage.getItem('ALLGSettings'));
+        for (const [key, value] of Object.entries(defaultSettings)) {
+            if (!(key in defaultSettings)) {
+                currentSettings[key] = value;
+            }
+        }
     };
 }
 
@@ -112,6 +132,22 @@ function computeColors() {
     } catch(e) {}
 }
 
+function changeUiElementColor(target, color) {
+    var contrastAlg = 'WCAG21';
+    var color = toSrgb(new Color(color));
+    var textColor = toSrgb(new Color(currentSettings.colors['--text']));
+    var backgroundColor = toSrgb(new Color(currentSettings.colors['--background']));
+    var contrastText = color.contrast(textColor, contrastAlg);
+    var contrastBack = color.contrast(backgroundColor, contrastAlg);
+    if (contrastText > contrastBack) {
+        target.style.color = textColor.toString({format: "oklch"});
+    } else {
+        target.style.color = backgroundColor.toString({format: "oklch"});
+    }
+    target.style.backgroundColor = toOklchStr(color);
+    target.value = toOklchStr(color);
+}
+
 function applySettings() {
     try {    
         document.getElementById('timer').style.fontSize = currentSettings['timerSize'] + "em";
@@ -147,6 +183,12 @@ function changeColor(event) {
     currentSettings['colors'][id] = newColor;
     document.body.style.setProperty(id, newColor);
     computeColors();
+    saveSettings();
+}
+
+function changeCubeColor(event, key) {
+    changeUiElementColor(event.srcElement, event.srcElement.value)
+    currentSettings['cubecolors'][key]  = event.srcElement.value;
     saveSettings();
 }
 
