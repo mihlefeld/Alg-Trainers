@@ -9,9 +9,9 @@ var selCases = [];
 var selectedAlgSets = {"PLL": true}
 var maxAlgsPerRow = 6;
 var algsGroups = {
-    "PLL Adjacent": [1, 2, 4, 5, 6, 7, 8, 10, 11, 14, 15, 16],
-    "PLL Opposite": [3, 12, 13, 19, 20],
-    "PLL Edges": [17, 18, 9, 21],
+    "PLL Adjacent": [1, 2, 4, 5, 6, 7, 8, 9, 10, 11, 12],
+    "PLL Opposite": [13, 14, 15, 16, 17],
+    "PLL Edges": [18, 19, 20, 21],
 };
 
 var algsets = {"PLL": ["PLL Adjacent", "PLL Opposite", "PLL Edges"]};
