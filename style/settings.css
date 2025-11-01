@@ -55,3 +55,14 @@ dialog#settings span {
     flex-direction: row;
     gap: 0.2em;;
 }
+
+div#cubeColorPresets button {
+    width: 7em;
+    height: min-content;
+}
+
+div#cubeColorPresets {
+    display: flex;
+    flex-direction: row;
+    gap: 0.2em;
+}

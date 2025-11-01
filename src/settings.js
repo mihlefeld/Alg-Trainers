@@ -38,6 +38,40 @@ var defaultSettings = {
     'selectedAlgSets': {}
 };
 
+var defaultCubeColors = {
+    'default': defaultSettings['cubecolors'],
+    'redgreen': {
+        "white": "#fafafa",
+        "ignore": "#777",
+        "black": "#222",
+        "lightblue": "#A0CBE8",
+        "blue": "#4E79A7",
+        "red": "#E157BD",
+        "pink": "#FF9AD5",
+        "beige": "#F4F3AA",
+        "yellow": "#F1CE63",
+        "green": "#59A14F",
+        "lightgreen": "#8CD17D",
+        "purple": "#900067",
+        "orange": "#9E6405"
+    },
+    'blueyellow': {
+        "white": "#fafafa",
+        "ignore": "#777",
+        "black": "#222",
+        "lightblue": "#A0E8E5",
+        "blue": "#4E75A7",
+        "red": "#E15759",
+        "pink": "#FF9D9A",
+        "beige": "#f4f3aa",
+        "yellow": "#F1CE63",
+        "green": "#59A14F",
+        "lightgreen": "#8CD17D",
+        "purple": "#B07AA1",
+        "orange": "#F28E2B"
+    }
+}
+
 var currentSettings = {};
 Object.assign(currentSettings, defaultSettings);
 Object.assign(currentSettings['colors'], defaultColors[getColorScheme()]);
@@ -190,6 +224,15 @@ function changeCubeColor(event, key) {
     changeUiElementColor(event.srcElement, event.srcElement.value)
     currentSettings['cubecolors'][key]  = event.srcElement.value;
     saveSettings();
+}
+
+function resetCubeColors(key) {
+    for ([key, value] of Object.entries(defaultCubeColors[key])) {
+        changeUiElementColor(document.getElementById(`cc-${key}`), value);
+        currentSettings['cubecolors'][key] = value;
+    }
+    saveSettings()
+
 }
 
 function resetStyle(dark) {
