@@ -73,19 +73,14 @@ function generateScramble() {
                 selCasesCounts.push(count);
             }
 
-            var expectedCount = 0; // calculate how often each case "should have" appeared
-            for (var i = 0; i < selCasesCounts.length; i++) {
-                expectedCount += selCasesCounts[i];
-            }
-            var expectedCount = expectedCount / selCases.length;
-
             var selCaseWeights = []; // calculate the weights with which the next case is to be chosen. weights are arranged cumulatively
             for (var i = 0; i < selCasesCounts.length; i++) {
                 if (i == 0)
-                    selCaseWeights.push(3.5 ** (- (selCasesCounts[i] - expectedCount)));
+                    selCaseWeights.push(selCasesCounts[i] ** 0.8);
                 else
-                    selCaseWeights.push(selCaseWeights[i - 1] + 3.5 ** (- (selCasesCounts[i] - expectedCount)));
+                    selCaseWeights.push(selCaseWeights[i - 1] + selCasesCounts[i] ** 0.8);
             }
+            console.log(selCaseWeights, selCases)
             caseNum = weightedRandomElement(selCases, selCaseWeights)
 
             //console.log(selCasesCounts, expectedCount, selCaseWeights, caseNum);
