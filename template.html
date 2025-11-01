@@ -126,6 +126,15 @@
 				</label>
 			</div>
 			<div class="settingsEntry">
+				<div>Import/export</div>
+				<div class="plusMinus">
+					<label for="uploadLS" id="uploadLSLabel" class="material-symbols-outlined abutton" >
+						upload
+					</label><input type="file" id="uploadLS" style="display: none;" onchange="uploadLocalStorage()">
+					<button onclick="downloadLocalStorage()" type="button" class="material-symbols-outlined abutton">download</button>
+				</div>
+			</div>
+			<div class="settingsEntry">
 				<div>Base size</div>
 				<div class="plusMinus">
 					<button onclick="adjustSize('body', 0.1);" type="button" class="abutton">+</button>

@@ -10,7 +10,6 @@ var assets = [
   "/Alg-Trainers/style/timer.css",
   "/Alg-Trainers/src/main.js",
   "/Alg-Trainers/src/practice.js",
-  "/Alg-Trainers/src/saveload.js",
   "/Alg-Trainers/src/selection.js",
   "/Alg-Trainers/src/settings.js",
   "/Alg-Trainers/src/timedetails.js",
@@ -22,7 +21,7 @@ var assets = [
   "https://colorjs.io/dist/color.global.js",
   "https://cdn.jsdelivr.net/npm/chart.js"
 ];
-const trainerCache = "alg-trainer-cache-1.3.2";
+const trainerCache = "alg-trainer-cache-1.3.3";
 
 const putInCache = async (request, response) => {
     const cache = await caches.open(trainerCache);

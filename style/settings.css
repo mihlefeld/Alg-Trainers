@@ -29,7 +29,7 @@ input[type=text]:focus {
     padding: 0.3em;
 }
 
-dialog#settings button {
+dialog#settings button, #uploadLSLabel {
     width: 3em;
     height: 100%;
     font-size: 1em;

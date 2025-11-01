@@ -56,3 +56,46 @@ function makeHtmlDisplayableTime(r) {
         + r["index"] + ")' >" + r["time"] + "</span>";
     return resultString;
 }
+
+function uploadLocalStorage() {
+    var files = document.getElementById('uploadLS').files;
+    console.log(files);
+    if (files.length != 1) {
+        return false;
+    }
+    
+    var fr = new FileReader();
+    
+    fr.onload = function(e) { 
+        try {
+            var result = JSON.parse(e.target.result)
+            for ([key, value] of Object.entries(result)) {
+                saveLocal(key, value);
+            }
+            location.reload()
+        } catch (e) {
+            console.error(e);
+        }
+        
+    }
+
+    fr.readAsText(files.item(0));
+}
+
+function downloadLocalStorage() {
+    var date = new Date();
+    var datestring = `${date.getFullYear()}-${date.getMonth()+1}-${date.getDate()}T${date.getHours()}${date.getMinutes()}`
+    const file = new File([JSON.stringify(localStorage)], `${datestring}-alg-trainers-export.json`, {
+        type: 'application/json',
+      })
+    const link = document.createElement('a')
+    const url = URL.createObjectURL(file)
+
+    link.href = url
+    link.download = file.name
+    document.body.appendChild(link)
+    link.click()
+
+    document.body.removeChild(link)
+    window.URL.revokeObjectURL(url)
+}
