@@ -17,6 +17,7 @@ div#timerDiv {
 
 div#stats {
     width: 30%;
+    font-variant-numeric: tabular-nums;
 }
 
 div#times {
