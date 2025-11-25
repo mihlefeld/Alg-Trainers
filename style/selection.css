@@ -19,6 +19,7 @@ div.itemUnsel {
 div#cases_selection {
     width: fit-content;
     padding-bottom: 5em;
+    font-variant-numeric: tabular-nums;
 }
 
 img.caseImage {
