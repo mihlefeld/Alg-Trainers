@@ -63,6 +63,7 @@ div#cubeColorPresets button {
 
 div#cubeColorPresets {
     display: flex;
+    flex-wrap: wrap;
     flex-direction: row;
     gap: 0.2em;
 }

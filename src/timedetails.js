@@ -169,9 +169,6 @@ function renderTimeDetails(caseNum) {
         dataset.backgroundColor = plt.backgroundColor;
         dataset.borderColor = plt.borderColor;
         dataset.data = plt.y;
-        console.log(plt.backgroundColor);
-        console.log(plt.borderColor);
-        console.log(plt.y);
     });
     outsideTimePlot.update();
 

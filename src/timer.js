@@ -53,7 +53,7 @@ function displayPracticeInfo() {
 function generateScramble() {
     if (window.lastScramble != "")
         document.getElementById("last_scramble").innerHTML = `<span>Last scramble: ${window.lastScramble}` +
-            ` <span onclick='showHint(this,${lastCase})' class='caseNameStats'>(${algsInfo[lastCase]["name"]})</span></span><span class='material-symbols-outlined inlineButton' onclick='confirmUnsel(${lastCase})'>close</span>`;
+            ` <span onclick='showHint(this,${lastCase})' class='caseNameStats'>(${algsInfo[lastCase]["name"]})</span></span><span id='last-scramble-buttons'><span class='material-symbols-outlined inlineButton' onclick='confirmUnsel(${lastCase})'>close</span><span class='material-symbols-outlined inlineButton' onclick='confirmRemLast();'>undo</span></span>`;
     displayPracticeInfo();
     // get random case
     var caseNum = 0;
@@ -80,7 +80,6 @@ function generateScramble() {
                 else
                     selCaseWeights.push(selCaseWeights[i - 1] + selCasesCounts[i] ** 0.8);
             }
-            console.log(selCaseWeights, selCases)
             caseNum = weightedRandomElement(selCases, selCaseWeights)
 
             //console.log(selCasesCounts, expectedCount, selCaseWeights, caseNum);
@@ -180,6 +179,13 @@ function timerStop() {
 
     appendStats();
     showScramble();
+}
+
+function timerAbort() {
+    waiting = true;
+    running = false;
+    clearTimeout();
+    timer.innerHTML = "0.00";
 }
 
 function timerSetReady() {
@@ -343,7 +349,6 @@ function downloadCustomAlgs() {
 
 function uploadCustomAlgs() {
     var files = document.getElementById('uploadFile').files;
-    console.log(files);
     if (files.length != 1) {
         return false;
     }
@@ -353,7 +358,6 @@ function uploadCustomAlgs() {
     fr.onload = function(e) { 
         try {
             var result = JSON.parse(e.target.result)
-            console.log(result)
             customAlgs = result
             renderHint(hintCase)
         } catch (e) {

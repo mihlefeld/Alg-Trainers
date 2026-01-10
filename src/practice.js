@@ -14,6 +14,9 @@ function changeMode(m) {
 
 function showMode(m)
 {
+    if (window.running) {
+        timerAbort();
+    }
     if (m == null) {
         m = 'select'
     }
@@ -25,17 +28,20 @@ function showMode(m)
 
     if (m == 'recap') {
         // recap
+        window.allowStartingTimer = true;
         var casesAmount = selCases.length;
         recapArray = selCases.slice();
         showScramble();
     }
     else if (m == 'train') {
         // practice
+        window.allowStartingTimer = true;
         recapArray = [];
         showScramble();
     }
-    else if (m == 'select') {
+    else if (m == 'select') { 
         // select
+        window.allowStartingTimer = false;
         recapArray = [];
         renderSelection();
     }

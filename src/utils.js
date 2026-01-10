@@ -4,7 +4,6 @@ function openDialog(id) {
     if (id == 'settings') {
         for (const [key, value] of Object.entries(currentSettings['cubecolors'])) {
             var target = document.getElementById(`cc-${key}`);
-            console.log(key, value);
             changeUiElementColor(target, value);
         }   
     }
@@ -59,7 +58,6 @@ function makeHtmlDisplayableTime(r) {
 
 function uploadLocalStorage() {
     var files = document.getElementById('uploadLS').files;
-    console.log(files);
     if (files.length != 1) {
         return false;
     }

@@ -6,10 +6,8 @@ function resize(event) {
         return;
     }
     var vpWidth = document.documentElement.clientWidth;
-    var gnds = document.getElementsByClassName('groupNameDiv');
-    var maxWidth = document.getElementById('allSelector').getBoundingClientRect().width;
     var fontSize = parseFloat(getComputedStyle(document.body).fontSize);
-    var itemWidth = 5*fontSize + 2* Math.floor(0.13*fontSize);
+    var itemWidth = document.getElementById("itemTd1").getBoundingClientRect().width;
     var gap = 0.2*fontSize;
     var margin = fontSize;
     var numItemsFitInVP = Math.floor((vpWidth - margin - itemWidth) / (itemWidth + gap)) + 1;
@@ -20,6 +18,7 @@ function resize(event) {
     var right = (vpWidth - maxWidth) / 2;
     var marginTop = parseFloat(getComputedStyle(document.getElementById('selectionLayout')).marginTop);
     var modeButtonsWidth = document.getElementById('modeButtons').offsetWidth;
+
     if (right > modeButtonsWidth * 1.5) {
         document.getElementById('settingsButton').style.transform = "translateX(calc(100% + " + marginTop + "px))";
         document.getElementById("modeButtons").style.transform = "translateX(calc(100% + " + marginTop + "px))";
@@ -69,16 +68,16 @@ function main() {
             return;
         }
 
+        if (event.code == "KeyR" && !running) {
+            confirmUnsel(lastCase);
+        }
+
         if (event.target.tagName == "INPUT") {
             return;
         }
 
         if (event.code == "KeyH" && !running) {
             showHint(null, window.lastCase);
-        }
-
-        if (event.code == "KeyP" && !running) {
-            showHint(null, lastCase);
         }
 
         if (!allowed || !window.allowStartingTimer)

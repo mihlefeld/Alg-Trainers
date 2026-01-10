@@ -82,6 +82,15 @@ body {
     color: var(--text);
 }
 
+#algtrainer-selections {
+    justify-content: center; 
+    width: min(80vw, 54em);
+    flex-wrap: wrap;
+}
+
+#algtrainer-selections > div {
+    width: 17em;
+}
 
 dialog::backdrop {
     background-color: rgba(0, 0, 0, 0.7);
@@ -110,6 +119,7 @@ dialog[open] {
     position: fixed;
     height: 100%;
     width: 100%;
+    top: 0;
     background: transparent;
     z-index: -1;
 }
