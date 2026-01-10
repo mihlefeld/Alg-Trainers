@@ -134,29 +134,47 @@ function main() {
     // document.body.style.display = "unset !important";
 }
 
-fetch('combined.json')
-    .then((response) => response.json())
-    .then((combined) => {
-        loadSettings();
-        Object.entries(combined).map((entry) => {
-            if (k in blobUrls) {
-                return;
-            }
-            var k = entry[0];
-            var svg = entry[1];
-            for (const [key, value] of Object.entries(defaultSettings['cubecolors'])) {
-                svg = svg.replaceAll(value, `cc-${key}`)
-            }
-            for (const [key, value] of Object.entries(currentSettings['cubecolors'])) {
-                svg = svg.replaceAll(`cc-${key}`, value)
+function fetchAll(...resources) {
+    var destination = []
+    resources.forEach(it => {
+        destination.push(fetch(it).then((response) => response.json()))
+    })
+    return Promise.all(destination)
+}
 
-            }
-            const blob = new Blob([svg], {type: 'image/svg+xml'});
-            const url = URL.createObjectURL(blob);
-            blobUrls[k] = url;
+fetchAll("selected_algsets.json", "groups_info.json", "algsets_info.json", "algs_info.json", "scrambles.json", "combined.json")
+    .then(
+        (dicts) => {
+            window.selectedAlgSets = dicts[0];
+            window.algsGroups = dicts[1];
+            window.algsets = dicts[2];
+            window.algsInfo = dicts[3];
+            window.scramblesMap = dicts[4];
+            combined = dicts[5];
+            
+            Object.assign(selectionPresets['Default']['selCases'], selCases);
+            Object.assign(selectionPresets['Default']['selectedAlgSets'], window.selectedAlgSets);
+            loadSettings();
+            Object.entries(combined).map((entry) => {
+                if (k in blobUrls) {
+                    return;
+                }
+                var k = entry[0];
+                var svg = entry[1];
+                for (const [key, value] of Object.entries(defaultSettings['cubecolors'])) {
+                    svg = svg.replaceAll(value, `cc-${key}`)
+                }
+                for (const [key, value] of Object.entries(currentSettings['cubecolors'])) {
+                    svg = svg.replaceAll(`cc-${key}`, value)
+
+                }
+                const blob = new Blob([svg], {type: 'image/svg+xml'});
+                const url = URL.createObjectURL(blob);
+                blobUrls[k] = url;
+                }
+            )
         }
-        )
-    }).then((_) => {
+    ).then((_) => {
         fetch("../template.html")
         .then((response) => response.text())
         .then((bodyHTML) => {
@@ -164,4 +182,5 @@ fetch('combined.json')
             document.body.outerHTML = bodyHTML;
             window.requestAnimationFrame(() => {window.requestAnimationFrame(main)})
         });
-    })
+    }
+)

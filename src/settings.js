@@ -75,7 +75,7 @@ var defaultCubeColors = {
 var currentSettings = {};
 Object.assign(currentSettings, defaultSettings);
 Object.assign(currentSettings['colors'], defaultColors[getColorScheme()]);
-Object.assign(currentSettings['selectedAlgSets'], selectedAlgSets)
+Object.assign(currentSettings['selectedAlgSets'], window.selectedAlgSets);
 
 
 function loadSettings() {

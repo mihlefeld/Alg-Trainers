@@ -21,7 +21,7 @@ var assets = [
   "https://colorjs.io/dist/color.global.js",
   "https://cdn.jsdelivr.net/npm/chart.js"
 ];
-const trainerCache = "alg-trainer-cache-1.3.6";
+const trainerCache = "alg-trainer-cache-1.3.8";
 
 const putInCache = async (request, response) => {
     const cache = await caches.open(trainerCache);
@@ -71,11 +71,15 @@ var algsInTrainers = {
 };
 
 for (const [trainer, algs] of Object.entries(algsInTrainers)) {
-    assets.push(`/Alg-Trainers/${trainer}/algsinfo.js`);
-    assets.push(`/Alg-Trainers/${trainer}/scrambles.js`);
-    assets.push(`/Alg-Trainers/${trainer}/icon.png`);
-    assets.push(`/Alg-Trainers/${trainer}/index.html`);
-    assets.push(`/Alg-Trainers/${trainer}/combined.json`);
+  assets.push(`/Alg-Trainers/${trainer}/algs_info.json`);
+  assets.push(`/Alg-Trainers/${trainer}/algsets_info.json`);
+  assets.push(`/Alg-Trainers/${trainer}/algsinfo.js`);
+  assets.push(`/Alg-Trainers/${trainer}/combined.json`);
+  assets.push(`/Alg-Trainers/${trainer}/groups_info.json`);
+  assets.push(`/Alg-Trainers/${trainer}/index.html`);
+  assets.push(`/Alg-Trainers/${trainer}/icon.png`);
+  assets.push(`/Alg-Trainers/${trainer}/scrambles.json`);
+  assets.push(`/Alg-Trainers/${trainer}/selected_algsets.json`);
 }
 
 self.addEventListener("install", installEvent => {

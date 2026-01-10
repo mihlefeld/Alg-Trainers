@@ -5,8 +5,7 @@ var selectionPresets = {
         "selectedAlgSets": {}
     }
 }
-Object.assign(selectionPresets['Default']['selCases'], selCases);
-Object.assign(selectionPresets['Default']['selectedAlgSets'], selectedAlgSets);
+
 function getAlgsetIds(algset) {
     var algsetIds = []
     for (const group of algsets[algset]) {
