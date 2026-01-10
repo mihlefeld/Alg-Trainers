@@ -12,10 +12,12 @@ div#timerDiv {
     justify-content: center;
     align-items: center;
     font-weight: 800;
+    font-variant-numeric: tabular-nums;
 }
 
 div#stats {
     width: 30%;
+    font-variant-numeric: tabular-nums;
 }
 
 div#times {
