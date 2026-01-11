@@ -145,6 +145,14 @@ dialog:focus {
     outline: none;
 }
 
+.puzzle-header {
+    display: flex;
+    justify-content: space-between;
+}
+
+.puzzle-header > img {
+    height: 1.4em;
+}
 
 html {
     height: 100%;
