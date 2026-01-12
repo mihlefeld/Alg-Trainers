@@ -84,12 +84,12 @@ body {
 
 #algtrainer-selections {
     justify-content: center; 
-    width: min(80vw, 54em);
+    width: min(80vw, 62em);
     flex-wrap: wrap;
 }
 
 #algtrainer-selections > div {
-    width: 17em;
+    width: 19em;
 }
 
 dialog::backdrop {
