@@ -23,10 +23,16 @@ var assets = [
 ];
 const trainerCache = "alg-trainer-cache-1.4.7";
 
-const putInCache = async (request, response) => {
-    const cache = await caches.open(trainerCache);
-    await cache.put(request, response);
-};
+function refreshCache() {
+  for (key of caches.keys()) {
+    if (key != trainerCache) {
+      caches.delete(key);
+    }
+  }
+  caches.open(trainerCache).then((cache) => {
+    cache.addAll(assets)
+  })
+}
 
 self.addEventListener('fetch', (event) => {
   event.respondWith(caches.open(trainerCache).then((cache) => {
@@ -85,8 +91,6 @@ for (const [trainer, algs] of Object.entries(algsInTrainers)) {
 self.addEventListener("install", installEvent => {
     console.log('Install-event');
     installEvent.waitUntil(
-        caches.open(trainerCache).then(cache => {
-            cache.addAll(assets);
-        })
+        refreshCache()
     )
 })
