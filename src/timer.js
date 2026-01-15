@@ -76,9 +76,9 @@ function generateScramble() {
             var selCaseWeights = []; // calculate the weights with which the next case is to be chosen. weights are arranged cumulatively
             for (var i = 0; i < selCasesCounts.length; i++) {
                 if (i == 0)
-                    selCaseWeights.push(selCasesCounts[i] ** 0.8);
+                    selCaseWeights.push(selCasesCounts[i] ** -0.8);
                 else
-                    selCaseWeights.push(selCaseWeights[i - 1] + selCasesCounts[i] ** 0.8);
+                    selCaseWeights.push(selCaseWeights[i - 1] + selCasesCounts[i] ** -0.8);
             }
             caseNum = weightedRandomElement(selCases, selCaseWeights)
 
