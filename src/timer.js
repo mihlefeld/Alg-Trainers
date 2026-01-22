@@ -103,7 +103,24 @@ function generateScramble() {
     if (preRotation != "") preRotation += " ";
     var postRotation = randomElement(postRotations);
     if (postRotation != "") postRotation += " ";
+
     var finalAlg = preRotation + preMove + alg + postMove + postRotation;
+    if (trainerTitle == "Square-1 PBL Trainer") {
+        var parts = (alg + postMove).split("/");
+        var firstMoveParts = parts[0].split(",");
+        var preMoveParts = preMove.split(",");
+        var preMove_u = parseInt(firstMoveParts[0]) + parseInt(preMoveParts[0]);
+        var preMove_d = parseInt(firstMoveParts[1]) + parseInt(preMoveParts[1]);
+        if (preMove_u > 6) {
+            preMove_u -= 12;
+        }
+        if (preMove_d > 6) {
+            preMove_d -= 12;
+        }
+        preMove = `${preMove_u},${preMove_d} `;
+        parts[0] = preMove;
+        var finalAlg = parts.join("/");
+    }
 
     window.lastScramble = finalAlg;
     window.lastCase = caseNum;
