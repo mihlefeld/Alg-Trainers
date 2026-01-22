@@ -2,6 +2,7 @@ img#boxImg {
     width: 100%;
     max-width: 15em;
     margin: 0.4em;
+    max-height: 15em;
 }
 
 .prevNext {
@@ -14,9 +15,10 @@ textarea:disabled {
     background-color: var(--background);
     color: var(--text);
     font: inherit;
-    overflow: hidden;
+    overflow-y: scroll;
     width: auto;
-    height: fit-content;
+    max-height: 8lh;
+    height: 8lh;
     resize: none;
     border-radius: var(--borderRadius);
     border-color: transparent;
@@ -28,7 +30,7 @@ textarea:enabled {
     color: var(--text);
     font: inherit;
     width: auto;
-    height: fit-content;
+    height: 5lh;
     border-radius: var(--borderRadius);
     border-color: var(--text);
     border-width: var(--borderWidth);

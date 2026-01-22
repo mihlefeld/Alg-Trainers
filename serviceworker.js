@@ -21,7 +21,7 @@ var assets = [
   "https://colorjs.io/dist/color.global.js",
   "https://cdn.jsdelivr.net/npm/chart.js"
 ];
-const trainerCache = "alg-trainer-cache-1.4.8";
+const trainerCache = "alg-trainer-cache-1.4.9";
 
 function refreshCache() {
   for (key of caches.keys()) {
