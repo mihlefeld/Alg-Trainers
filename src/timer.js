@@ -316,7 +316,11 @@ function renderHint(i) {
     document.getElementById('prevButton').style.opacity = i == 1 ? 0 : 1;
     document.getElementById('nextButton').style.opacity = i == Object.keys(algsInfo).length ? 0 : 1;
     document.getElementById("boxalg").innerHTML = algsStr;
-    document.getElementById("boxsetup").innerHTML = "Setup:<br/>" + scramblesMap[i][0];
+    if (scramblesMap[i]) {
+        document.getElementById("boxsetup").innerHTML = "Setup:<br/>" + scramblesMap[i][0];
+    } else {
+        document.getElementById("boxsetup").innerHTML = "Setup:<br/>";
+    }
     document.getElementById("boxImg").src = blobUrls[i];
 }
 
