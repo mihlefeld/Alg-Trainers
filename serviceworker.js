@@ -21,7 +21,7 @@ var assets = [
   "https://colorjs.io/dist/color.global.js",
   "https://cdn.jsdelivr.net/npm/chart.js"
 ];
-const trainerCache = "alg-trainer-cache-1.4.9";
+const trainerCache = "alg-trainer-cache-1.4.10";
 
 function refreshCache() {
   for (key of caches.keys()) {
@@ -73,7 +73,8 @@ var algsInTrainers = {
     'Octaminx-TCP-Trainer': 18,
     'Octaminx-L3T-Trainer': 12,
     '3x3-ZBLL-Trainer': 472,
-    '3x3-OH-ZBLL-Trainer': 472
+    '3x3-OH-ZBLL-Trainer': 472,
+    'Sq1-PBL-Trainer': 967
 };
 
 for (const [trainer, algs] of Object.entries(algsInTrainers)) {
