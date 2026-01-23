@@ -344,6 +344,7 @@ function renderHint(i) {
 function showHint(element, i) {
     renderHint(i);
     hintCase = i;
+    console.log(hintCase)
     openDialog('hintWindow');
 }
 
@@ -392,7 +393,9 @@ function uploadCustomAlgs() {
 
 function nextCase() {
     var length = Object.keys(algsInfo).length;
+    console.log(`before ${length} ${hintCase}`)
     hintCase = Math.min(hintCase + 1, length);
+    console.log(`after ${length} ${hintCase}`)
     renderHint(hintCase);
 }
 
@@ -445,7 +448,6 @@ function displayStats() {
             meanForCase *= i / (i + 1);
             meanForCase += resultsByCase[case_][i]["ms"] / (i + 1);
         }
-        // s += `<div class='timeEntry'><div><span class='caseNameStats' onclick='showHint(this, ${keys[j]})'>${algsInfo[case_]["algset"]} ${algsInfo[case_]["name"]}</span> (⌀${msToHumanReadable(meanForCase)}):</div> ${timesString} </div>`;
         s += `<div class='timeEntry'><span class='caseNameStats' onclick='showHint(this, ${keys[j]})'>${algsInfo[case_]["algset"]} ${algsInfo[case_]["name"]}</span>`
         s += ` <span class='caseNameStats' onclick=(showCaseTimeDetails(${case_}))>(#${resultsByCase[case_].length}, ⌀${msToHumanReadable(meanForCase)})</span></div>`;
     }

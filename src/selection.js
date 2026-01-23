@@ -189,10 +189,9 @@ function makeDivNormal(groupname) {
     for (var j = 0; j < indeces.length; j++) {
         var i = indeces[j]; // case number
         var sel = (selCases.indexOf(i) != -1);
-        // var dblclick = isMobile() ? ` ontouchstart='touchstart(event, () => {console.log("test"); showHint(null, ${i})})' ontouchend='touchend(${i})' ` : "ondblclick='showHint(this, " + i + ")'";
-        var dblclick =` oncontextmenu='showHint(this, "${i}"); return false;' `;
+        var dblclick =` oncontextmenu='showHint(this, ${i}); return false;' `;
         if (!isMobile()) {
-            dblclick += ` ondblclick='showHint(this, "${i}")'`;
+            dblclick += ` ondblclick='showHint(this, ${i})'`;
         }
         allSelected &= sel;
 
