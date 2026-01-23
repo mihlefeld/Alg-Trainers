@@ -4,8 +4,21 @@ div.itemSel {
     touch-action: manipulation;
     border-color: var(--accent);
     color: var(--accentText);
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+    align-items: center;
 }
 
+div.itemSel > {
+    font-size: small;
+    font-weight: bold;
+}
+
+div.itemUnSel > {
+    font-size: small;
+    font-weight: bold;
+}
 
 div.itemUnsel {
     background-color: transparent;
@@ -14,6 +27,10 @@ div.itemUnsel {
     background-color: var(--secondary);
     border-color: var(--secondary);
     color: var(--secondaryText);
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+    align-items: center;
 }
 
 div#cases_selection {
@@ -24,6 +41,11 @@ div#cases_selection {
 
 img.caseImage {
     width: 5em;
+}
+
+span.caseSpan {
+    width: 5em;
+    text-align: center;
 }
 
 .version {

@@ -21,7 +21,7 @@ var assets = [
   "https://colorjs.io/dist/color.global.js",
   "https://cdn.jsdelivr.net/npm/chart.js"
 ];
-const trainerCache = "alg-trainer-cache-1.4.10.2";
+const trainerCache = "alg-trainer-cache-1.4.11";
 
 function refreshCache() {
   for (key of caches.keys()) {
@@ -56,25 +56,29 @@ self.addEventListener('fetch', (event) => {
 });
 
 var algsInTrainers = {
-    'Megaminx-OLL-Trainer': 259, 
-    'Megaminx-PLL-Trainer': 151, 
-    'Pyraminx-L4E-Trainer': 35, 
-    'Skewb-NS2-Trainer': 267,
-    '2x2-TCLL-Trainer': 86,
-    '2x2-LS-Trainer': 486,
-    '2x2-FH-Trainer': 172,
-    '2x2-EG-Trainer': 160,
-    '2x2-TEG-Trainer': 516,
-    '3x3-OLL-Trainer': 57,
-    '3x3-PLL-Trainer': 21,
-    '3x3-OH-PLL-Trainer': 21,
-    '3x3-CMLL-Trainer': 42,
-    '3x3-OH-CMLL-Trainer': 42,
-    'Octaminx-TCP-Trainer': 18,
-    'Octaminx-L3T-Trainer': 12,
-    '3x3-ZBLL-Trainer': 472,
-    '3x3-OH-ZBLL-Trainer': 472,
-    'Sq1-PBL-Trainer': 967
+  '2x2-EG-Trainer': 160,
+  '2x2-FH-Trainer': 172,
+  '2x2-LS-Trainer': 486,
+  '2x2-TCLL-Trainer': 86,
+  '2x2-TEG-Trainer': 516,
+  '3x3-CMLL-Trainer': 42,
+  '3x3-OH-PLL-Trainer': 21,
+  '3x3-OH-CMLL-Trainer': 42,
+  '3x3-OH-OLL-Trainer': 57,
+  '3x3-OH-PLL-Trainer': 21,
+  '3x3-OH-ZBLL-Trainer': 472,
+  '3x3-OLL-Trainer': 57,
+  '3x3-PLL-Trainer': 21,
+  '3x3-ZBLL-Trainer': 472,
+  '3x3-ZBLS-Trainer': 302,
+  '5x5-L2E-Trainer': 15,
+  'Megaminx-OLL-Trainer': 259, 
+  'Megaminx-PLL-Trainer': 151, 
+  'Octaminx-TCP-Trainer': 18,
+  'Octaminx-L3T-Trainer': 12,
+  'Pyraminx-L4E-Trainer': 35, 
+  'Skewb-NS2-Trainer': 267,
+  'Sq1-PBL-Trainer': 967
 };
 
 for (const [trainer, algs] of Object.entries(algsInTrainers)) {

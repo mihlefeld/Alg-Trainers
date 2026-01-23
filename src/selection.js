@@ -188,8 +188,15 @@ function makeDivNormal(groupname) {
         var sel = (selCases.indexOf(i) != -1);
         var dblclick = isMobile() ? ` ontouchstart='touchstart(event, () => {console.log("test"); showHint(null, ${i})})' ontouchend='touchend(${i})' ` : "ondblclick='showHint(this, " + i + ")'";
         allSelected &= sel;
-        s += "<div id='itemTd" + i + "' " + dblclick  + " onclick='itemClicked(" + i + ")' class='" + (sel ? "itemSel" : "itemUnsel") + " borderedContainer' title='" + algsInfo[i]["name"] + "'>" +
-            `<img oncontextmenu='return false;' class='caseImage' id='sel${i}' src='${blobUrls[i]}' ></div>`;
+        // s += "<div id='itemTd" + i + "' " + dblclick  + " onclick='itemClicked(" + i + ")' class='" + (sel ? "itemSel" : "itemUnsel") + " borderedContainer' title='" + algsInfo[i]["name"] + "'>" +
+        //     `<img oncontextmenu='return false;' class='caseImage' id='sel${i}' src='${blobUrls[i]}' ></div>`;
+        var alg_name = algsInfo[i]["name"];
+        if (trainerTitle == "Square-1 PBL Trainer") {
+            var content = `<span class='caseSpan'>${algsInfo[i]["name"]}</span>`;
+        } else {
+            var content = `<img oncontextmenu='return false;' class='caseImage' id='sel${i}' src='${blobUrls[i]}'>`;
+        }
+        s += `<div id='itemTd${i}' ${dblclick} onclick='itemClicked(${i})' class='${(sel ? "itemSel" : "itemUnsel")} borderedContainer' title='${alg_name}' name='${alg_name}'>${content}</div>`
     }
     s = "<div class='colFlex' style='width: fit-content'> <div class='borderedContainer " + (allSelected ? "itemSel" : "itemUnsel") + " pad groupNameDiv'" + s;
     s += "</div></div>";
