@@ -1,4 +1,14 @@
 var dialogOpen = false;
+var dialogOpenId = null;
+
+function closeDialog(id) {
+    var dialog = document.getElementById(id);
+    dialog.close();
+    dialogOpen = false;
+    dialogOpenId = null;
+    window.allowStartingTimer = true;
+    document.activeElement.blur();
+}
 
 function openDialog(id) {
     if (id == 'settings') {
@@ -10,6 +20,7 @@ function openDialog(id) {
     document.getElementById(id).showModal();
     dialogOpen = true;
     window.allowStartingTimer = false;
+    dialogOpenId = id;
 }
 
 
@@ -20,7 +31,9 @@ function dialogClick(event, dialog) {
     if (!isInDialog) {
         dialog.close();
         dialogOpen = false;
+        dialogOpenId = null;
         window.allowStartingTimer = true;
+        document.activeElement.blur();
     }
 }
 

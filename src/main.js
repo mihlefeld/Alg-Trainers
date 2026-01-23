@@ -77,7 +77,11 @@ function main() {
         }
 
         if (event.code == "KeyH" && !running) {
-            showHint(null, window.lastCase);
+            console.log(event.target)
+            if (event.target.id != "hintWindow" && dialogOpenId != "hintWindow" && !dialogOpen) {
+                console.log("Open dialog", dialogOpenId, dialogOpen)
+                showHint(null, window.lastCase);
+            }
         }
 
         if (!allowed || !window.allowStartingTimer)

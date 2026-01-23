@@ -8,6 +8,11 @@ div.itemSel {
     flex-direction: column;
     gap: 0;
     align-items: center;
+    -webkit-user-select: none; /* Safari */        
+    -moz-user-select: none; /* Firefox */
+    -ms-user-select: none; /* IE10+/Edge */
+    user-select: none; /* Standard */
+
 }
 
 div.itemSel > {
@@ -31,6 +36,10 @@ div.itemUnsel {
     flex-direction: column;
     gap: 0;
     align-items: center;
+    -webkit-user-select: none; /* Safari */        
+    -moz-user-select: none; /* Firefox */
+    -ms-user-select: none; /* IE10+/Edge */
+    user-select: none; /* Standard */
 }
 
 div#cases_selection {

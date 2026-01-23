@@ -186,10 +186,13 @@ function makeDivNormal(groupname) {
     for (var j = 0; j < indeces.length; j++) {
         var i = indeces[j]; // case number
         var sel = (selCases.indexOf(i) != -1);
-        var dblclick = isMobile() ? ` ontouchstart='touchstart(event, () => {console.log("test"); showHint(null, ${i})})' ontouchend='touchend(${i})' ` : "ondblclick='showHint(this, " + i + ")'";
+        // var dblclick = isMobile() ? ` ontouchstart='touchstart(event, () => {console.log("test"); showHint(null, ${i})})' ontouchend='touchend(${i})' ` : "ondblclick='showHint(this, " + i + ")'";
+        var dblclick =` oncontextmenu='showHint(this, "${i}"); return false;' `;
+        if (!isMobile()) {
+            dblclick += ` ondblclick='showHint(this, "${i}")'`;
+        }
         allSelected &= sel;
-        // s += "<div id='itemTd" + i + "' " + dblclick  + " onclick='itemClicked(" + i + ")' class='" + (sel ? "itemSel" : "itemUnsel") + " borderedContainer' title='" + algsInfo[i]["name"] + "'>" +
-        //     `<img oncontextmenu='return false;' class='caseImage' id='sel${i}' src='${blobUrls[i]}' ></div>`;
+
         var alg_name = algsInfo[i]["name"];
         if (trainerTitle == "Square-1 PBL Trainer") {
             var content = `<span class='caseSpan'>${algsInfo[i]["name"]}</span>`;

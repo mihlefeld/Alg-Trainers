@@ -60,14 +60,14 @@
 		</div>
 		<div class="borderedContainer colFlex pad center" style="background-color: var(--backgroundDarker);">
 			<div id="presetsSettings" class="colFlex" style="width: fit-content; max-width: 100%;"></div>
-			<div style="width: 100%; display: flex; justify-content: space-between; align-items: end;"><span class="version">v1.4.11</span><a onclick="openDialog('aboutDialog')">credits</a></div>
+			<div style="width: 100%; display: flex; justify-content: space-between; align-items: end;"><span class="version">v1.4.12</span><a onclick="openDialog('aboutDialog')">credits</a></div>
 		</div>
 		<div id="cases_selection" style="width: 100%;" class="colFlex">
 		</div>
 	</div> <!-- selection layout -->
 
 
-	<dialog id='hintWindow' class="colFlex" onclick="dialogClick(event, this)" autofocus=''>
+	<dialog id='hintWindow' class="colFlex" onclick="dialogClick(event, this)" onkeydown="if(dialogOpen && event.target.id == 'hintWindow' && event.code == 'KeyH') {closeDialog(dialogOpenId);}" autofocus=''>
 		<div class="dialogDiv colFlex borderedContainer">
 			<span onclick="this.parentElement.parentElement.close()" class="material-symbols-outlined abutton closeButton">Close</span>
 			<div class="borderedContainer rowFlex pad center" style="justify-content: space-between;">
