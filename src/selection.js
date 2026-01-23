@@ -7,11 +7,14 @@ var selectionPresets = {
 }
 
 function getAlgsetIds(algset) {
-    var algsetIds = []
-    for (const group of algsets[algset]) {
-        algsetIds = algsetIds.concat(algsGroups[group]);
+    if (algsets[algset]) {
+        var algsetIds = []
+        for (const group of algsets[algset]) {
+            algsetIds = algsetIds.concat(algsGroups[group]);
+        }
+        return algsetIds;
     }
-    return algsetIds;
+    return [];
 }
 
 function getAllValidGroups() {
@@ -351,8 +354,14 @@ function loadSelection() {
     if (cases != null)
         selCases = JSON.parse(cases);
     var loadedAlgSets = loadLocal(selectionArrayKey + "AlgSets");
-    if (loadedAlgSets != null) 
-        selectedAlgSets = JSON.parse(loadedAlgSets);
+    if (loadedAlgSets != null)  {
+        tempAlgset = JSON.parse(loadedAlgSets);
+        for (const [algset, isShown] of Object.entries(selectedAlgSets)) {
+            if (tempAlgset[algset]) {
+                selectedAlgSets[algset] = tempAlgset[algset];
+            }
+        }
+    }
     var preset = localStorage.getItem(selectionArrayKey + 'Presets')
     if (preset != null) {
         selectionPresets = JSON.parse(preset);
