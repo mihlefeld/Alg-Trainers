@@ -12,6 +12,7 @@ function openDialog(id) {
     window.allowStartingTimer = false;
 }
 
+
 function dialogClick(event, dialog) {
     var rect = dialog.getBoundingClientRect();
     var isInDialog = (rect.top <= event.clientY && event.clientY <= rect.top + rect.height &&

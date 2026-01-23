@@ -69,6 +69,7 @@
 
 	<dialog id='hintWindow' class="colFlex" onclick="dialogClick(event, this)" autofocus=''>
 		<div class="dialogDiv colFlex borderedContainer">
+			<span onclick="this.parentElement.parentElement.close()" class="material-symbols-outlined abutton closeButton">Close</span>
 			<div class="borderedContainer rowFlex pad center" style="justify-content: space-between;">
 				<span id='prevButton' onclick="previousCase()"
 					class="material-symbols-outlined abutton prevNext">arrow_back</span>
@@ -105,6 +106,7 @@
 
 	<dialog id="caseTimeDetails" class="colFlex" onclick="dialogClick(event, this)" autofocus="">
 		<div class="dialogDiv colFlex borderedContainer">
+			<span onclick="this.parentElement.parentElement.close()" class="material-symbols-outlined abutton closeButton">Close</span>
 			<div class="borderedContainer pad">
 				<canvas id="timeHistogram"></canvas>
 			</div>
@@ -121,6 +123,7 @@
 
 	<dialog id="settings" class='colFlex borderedContainer' autofocus="">
 		<div class="dialogDiv colFlex borderedContainer">
+			<span onclick="this.parentElement.parentElement.close()" class="material-symbols-outlined abutton closeButton">Close</span>
 			<div class="settingsEntry">
 				<div>Weighted choice</div>
 				<!-- Rounded switch -->
@@ -261,6 +264,7 @@
 	</dialog>
 	<dialog id="aboutDialog" onclick="dialogClick(event, this)" autofocus=''>
 		<div class="dialogDiv colFlex borderedContainer">
+			<span onclick="this.parentElement.parentElement.close()" class="material-symbols-outlined abutton closeButton">Close</span>
 			<div class="borderedContainer pad rowFlex" style="flex-wrap: wrap; gap: 2em">
 				<div class="colFlex">
 					<span>Alg-sheets</span>

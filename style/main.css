@@ -180,6 +180,15 @@ html {
     align-items: center;
 }
 
+.closeButton {
+    background-color: var(--accent);
+    border-color: var(--accent);
+    color: var(--accentText);
+    font-size: unset !important;
+    height: 0.2em;
+    width: auto !important;
+}
+
 .largeButton {
     font-size: 2.8em !important; 
     margin: 0em !important;
@@ -202,6 +211,14 @@ html {
     box-shadow: 0px 0px 5px var(--primaryBGHover);
     background-color: var(--primaryBGHover);
     border-color: var(--primaryBGHover);
+}
+
+.closeButton:hover {
+    transform: translateY(-0.05em);
+    box-shadow: 0px 0px 5px var(--accentHover);
+    background-color: var(--accentHover);
+    border-color: var(--accentHover);
+    color: var(--accentText);
 }
 
 .abutton:focus {
