@@ -35,7 +35,9 @@ var defaultSettings = {
         "purple": "#B07AA1",
         "orange": "#F28E2B"
     },
-    'selectedAlgSets': {}
+    'selectedAlgSets': {},
+    'letterSchemeCorners': "abcdefghijklmnopqrstuvwx",
+    'letterSchemeEdges': "abcdefghijklmnopqrstuvwx"
 };
 
 var defaultCubeColors = {
@@ -112,6 +114,23 @@ function toOklchStr(color) {
     return s;
 }
 
+function get_translated_letter(original_letterscheme, custom_letterscheme, letter) {
+    var oi = original_letterscheme.indexOf(letter);
+    if (custom_letterscheme.length > oi) {
+        return custom_letterscheme[oi]
+    } else {
+        return original_letterscheme[oi]
+    }
+}
+
+function translate_blind_letter_pair(original_letterscheme, custom_letterscheme, letter_pair) {
+    var original_letterscheme = original_letterscheme.toLowerCase()
+    var custom_letterscheme = custom_letterscheme.toLowerCase()
+    var letter_pair = letter_pair.toLowerCase();
+    if (letter_pair.length == 1)
+        return get_translated_letter(original_letterscheme, custom_letterscheme, letter_pair[0]).toUpperCase();
+    return (get_translated_letter(original_letterscheme, custom_letterscheme, letter_pair[0]) + get_translated_letter(original_letterscheme, custom_letterscheme, letter_pair[1])).toUpperCase();
+}
 
 function computeColors() {
     var body = document.body;
@@ -187,6 +206,8 @@ function applySettings() {
         document.getElementById('timer').style.fontSize = currentSettings['timerSize'] + "em";
         document.getElementById('scramble').style.fontSize = currentSettings['scrambleSize'] + "em";
         document.getElementById("weighted_choice_on_off").checked = currentSettings['weightedChoice'];
+        document.getElementById('cornerSchemeInput').value = currentSettings['letterSchemeCorners'];
+        document.getElementById('edgeSchemeInput').value = currentSettings['letterSchemeEdges'];
     } catch(e) {}
     document.body.style.fontSize = currentSettings['baseSize'] + "em";
     computeColors();
@@ -226,13 +247,18 @@ function changeCubeColor(event, key) {
     saveSettings();
 }
 
+function changeSettingsKey(event, key) {
+    console.log(key, event.srcElement.value);
+    currentSettings[key] = event.srcElement.value;
+    saveSettings();
+}
+
 function resetCubeColors(key) {
     for ([key, value] of Object.entries(defaultCubeColors[key])) {
         changeUiElementColor(document.getElementById(`cc-${key}`), value);
         currentSettings['cubecolors'][key] = value;
     }
-    saveSettings()
-
+    saveSettings();
 }
 
 function resetStyle(dark) {

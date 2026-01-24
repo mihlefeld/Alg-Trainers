@@ -1,3 +1,4 @@
+
 var selCases = [1, 2];
 var selectionPresets = {
     "Default": {
@@ -73,26 +74,31 @@ function updateTitle() {
     document.getElementById("csi").innerHTML = selCases.length;
 }
 
-function itemClicked(i) {
-    if (window.scramblesMap[i] == null) {
-        console.error("is null");
+function setSelectionStatus(i, index, active) {
+    if (!active && index < 0) {
+        console.log("nothing to do", i, index, active)
+        return;
+    } 
+    if (active && index >= 0) {
+        console.log("nothing to do", i, index, active)
         return;
     }
-
-    var index = selCases.indexOf(i);
-    var wasSelected = (index != -1);
-    if (wasSelected)
+    if (!active) {
+        console.log("removing case", i, index, active);
         selCases.splice(index, 1);
-    else
+    } else {
+        console.log("addingCase", i, index, active);
         selCases.push(i);
+    }
     var element = document.getElementById("itemTd" + i);
-    element.className = (wasSelected ? "itemUnsel" : "itemSel") + " borderedContainer";
+    element.className = (active ? "itemSel" : "itemUnsel") + " borderedContainer";
+    console.log("new classname ", (active ? "itemSel" : "itemUnsel") + " borderedContainer")
     var groupElement = element.parentElement.previousElementSibling;
     var groupWasSelected = groupElement.classList[1] == 'itemSel';
-    if (groupWasSelected && wasSelected) {
+    if (groupWasSelected && !active) {
         groupElement.className = 'borderedContainer itemUnsel pad groupNameDiv';
     }
-    if (!groupWasSelected && !wasSelected) {
+    if (!groupWasSelected && active) {
         var groupElements = element.parentElement.childNodes;
         var selectedCount = 0;
         for (var i = 0; i < groupElements.length; i++) {
@@ -102,6 +108,36 @@ function itemClicked(i) {
             groupElement.className = 'borderedContainer itemSel pad groupNameDiv';
         }
     }
+    return active;
+}
+
+function matchInverseSelectionIfNecessary(caseId, matchGoal) {
+    if (trainerTitle.includes("BLD")) {
+        var alg_name = algsInfo[caseId]['name'];
+        var inverse_group = alg_name[1];
+        var group_candidates = algsGroups[inverse_group];
+        for (inverseCaseId of group_candidates) {
+            if (algsInfo[inverseCaseId]['name'][1] == alg_name[0]) {
+                var selCaseIndex = selCases.indexOf(inverseCaseId);
+                console.log("matching selection", caseId, selCaseIndex, matchGoal)
+                setSelectionStatus(inverseCaseId, selCaseIndex, matchGoal);
+                break;
+            }
+        }
+    }
+}
+
+function itemClicked(i) {
+    if (window.scramblesMap[i] == null) {
+        console.error("is null");
+        return;
+    }
+    var index = selCases.indexOf(i);
+    var wasSelected = (index >= 0); // if it was selected the index will be >= 0
+    console.log("wasSelected", wasSelected, index, i);
+    setSelectionStatus(i, index, !wasSelected); // if it was seleted, we want to deselect, otherwise select
+    matchInverseSelectionIfNecessary(i, !wasSelected);
+
     saveSelection();
     updateTitle();
 }
@@ -137,18 +173,11 @@ function selectCaseGroup(name) {
     var allSelected = areAllSelected(name);
     var indeces = algsGroups[name];
     var firstChild = document.getElementById(`itemTd${indeces[0]}`);
-    var elements = firstChild.parentElement.childNodes;
     var groupNameDiv = firstChild.parentElement.previousSibling;
     for (var i = 0; i < indeces.length; i++) {
         var j = selCases.indexOf(indeces[i]);
-        if (allSelected && j != -1) { // need to delete
-            selCases.splice(j, 1);
-            elements[i].className = 'itemUnsel borderedContainer';
-        }
-        if (!allSelected && j == -1) { // need to add
-            selCases.push(indeces[i]);
-            elements[i].className = 'itemSel borderedContainer';
-        }
+        setSelectionStatus(indeces[i], j, !allSelected);
+        matchInverseSelectionIfNecessary(indeces[i], !allSelected);
     }
     if (allSelected) {
         groupNameDiv.className = 'borderedContainer itemUnsel pad groupNameDiv';
@@ -198,7 +227,12 @@ function makeDivNormal(groupname) {
         var alg_name = algsInfo[i]["name"];
         if (trainerTitle == "Square-1 PBL Trainer") {
             var content = `<span class='caseSpan'>${algsInfo[i]["name"]}</span>`;
-        } else if (trainerTitle.includes("Square-1")) {
+        } else if ( trainerTitle.includes("BLD") ) {
+            var key = trainerTitle.includes("UFR") ? 'letterSchemeCorners' : 'letterSchemeEdges';
+            var alg_name = translate_blind_letter_pair(defaultSettings[key], currentSettings[key], algsInfo[i]["name"])
+            var content = `<span class='caseSpan'>${alg_name}</span>`;
+        }
+        else if (trainerTitle.includes("Square-1")) {
             var content = `<span class='caseSpan'>${algsInfo[i]["name"]}</span><img oncontextmenu='return false;' class='caseImage' id='sel${i}' src='${blobUrls[i]}'>`;
         } else {
             var content = `<img oncontextmenu='return false;' class='caseImage' id='sel${i}' src='${blobUrls[i]}'>`;

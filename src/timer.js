@@ -121,6 +121,10 @@ function generateScramble() {
         parts[0] = preMove;
         var finalAlg = parts.join("/");
     }
+    if (trainerTitle.includes("BLD")) {
+        var key = trainerTitle.includes("UFR") ? 'letterSchemeCorners' : 'letterSchemeEdges';
+        finalAlg = alg_name = translate_blind_letter_pair(defaultSettings[key], currentSettings[key], alg)
+    }
 
     window.lastScramble = finalAlg;
     window.lastCase = caseNum;
@@ -316,7 +320,18 @@ function editAlg() {
 
 function renderHint(i) {
     document.getElementById('editAlgButton').innerText = "edit"
-    document.getElementById("boxTitle").innerHTML = `${algsInfo[i]['algset']} ${algsInfo[i]['group']} ${algsInfo[i]['name']}`;
+    var setup = scramblesMap[i];
+    if (trainerTitle.includes("BLD")) {
+        var key = trainerTitle.includes("UFR") ? 'letterSchemeCorners' : 'letterSchemeEdges';
+        var group = translate_blind_letter_pair(defaultSettings[key], currentSettings[key], algsInfo[i]['group']);
+        var name = translate_blind_letter_pair(defaultSettings[key], currentSettings[key], algsInfo[i]['name']);
+        if (setup) {
+            setup = translate_blind_letter_pair(defaultSettings[key], currentSettings[key], setup[0]);
+        }
+        document.getElementById("boxTitle").innerHTML = `${algsInfo[i]['algset']} ${group} ${name}`;
+    } else {
+        document.getElementById("boxTitle").innerHTML = `${algsInfo[i]['algset']} ${algsInfo[i]['group']} ${algsInfo[i]['name']}`;
+    }
     var longestAlgLength = 0;
     var currentAlgs = algsInfo[i]["a"]
     if (i in customAlgs) {
@@ -333,8 +348,8 @@ function renderHint(i) {
     document.getElementById('prevButton').style.opacity = i == 1 ? 0 : 1;
     document.getElementById('nextButton').style.opacity = i == Object.keys(algsInfo).length ? 0 : 1;
     document.getElementById("boxalg").innerHTML = algsStr;
-    if (scramblesMap[i]) {
-        document.getElementById("boxsetup").innerHTML = "Setup:<br/>" + scramblesMap[i][0];
+    if (setup) {
+        document.getElementById("boxsetup").innerHTML = "Setup:<br/>" + setup;
     } else {
         document.getElementById("boxsetup").innerHTML = "Setup:<br/>";
     }
@@ -448,7 +463,12 @@ function displayStats() {
             meanForCase *= i / (i + 1);
             meanForCase += resultsByCase[case_][i]["ms"] / (i + 1);
         }
-        s += `<div class='timeEntry'><span class='caseNameStats' onclick='showHint(this, ${keys[j]})'>${algsInfo[case_]["algset"]} ${algsInfo[case_]["name"]}</span>`
+        alg_name = algsInfo[case_]["name"];
+        if (trainerTitle.includes("BLD")) {
+            var key = trainerTitle.includes("UFR") ? 'letterSchemeCorners' : 'letterSchemeEdges';
+            alg_name = translate_blind_letter_pair(defaultSettings[key], currentSettings[key], algsInfo[case_]["name"]);
+        } 
+        s += `<div class='timeEntry'><span class='caseNameStats' onclick='showHint(this, ${keys[j]})'>${algsInfo[case_]["algset"]} ${alg_name}</span>`
         s += ` <span class='caseNameStats' onclick=(showCaseTimeDetails(${case_}))>(#${resultsByCase[case_].length}, ⌀${msToHumanReadable(meanForCase)})</span></div>`;
     }
     el.innerHTML = s;

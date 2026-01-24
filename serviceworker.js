@@ -21,16 +21,18 @@ var assets = [
   "https://colorjs.io/dist/color.global.js",
   "https://cdn.jsdelivr.net/npm/chart.js"
 ];
-const trainerCache = "alg-trainer-cache-1.4.13";
+const trainerCache = "alg-trainer-cache-1.5.0";
 
 function refreshCache() {
-  for (key of caches.keys()) {
-    if (key != trainerCache) {
-      caches.delete(key);
+  caches.keys().then((keys) => {
+    for (key of keys) {
+      if (key != trainerCache) {
+        caches.delete(key);
+      }
     }
-  }
-  caches.open(trainerCache).then((cache) => {
-    cache.addAll(assets)
+    caches.open(trainerCache).then((cache) => {
+      cache.addAll(assets);
+    })
   })
 }
 
@@ -61,6 +63,8 @@ var algsInTrainers = {
   '2x2-LS-Trainer': 486,
   '2x2-TCLL-Trainer': 86,
   '2x2-TEG-Trainer': 516,
+  '3x3-BLD-UFR-Trainer': 378,
+  '3x3-BLD-UF-Trainer': 440,
   '3x3-CMLL-Trainer': 42,
   '3x3-OH-PLL-Trainer': 21,
   '3x3-OH-CMLL-Trainer': 42,

@@ -1,0 +1,9 @@
+const timesArrayKey = "3x3bldufrTimes";
+const selectionArrayKey = "3x3bldufrSelection";
+var trainerTitle = "3x3 BLD UF Trainer";
+var preRotations = [''];
+var postRotations = [''];
+var preMoves = [""];
+var postMoves = preMoves;
+var selCases = [];
+var maxAlgsPerRow = 7;
