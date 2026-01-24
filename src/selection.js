@@ -198,6 +198,8 @@ function makeDivNormal(groupname) {
         var alg_name = algsInfo[i]["name"];
         if (trainerTitle == "Square-1 PBL Trainer") {
             var content = `<span class='caseSpan'>${algsInfo[i]["name"]}</span>`;
+        } else if (trainerTitle.includes("Square-1")) {
+            var content = `<span class='caseSpan'>${algsInfo[i]["name"]}</span><img oncontextmenu='return false;' class='caseImage' id='sel${i}' src='${blobUrls[i]}'>`;
         } else {
             var content = `<img oncontextmenu='return false;' class='caseImage' id='sel${i}' src='${blobUrls[i]}'>`;
         }

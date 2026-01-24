@@ -105,7 +105,7 @@ function generateScramble() {
     if (postRotation != "") postRotation += " ";
 
     var finalAlg = preRotation + preMove + alg + postMove + postRotation;
-    if (trainerTitle == "Square-1 PBL Trainer") {
+    if (trainerTitle.includes("Square-1")) {
         var parts = (alg + postMove).split("/");
         var firstMoveParts = parts[0].split(",");
         var preMoveParts = preMove.split(",");
