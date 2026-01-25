@@ -326,7 +326,7 @@ function renderHint(i) {
         var group = translate_blind_letter_pair(defaultSettings[key], currentSettings[key], algsInfo[i]['group']);
         var name = translate_blind_letter_pair(defaultSettings[key], currentSettings[key], algsInfo[i]['name']);
         if (setup) {
-            setup = translate_blind_letter_pair(defaultSettings[key], currentSettings[key], setup[0]);
+            setup = [translate_blind_letter_pair(defaultSettings[key], currentSettings[key], setup[0])];
         }
         document.getElementById("boxTitle").innerHTML = `${algsInfo[i]['algset']} ${group} ${name}`;
     } else {
@@ -349,7 +349,7 @@ function renderHint(i) {
     document.getElementById('nextButton').style.opacity = i == Object.keys(algsInfo).length ? 0 : 1;
     document.getElementById("boxalg").innerHTML = algsStr;
     if (setup) {
-        document.getElementById("boxsetup").innerHTML = "Setup:<br/>" + setup;
+        document.getElementById("boxsetup").innerHTML = "Setup:<br/>" + setup[0];
     } else {
         document.getElementById("boxsetup").innerHTML = "Setup:<br/>";
     }
