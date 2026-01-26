@@ -46,12 +46,12 @@ function bookmarkCase(i) {
     if (!selectionPresets['Bookmarks']) {
         selectionPresets['Bookmarks'] = {
             'selCases': [],
-            'selectedAlgsets': {}
+            'selectedAlgSets': {}
         };
     }
     var preset = selectionPresets['Bookmarks'];
     var presetSelcases = preset['selCases'];
-    var presetAlgsets = preset['selectedAlgsets'];
+    var presetAlgsets = preset['selectedAlgSets'];
     var algset = algsInfo[i]['algset'];
     var caseIndex = presetSelcases.indexOf(i);
     if (caseIndex >= 0) {
@@ -60,7 +60,7 @@ function bookmarkCase(i) {
         for (const caseId of presetSelcases) {
             algsetsInSel[algsInfo[caseId]['algset']] = true;
         }
-        preset['selectedAlgsets'] = algsetsInSel;
+        preset['selectedAlgSets'] = algsetsInSel;
         document.getElementById('bookmarkButton').innerText = "bookmark_add";
         if (presetSelcases.length == 0) {
             delete selectionPresets['Bookmarks'];
