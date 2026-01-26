@@ -299,23 +299,44 @@ input:checked+.slider:before {
 }
 
 
- /* width */
- ::-webkit-scrollbar {
-    width: 0.3em;
-  }
-  
-  /* Track */
-  ::-webkit-scrollbar-track {
-    background: transparent;
-  }
-  
-  /* Handle */
-  ::-webkit-scrollbar-thumb {
-      background: var(--primary);
-      border-radius: 0.3em;
-  }
-  
-  /* Handle on hover */
-  ::-webkit-scrollbar-thumb:hover {
-    background: var(--primaryTextHover);
-  } 
+/* width */
+::-webkit-scrollbar {
+width: 0.3em;
+}
+
+/* Track */
+::-webkit-scrollbar-track {
+background: transparent;
+}
+
+/* Handle */
+::-webkit-scrollbar-thumb {
+    background: var(--primary);
+    border-radius: 0.3em;
+}
+
+/* Handle on hover */
+::-webkit-scrollbar-thumb:hover {
+background: var(--primaryTextHover);
+} 
+
+.hotkeyRow {
+    justify-content: space-between;
+}
+
+.hotkeyValue {
+    display: flex;
+    gap: 0.2em;
+}
+
+.hotkey {
+    background: white;
+    color: black;
+    padding: 0.18em 0.4em 0.2em 0.4em;
+    border-right-color: grey;
+    border-right-width: 0.2em;
+    border-right-style: solid;
+    border-bottom-color: grey;
+    border-bottom-width: 0.2em;
+    border-bottom-style: solid;
+}

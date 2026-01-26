@@ -248,7 +248,6 @@ function changeCubeColor(event, key) {
 }
 
 function changeSettingsKey(event, key) {
-    console.log(key, event.srcElement.value);
     currentSettings[key] = event.srcElement.value;
     saveSettings();
 }

@@ -43,7 +43,6 @@ function confirmUnsel(i) {
 }
 
 function bookmarkCase(i) {
-    console.log(`bookmarked ${i}`)
     if (!selectionPresets['Bookmarks']) {
         selectionPresets['Bookmarks'] = {
             'selCases': [],
@@ -77,7 +76,6 @@ function bookmarkCase(i) {
 function getBookmarkButton(i) {
     if (selectionPresets['Bookmarks']) {
         var index = selectionPresets['Bookmarks']['selCases'].indexOf(i);
-        console.log(`bookmarked index ${index}`)
         if (index >= 0) {
             return `<span id='bookmarkButton' class='material-symbols-outlined inlineButton' onclick='bookmarkCase(${i})'>bookmark_remove</span>`;
         }
@@ -98,14 +96,12 @@ function displayPracticeInfo() {
 }
 
 function generateScramble() {
-    console.log("last case", lastCase)
     if (window.lastScramble != "") {
         document.getElementById("last_scramble").innerHTML = `<span>Last scramble: ${window.lastScramble}`
-        + ` <span onclick='showHint(this,${lastCase})' class='caseNameStats'>(${algsInfo[lastCase]["name"]})</span></span><span id='last-scramble-buttons'>`
+        + ` <span id='showHintLastCaseButton' onclick='showHint(this,${lastCase})' class='caseNameStats'>(${algsInfo[lastCase]["name"]})</span></span><span id='last-scramble-buttons'>`
         + getBookmarkButton(lastCase)
         + `<span class='material-symbols-outlined inlineButton' onclick='confirmUnsel(${lastCase})'>close</span>`
         + `<span class='material-symbols-outlined inlineButton' onclick='confirmRemLast();'>undo</span></span>`;
-        console.log(getBookmarkButton(lastCase));
     }
     displayPracticeInfo();
     // get random case
@@ -134,8 +130,6 @@ function generateScramble() {
                     selCaseWeights.push(selCaseWeights[i - 1] + (selCasesCounts[i] + 0.1) ** -0.8);
             }
             caseNum = weightedRandomElement(selCases, selCaseWeights)
-
-            //console.log(selCasesCounts, expectedCount, selCaseWeights, caseNum);
         }
 
         else // random choice of next case
@@ -412,7 +406,6 @@ function renderHint(i) {
 function showHint(element, i) {
     renderHint(i);
     hintCase = i;
-    console.log(hintCase)
     openDialog('hintWindow');
 }
 
@@ -461,9 +454,7 @@ function uploadCustomAlgs() {
 
 function nextCase() {
     var length = Object.keys(algsInfo).length;
-    console.log(`before ${length} ${hintCase}`)
     hintCase = Math.min(hintCase + 1, length);
-    console.log(`after ${length} ${hintCase}`)
     renderHint(hintCase);
 }
 

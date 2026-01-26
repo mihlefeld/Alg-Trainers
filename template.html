@@ -62,7 +62,11 @@
 		</div>
 		<div class="borderedContainer colFlex pad center" style="background-color: var(--backgroundDarker);">
 			<div id="presetsSettings" class="colFlex" style="width: fit-content; max-width: 100%;"></div>
-			<div style="width: 100%; display: flex; justify-content: space-between; align-items: end;"><span class="version">v1.5.1</span><a onclick="openDialog('aboutDialog')">credits</a></div>
+			<div style="width: 100%; display: flex; justify-content: space-between; align-items: end;">
+				<a onclick="openDialog('hotkeysDialog')">Hotkeys</a>
+				<span class="version">v1.5.1</span>
+				<a onclick="openDialog('aboutDialog')">Credits</a>
+			</div>
 		</div>
 		<div id="cases_selection" style="width: 100%;" class="colFlex">
 		</div>
@@ -103,7 +107,7 @@
 			</div>
 
 		</div>
-		<div class="dialogBackground" onclick="document.getElementById('hintWindow').close()"></div>
+		<div class="dialogBackground" onclick="closeDialog('hintWindow')"></div>
 	</dialog>
 
 	<dialog id="caseTimeDetails" class="colFlex" onclick="dialogClick(event, this)" autofocus="">
@@ -120,7 +124,7 @@
 				<div id="caseTimeDetailsTimes"></div>
 			</div>
 		</div>
-		<div class="dialogBackground" onclick="document.getElementById('caseTimeDetails').close()"></div>
+		<div class="dialogBackground"></div>
 	</dialog>
 
 	<dialog id="settings" class='colFlex borderedContainer' autofocus="">
@@ -268,8 +272,37 @@
 			</div>
 			
 		</div>
-		<div class="dialogBackground" onclick="document.getElementById('settings').close()"></div>
+		<div class="dialogBackground" onclick="closeDialog('settings')"></div>
 	</dialog>
+
+	<dialog id="hotkeysDialog" onclick="dialogClick(event, this)" autofocus=''>
+		<div class="dialogDiv colFlex borderedContainer">
+			<span onclick="this.parentElement.parentElement.close()" class="material-symbols-outlined abutton closeButton">Close</span>
+			<div class="borderedContainer pad rowFlex hotkeyRow" style="flex-wrap: wrap; gap: 2em">
+				<span class="hotKeyText">Delete last time</span><span class="hotkeyValue"><kbd class="hotkey">Delete</kbd></span>
+			</div>
+			<div class="borderedContainer pad rowFlex hotkeyRow" style="flex-wrap: wrap; gap: 2em">
+				<span class="hotKeyText">Clear session</span><span class="hotkeyValue"><kbd class="hotkey">Shift</kbd><span>+</span><kbd class="hotkey">Delete</kbd></span>
+			</div>
+			<div class="borderedContainer pad rowFlex hotkeyRow" style="flex-wrap: wrap; gap: 2em">
+				<span class="hotKeyText">Remove last case from selection</span><span class="hotkeyValue"><kbd class="hotkey">R</kbd></span>
+			</div>
+			<div class="borderedContainer pad rowFlex hotkeyRow" style="flex-wrap: wrap; gap: 2em">
+				<span class="hotKeyText">Switch training mode</span><span class="hotkeyValue"><kbd class="hotkey">X</kbd></span>
+			</div>
+			<div class="borderedContainer pad rowFlex hotkeyRow" style="flex-wrap: wrap; gap: 2em">
+				<span class="hotKeyText">Bookmark case</span><span class="hotkeyValue"><kbd class="hotkey">B</kbd></span>
+			</div>
+			<div class="borderedContainer pad rowFlex hotkeyRow" style="flex-wrap: wrap; gap: 2em">
+				<span class="hotKeyText">Show hint for current case</span><span class="hotkeyValue"><kbd class="hotkey">H</kbd></span>
+			</div>
+			<div class="borderedContainer pad rowFlex hotkeyRow" style="flex-wrap: wrap; gap: 2em">
+				<span class="hotKeyText">Show hint for last case</span><span class="hotkeyValue"><kbd class="hotkey">Shift</kbd><span>+</span><kbd class="hotkey">H</kbd></span>
+			</div>
+		</div>
+		<div class="dialogBackground" onclick="closeDialog('hotkeysDialog')"></div>
+	</dialog>
+
 	<dialog id="aboutDialog" onclick="dialogClick(event, this)" autofocus=''>
 		<div class="dialogDiv colFlex borderedContainer">
 			<span onclick="this.parentElement.parentElement.close()" class="material-symbols-outlined abutton closeButton">Close</span>
@@ -304,7 +337,7 @@
 				</div>
 			</div>
 		</div>
-		<div class="dialogBackground" onclick="document.getElementById('aboutDialog').close()"></div>
+		<div class="dialogBackground" onclick="closeDialog(aboutDialog)"></div>
 	</dialog>
 </body>
 </body>

@@ -76,23 +76,18 @@ function updateTitle() {
 
 function setSelectionStatus(i, index, active) {
     if (!active && index < 0) {
-        console.log("nothing to do", i, index, active)
         return;
     } 
     if (active && index >= 0) {
-        console.log("nothing to do", i, index, active)
         return;
     }
     if (!active) {
-        console.log("removing case", i, index, active);
         selCases.splice(index, 1);
     } else {
-        console.log("addingCase", i, index, active);
         selCases.push(i);
     }
     var element = document.getElementById("itemTd" + i);
     element.className = (active ? "itemSel" : "itemUnsel") + " borderedContainer";
-    console.log("new classname ", (active ? "itemSel" : "itemUnsel") + " borderedContainer")
     var groupElement = element.parentElement.previousElementSibling;
     var groupWasSelected = groupElement.classList[1] == 'itemSel';
     if (groupWasSelected && !active) {
@@ -138,7 +133,6 @@ function itemClicked(i) {
     }
     var index = selCases.indexOf(i);
     var wasSelected = (index >= 0); // if it was selected the index will be >= 0
-    console.log("wasSelected", wasSelected, index, i);
     setSelectionStatus(i, index, !wasSelected); // if it was seleted, we want to deselect, otherwise select
     matchInverseSelectionIfNecessary(i, !wasSelected);
 

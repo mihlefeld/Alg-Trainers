@@ -78,13 +78,26 @@ function main() {
             bookmarkButton.blur();
         }
 
+        if (event.code == "KeyX" && !running & window.history.state != "select") {
+            if (window.history.state == "recap") {
+                changeMode("train");
+            } else {
+                changeMode("recap");
+            }
+        }
+
+
         if (event.target.tagName == "INPUT") {
             return;
         }
 
         if (event.code == "KeyH" && !running && window.history.state != "select") {
             if (event.target.id != "hintWindow" && dialogOpenId != "hintWindow" && !dialogOpen) {
-                showHint(null, window.lastCase);
+                if (event.shiftKey) {
+                    document.getElementById("showHintLastCaseButton").click();
+                } else {
+                    showHint(null, window.lastCase);
+                }
             }
         }
 
