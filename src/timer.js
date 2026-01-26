@@ -29,13 +29,60 @@ function randomElement(arr) {
 
 function confirmUnsel(i) {
     if (confirm("Do you want to unselect case " + algsInfo[i]['name']  + "?")) {
-        var index = selCases.indexOf(i);
-        if (index != -1)
-            selCases.splice(index, 1);
-        else
-            document.getElementById("last_scramble").firstChild.innerHTML = "Case already removed!";
-        document.getElementById("last_scramble").firstChild.innerHTML = "Removed case " + algsInfo[i]['name'] + "!";
+        var caseIndex = selCases.indexOf(i);
+        if (caseIndex >= 0) {
+            selCases.splice(caseIndex, 1);
+            document.getElementById("last_scramble").firstChild.innerHTML = "Removed case " + algsInfo[i]['name'] + "!";
+        } else {
+            selCases.push(i);
+            document.getElementById("last_scramble").firstChild.innerHTML = "Re-selected case " + algsInfo[i]['name'] + "!";
+        }
+        saveSelection();
+        displayPracticeInfo();
     }
+}
+
+function bookmarkCase(i) {
+    console.log(`bookmarked ${i}`)
+    if (!selectionPresets['Bookmarks']) {
+        selectionPresets['Bookmarks'] = {
+            'selCases': [],
+            'selectedAlgsets': {}
+        };
+    }
+    var preset = selectionPresets['Bookmarks'];
+    var presetSelcases = preset['selCases'];
+    var presetAlgsets = preset['selectedAlgsets'];
+    var algset = algsInfo[i]['algset'];
+    var caseIndex = presetSelcases.indexOf(i);
+    if (caseIndex >= 0) {
+        presetSelcases.splice(caseIndex, 1);
+        var algsetsInSel = {};
+        for (const caseId of presetSelcases) {
+            algsetsInSel[algsInfo[caseId]['algset']] = true;
+        }
+        preset['selectedAlgsets'] = algsetsInSel;
+        document.getElementById('bookmarkButton').innerText = "bookmark_add";
+        if (presetSelcases.length == 0) {
+            delete selectionPresets['Bookmarks'];
+        }
+    } else {
+        presetSelcases.push(i);
+        presetAlgsets[algset] = true;
+        document.getElementById('bookmarkButton').innerText = "bookmark_remove";
+    }
+    localStorage.setItem(selectionArrayKey + 'Presets', JSON.stringify(selectionPresets));
+}
+
+function getBookmarkButton(i) {
+    if (selectionPresets['Bookmarks']) {
+        var index = selectionPresets['Bookmarks']['selCases'].indexOf(i);
+        console.log(`bookmarked index ${index}`)
+        if (index >= 0) {
+            return `<span id='bookmarkButton' class='material-symbols-outlined inlineButton' onclick='bookmarkCase(${i})'>bookmark_remove</span>`;
+        }
+    }
+    return `<span id='bookmarkButton' class='material-symbols-outlined inlineButton' onclick='bookmarkCase(${i})'>bookmark_add</span>`;
 }
 
 function displayPracticeInfo() {
@@ -51,9 +98,15 @@ function displayPracticeInfo() {
 }
 
 function generateScramble() {
-    if (window.lastScramble != "")
-        document.getElementById("last_scramble").innerHTML = `<span>Last scramble: ${window.lastScramble}` +
-            ` <span onclick='showHint(this,${lastCase})' class='caseNameStats'>(${algsInfo[lastCase]["name"]})</span></span><span id='last-scramble-buttons'><span class='material-symbols-outlined inlineButton' onclick='confirmUnsel(${lastCase})'>close</span><span class='material-symbols-outlined inlineButton' onclick='confirmRemLast();'>undo</span></span>`;
+    console.log("last case", lastCase)
+    if (window.lastScramble != "") {
+        document.getElementById("last_scramble").innerHTML = `<span>Last scramble: ${window.lastScramble}`
+        + ` <span onclick='showHint(this,${lastCase})' class='caseNameStats'>(${algsInfo[lastCase]["name"]})</span></span><span id='last-scramble-buttons'>`
+        + getBookmarkButton(lastCase)
+        + `<span class='material-symbols-outlined inlineButton' onclick='confirmUnsel(${lastCase})'>close</span>`
+        + `<span class='material-symbols-outlined inlineButton' onclick='confirmRemLast();'>undo</span></span>`;
+        console.log(getBookmarkButton(lastCase));
+    }
     displayPracticeInfo();
     // get random case
     var caseNum = 0;

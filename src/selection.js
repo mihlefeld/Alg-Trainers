@@ -111,19 +111,23 @@ function setSelectionStatus(i, index, active) {
     return active;
 }
 
+function getBldInverseCase(caseId) {
+    var alg_name = algsInfo[caseId]['name'];
+    var inverse_group = alg_name[1];
+    var group_candidates = algsGroups[inverse_group];
+    for (inverseCaseId of group_candidates) {
+        if (algsInfo[inverseCaseId]['name'][1] == alg_name[0]) {
+            var selCaseIndex = selCases.indexOf(inverseCaseId);
+            return [inverseCaseId, selCaseIndex];
+        }
+    }
+    return [null, null];
+}
+
 function matchInverseSelectionIfNecessary(caseId, matchGoal) {
     if (trainerTitle.includes("BLD")) {
-        var alg_name = algsInfo[caseId]['name'];
-        var inverse_group = alg_name[1];
-        var group_candidates = algsGroups[inverse_group];
-        for (inverseCaseId of group_candidates) {
-            if (algsInfo[inverseCaseId]['name'][1] == alg_name[0]) {
-                var selCaseIndex = selCases.indexOf(inverseCaseId);
-                console.log("matching selection", caseId, selCaseIndex, matchGoal)
-                setSelectionStatus(inverseCaseId, selCaseIndex, matchGoal);
-                break;
-            }
-        }
+        var inverse = getBldInverseCase(caseId);
+        setSelectionStatus(inverse[0], inverse[1], matchGoal);
     }
 }
 
@@ -140,6 +144,7 @@ function itemClicked(i) {
 
     saveSelection();
     updateTitle();
+    return !wasSelected;
 }
 
 function selectAllNone() {
@@ -325,6 +330,19 @@ function deletePreset(name) {
 
 function usePreset(name) {
     selCases = [...selectionPresets[name]['selCases']];
+    if (trainerTitle.includes("BLD")) {
+        var withInverse = []
+        for (const caseId of selCases) {
+            if (!withInverse.includes(caseId)) {
+                withInverse.push(caseId);
+            }
+            inverse = getBldInverseCase(caseId)[0];
+            if (!withInverse.includes(inverse)) {
+                withInverse.push(inverse)
+            }
+        }
+        selCases = [...withInverse];
+    }
     Object.assign(selectedAlgSets, selectionPresets[name]['selectedAlgSets']);
     renderSelection();
 }

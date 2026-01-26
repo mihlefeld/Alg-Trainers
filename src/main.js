@@ -60,7 +60,7 @@ function main() {
             return;
         }
         // delete hotkey - remove last
-        if (event.code == "Delete" && !running) {
+        if (event.code == "Delete" && !running && window.history.state != "select") {
             if (!!event.shiftKey)
                 confirmClear();
             else
@@ -68,18 +68,22 @@ function main() {
             return;
         }
 
-        if (event.code == "KeyR" && !running) {
+        if (event.code == "KeyR" && !running && window.history.state != "select") {
             confirmUnsel(lastCase);
+        }
+
+        if (event.code == "KeyB" && !running && window.history.state != "select") {
+            var bookmarkButton = document.getElementById('bookmarkButton');
+            bookmarkButton.click();
+            bookmarkButton.blur();
         }
 
         if (event.target.tagName == "INPUT") {
             return;
         }
 
-        if (event.code == "KeyH" && !running) {
-            console.log(event.target)
+        if (event.code == "KeyH" && !running && window.history.state != "select") {
             if (event.target.id != "hintWindow" && dialogOpenId != "hintWindow" && !dialogOpen) {
-                console.log("Open dialog", dialogOpenId, dialogOpen)
                 showHint(null, window.lastCase);
             }
         }
