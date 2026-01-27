@@ -55,6 +55,11 @@ function bookmarkCase(i) {
     var algset = algsInfo[i]['algset'];
     var caseIndex = presetSelcases.indexOf(i);
     if (caseIndex >= 0) {
+        if (!window.confirm(`Are you sure you want to remove the bookmark from ${algsInfo[i]['name']}`)) {
+            return;
+        }
+    }
+    if (caseIndex >= 0) {
         presetSelcases.splice(caseIndex, 1);
         var algsetsInSel = {};
         for (const caseId of presetSelcases) {

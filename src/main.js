@@ -80,7 +80,9 @@ function main() {
 
         if (event.code == "KeyX" && !running & window.history.state != "select") {
             if (window.history.state == "recap") {
-                changeMode("train");
+                if (window.confirm("Are you sure you want to switch to train? This will reset your current recap progress")) {
+                    changeMode("train");
+                }
             } else {
                 changeMode("recap");
             }

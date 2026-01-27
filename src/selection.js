@@ -307,19 +307,23 @@ function addPreset(name_) {
 }
 
 function updatePreset(name) {
-    selectionPresets[name] = {
-        'selCases': [],
-        'selectedAlgSets': {}
-    };
-    Object.assign(selectionPresets[name]['selCases'], selCases);
-    Object.assign(selectionPresets[name]['selectedAlgSets'], selectedAlgSets);
-    localStorage.setItem(selectionArrayKey + 'Presets', JSON.stringify(selectionPresets));
+    if (window.confirm(`Are you sure you want to set preset ${name} to the current selection?`)) {
+        selectionPresets[name] = {
+            'selCases': [],
+            'selectedAlgSets': {}
+        };
+        Object.assign(selectionPresets[name]['selCases'], selCases);
+        Object.assign(selectionPresets[name]['selectedAlgSets'], selectedAlgSets);
+        localStorage.setItem(selectionArrayKey + 'Presets', JSON.stringify(selectionPresets));
+    }
 }
 
 function deletePreset(name) {
-    delete selectionPresets[name];
-    localStorage.setItem(selectionArrayKey + 'Presets', JSON.stringify(selectionPresets));
-    renderPresets();
+    if (window.confirm(`Are you sure you want to delete preset ${name}?`)) {
+        delete selectionPresets[name];
+        localStorage.setItem(selectionArrayKey + 'Presets', JSON.stringify(selectionPresets));
+        renderPresets();
+    }
 }
 
 function usePreset(name) {
