@@ -157,8 +157,10 @@ function generateScramble() {
     if (postRotation != "") postRotation += " ";
 
     var finalAlg = preRotation + preMove + alg + postMove + postRotation;
+    console.log(alg)
     if (trainerTitle.includes("Square-1")) {
-        var parts = (alg + postMove).split("/");
+        var parts = alg.split("/");
+        console.log(parts)
         var firstMoveParts = parts[0].split(",");
         var preMoveParts = preMove.split(",");
         var preMove_u = parseInt(firstMoveParts[0]) + parseInt(preMoveParts[0]);
@@ -171,7 +173,22 @@ function generateScramble() {
         }
         preMove = `${preMove_u},${preMove_d} `;
         parts[0] = preMove;
-        var finalAlg = parts.join("/");
+
+        var lastMoveParts = parts.at(-1).split(",");
+        var postMoveParts = postMove.split(",");
+        var postMove_u = parseInt(lastMoveParts[0]) + parseInt(postMoveParts[0]);
+        var postMove_d = parseInt(lastMoveParts[1]) + parseInt(postMoveParts[1]);
+        if (postMove_u > 6) {
+            postMove_u -= 12;
+        }
+        if (postMove_d > 6) {
+            postMove_d -= 12;
+        }
+        postMove = ` ${postMove_u},${postMove_d}`;
+        parts[parts.length - 1] = postMove
+        console.log(preMove, postMove)
+        console.log(parts)
+        finalAlg = parts.join("/");
     }
     if (trainerTitle.includes("BLD")) {
         var key = trainerTitle.includes("UFR") ? 'letterSchemeCorners' : 'letterSchemeEdges';
@@ -221,22 +238,28 @@ function displayTime() {
     }
 }
 
-function handleTouchEnd() {
-    if (!window.allowStartingTimer)
-        return; // preventing auto-repeat
-    if (!running && !waiting) {
-        timerStart();
-    }
-    else {
-        timerAfterStop();
+function handleTouchEnd(pointerEvent) {
+    // allow undefined or touch events
+    if (!pointerEvent.pointerType || pointerEvent.pointerType == "touch") {
+        if (!window.allowStartingTimer)
+            return; // preventing auto-repeat
+        if (!running && !waiting) {
+            timerStart();
+        }
+        else {
+            timerAfterStop();
+        }
     }
 }
 
-function handleTouchStart() {
-    if (running)
-        timerStop();
-    else {
-        timerSetReady(); // set green back
+function handleTouchStart(pointerEvent) {
+    // allow undefined or touch events
+    if (!pointerEvent.pointerType || pointerEvent.pointerType == "touch") {
+        if (running)
+            timerStop();
+        else {
+            timerSetReady(); // set green back
+        }
     }
 }
 

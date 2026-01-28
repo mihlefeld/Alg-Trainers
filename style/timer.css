@@ -34,8 +34,14 @@ div#practiceLayout {
     height: 100%;
     padding: 0.5em;
     box-sizing: border-box;    
-    touch-action: manipulation;
+    touch-action: none;
     user-select: none;
+}
+
+div#practiceLayout * {
+    touch-action: none;
+    user-select: none;
+    overscroll-behavior: none;
 }
 
 div#casesBox {

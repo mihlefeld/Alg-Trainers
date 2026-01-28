@@ -43,8 +43,6 @@ function main() {
         showMode(history.state);
     })
 
-    
-
     /// handles keypup and keydown events. Starts timer etc.
     document.getElementById("bodyid").addEventListener("keydown", function (event) {
         if (dialogOpen) {
@@ -133,8 +131,10 @@ function main() {
     });
 
     timerDiv = document.getElementById("timerDiv")
-    timerDiv.addEventListener("touchstart", handleTouchStart, false);
-    timerDiv.addEventListener("touchend", handleTouchEnd, false);
+    timerDiv.addEventListener("pointerdown", handleTouchStart, false);
+    timerDiv.addEventListener("pointerup", handleTouchEnd, false);
+    timerDiv.addEventListener("pointermove", (event) => {event.preventDefault()}, false);
+    timerDiv.addEventListener("pointercancel", (event) => {window.alert("canceled"); event.preventDefault()}, false);
     window.addEventListener('keydown', function (e) {
         if (e.code == 'Space' && (e.target == document.body || e.target.tagName == "DIALOG")) {
             e.preventDefault();
