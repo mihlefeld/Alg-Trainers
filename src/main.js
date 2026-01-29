@@ -133,8 +133,8 @@ function main() {
     timerDiv = document.getElementById("timerDiv")
     timerDiv.addEventListener("pointerdown", handleTouchStart, false);
     timerDiv.addEventListener("pointerup", handleTouchEnd, false);
-    timerDiv.addEventListener("pointermove", (event) => {event.preventDefault()}, false);
-    timerDiv.addEventListener("pointercancel", (event) => {window.alert("canceled"); event.preventDefault()}, false);
+    timerDiv.addEventListener("pointermove", (event) => {event.preventDefault();}, false);
+    timerDiv.addEventListener("pointercancel", (event) => {event.preventDefault();}, false);
     window.addEventListener('keydown', function (e) {
         if (e.code == 'Space' && (e.target == document.body || e.target.tagName == "DIALOG")) {
             e.preventDefault();

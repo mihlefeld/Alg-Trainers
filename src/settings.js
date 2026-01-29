@@ -114,24 +114,6 @@ function toOklchStr(color) {
     return s;
 }
 
-function get_translated_letter(original_letterscheme, custom_letterscheme, letter) {
-    var oi = original_letterscheme.indexOf(letter);
-    if (custom_letterscheme.length > oi) {
-        return custom_letterscheme[oi]
-    } else {
-        return original_letterscheme[oi]
-    }
-}
-
-function translate_blind_letter_pair(original_letterscheme, custom_letterscheme, letter_pair) {
-    var original_letterscheme = original_letterscheme.toLowerCase()
-    var custom_letterscheme = custom_letterscheme.toLowerCase()
-    var letter_pair = letter_pair.toLowerCase();
-    if (letter_pair.length == 1)
-        return get_translated_letter(original_letterscheme, custom_letterscheme, letter_pair[0]).toUpperCase();
-    return (get_translated_letter(original_letterscheme, custom_letterscheme, letter_pair[0]) + get_translated_letter(original_letterscheme, custom_letterscheme, letter_pair[1])).toUpperCase();
-}
-
 function computeColors() {
     var body = document.body;
     var contrastAlg = 'WCAG21';

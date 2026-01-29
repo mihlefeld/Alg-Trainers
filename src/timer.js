@@ -30,12 +30,13 @@ function randomElement(arr) {
 function confirmUnsel(i) {
     if (confirm("Do you want to unselect case " + algsInfo[i]['name']  + "?")) {
         var caseIndex = selCases.indexOf(i);
+        var displayName = getAlgName(i);
         if (caseIndex >= 0) {
             selCases.splice(caseIndex, 1);
-            document.getElementById("last_scramble").firstChild.innerHTML = "Removed case " + algsInfo[i]['name'] + "!";
+            document.getElementById("last_scramble").firstChild.innerHTML = `Removed case ${displayName}!`;
         } else {
             selCases.push(i);
-            document.getElementById("last_scramble").firstChild.innerHTML = "Re-selected case " + algsInfo[i]['name'] + "!";
+            document.getElementById("last_scramble").firstChild.innerHTML = `Re-selected case ${displayName}!`;
         }
         saveSelection();
         displayPracticeInfo();
@@ -55,7 +56,7 @@ function bookmarkCase(i) {
     var algset = algsInfo[i]['algset'];
     var caseIndex = presetSelcases.indexOf(i);
     if (caseIndex >= 0) {
-        if (!window.confirm(`Are you sure you want to remove the bookmark from ${algsInfo[i]['name']}`)) {
+        if (!window.confirm(`Are you sure you want to remove the bookmark from ${getAlgName(i)}`)) {
             return;
         }
     }
@@ -103,7 +104,7 @@ function displayPracticeInfo() {
 function generateScramble() {
     if (window.lastScramble != "") {
         document.getElementById("last_scramble").innerHTML = `<span>Last scramble: ${window.lastScramble}`
-        + ` <span id='showHintLastCaseButton' onclick='showHint(this,${lastCase})' class='caseNameStats'>(${algsInfo[lastCase]["name"]})</span></span><span id='last-scramble-buttons'>`
+        + ` <span id='showHintLastCaseButton' onclick='showHint(this,${lastCase})' class='caseNameStats'>(${getAlgName(lastCase)})</span></span><span id='last-scramble-buttons'>`
         + getBookmarkButton(lastCase)
         + `<span class='material-symbols-outlined inlineButton' onclick='confirmUnsel(${lastCase})'>close</span>`
         + `<span class='material-symbols-outlined inlineButton' onclick='confirmRemLast();'>undo</span></span>`;
@@ -157,10 +158,8 @@ function generateScramble() {
     if (postRotation != "") postRotation += " ";
 
     var finalAlg = preRotation + preMove + alg + postMove + postRotation;
-    console.log(alg)
     if (trainerTitle.includes("Square-1")) {
         var parts = alg.split("/");
-        console.log(parts)
         var firstMoveParts = parts[0].split(",");
         var preMoveParts = preMove.split(",");
         var preMove_u = parseInt(firstMoveParts[0]) + parseInt(preMoveParts[0]);
@@ -186,8 +185,6 @@ function generateScramble() {
         }
         postMove = ` ${postMove_u},${postMove_d}`;
         parts[parts.length - 1] = postMove
-        console.log(preMove, postMove)
-        console.log(parts)
         finalAlg = parts.join("/");
     }
     if (trainerTitle.includes("BLD")) {
@@ -396,17 +393,14 @@ function editAlg() {
 function renderHint(i) {
     document.getElementById('editAlgButton').innerText = "edit"
     var setup = scramblesMap[i];
+    var group = getAlgGroup(i);
+    var name = getAlgName(i);
     if (trainerTitle.includes("BLD")) {
-        var key = trainerTitle.includes("UFR") ? 'letterSchemeCorners' : 'letterSchemeEdges';
-        var group = translate_blind_letter_pair(defaultSettings[key], currentSettings[key], algsInfo[i]['group']);
-        var name = translate_blind_letter_pair(defaultSettings[key], currentSettings[key], algsInfo[i]['name']);
         if (setup) {
-            setup = [translate_blind_letter_pair(defaultSettings[key], currentSettings[key], setup[0])];
+            setup = [translateAlgName(setup[0])];
         }
-        document.getElementById("boxTitle").innerHTML = `${algsInfo[i]['algset']} ${group} ${name}`;
-    } else {
-        document.getElementById("boxTitle").innerHTML = `${algsInfo[i]['algset']} ${algsInfo[i]['group']} ${algsInfo[i]['name']}`;
     }
+    document.getElementById("boxTitle").innerHTML = `${algsInfo[i]['algset']} ${group} ${name}`;
     var longestAlgLength = 0;
     var currentAlgs = algsInfo[i]["a"]
     if (i in customAlgs) {
@@ -535,11 +529,7 @@ function displayStats() {
             meanForCase *= i / (i + 1);
             meanForCase += resultsByCase[case_][i]["ms"] / (i + 1);
         }
-        alg_name = algsInfo[case_]["name"];
-        if (trainerTitle.includes("BLD")) {
-            var key = trainerTitle.includes("UFR") ? 'letterSchemeCorners' : 'letterSchemeEdges';
-            alg_name = translate_blind_letter_pair(defaultSettings[key], currentSettings[key], algsInfo[case_]["name"]);
-        } 
+        alg_name = getAlgName(case_);
         s += `<div class='timeEntry'><span class='caseNameStats' onclick='showHint(this, ${keys[j]})'>${algsInfo[case_]["algset"]} ${alg_name}</span>`
         s += ` <span class='caseNameStats' onclick=(showCaseTimeDetails(${case_}))>(#${resultsByCase[case_].length}, ⌀${msToHumanReadable(meanForCase)})</span></div>`;
     }

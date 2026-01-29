@@ -209,10 +209,9 @@ function touchend(i) {
 function makeDivNormal(groupname) {
     var s = "";
     var indeces = algsGroups[groupname];
+    var displayGroupname = translateAlgGroup(groupname) 
 
-    s += " onclick='selectCaseGroup(\"" + groupname
-        + "\")'><b>" + groupname + "</b></div>";
-    s += "<div class='rowFlex' style='flex-wrap: wrap'>";
+    s += ` onclick='selectCaseGroup("${groupname}")'><b>${displayGroupname}</b></div><div class='rowFlex' style='flex-wrap: wrap'>`
     var allSelected = true;
     for (var j = 0; j < indeces.length; j++) {
         var i = indeces[j]; // case number
@@ -223,16 +222,12 @@ function makeDivNormal(groupname) {
         }
         allSelected &= sel;
 
-        var alg_name = algsInfo[i]["name"];
-        if (trainerTitle == "Square-1 PBL Trainer") {
-            var content = `<span class='caseSpan'>${algsInfo[i]["name"]}</span>`;
-        } else if ( trainerTitle.includes("BLD") ) {
-            var key = trainerTitle.includes("UFR") ? 'letterSchemeCorners' : 'letterSchemeEdges';
-            var alg_name = translate_blind_letter_pair(defaultSettings[key], currentSettings[key], algsInfo[i]["name"])
+        var alg_name = getAlgName(i);
+        if (trainerTitle == "Square-1 PBL Trainer" || trainerTitle.includes("BLD")) {
             var content = `<span class='caseSpan'>${alg_name}</span>`;
-        }
+        } 
         else if (trainerTitle.includes("Square-1")) {
-            var content = `<span class='caseSpan'>${algsInfo[i]["name"]}</span><img oncontextmenu='return false;' class='caseImage' id='sel${i}' src='${blobUrls[i]}'>`;
+            var content = `<span class='caseSpan'>${alg_name}</span><img oncontextmenu='return false;' class='caseImage' id='sel${i}' src='${blobUrls[i]}'>`;
         } else {
             var content = `<img oncontextmenu='return false;' class='caseImage' id='sel${i}' src='${blobUrls[i]}'>`;
         }

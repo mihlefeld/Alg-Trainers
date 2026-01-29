@@ -111,3 +111,46 @@ function downloadLocalStorage() {
     document.body.removeChild(link)
     window.URL.revokeObjectURL(url)
 }
+
+function get_translated_letter(original_letterscheme, custom_letterscheme, letter) {
+    var oi = original_letterscheme.indexOf(letter);
+    if (custom_letterscheme.length > oi) {
+        return custom_letterscheme[oi]
+    } else {
+        return original_letterscheme[oi]
+    }
+}
+
+function translate_blind_letter_pair(original_letterscheme, custom_letterscheme, letter_pair) {
+    var original_letterscheme = original_letterscheme.toLowerCase()
+    var custom_letterscheme = custom_letterscheme.toLowerCase()
+    var letter_pair = letter_pair.toLowerCase();
+    if (letter_pair.length == 1)
+        return get_translated_letter(original_letterscheme, custom_letterscheme, letter_pair[0]).toUpperCase();
+    return (get_translated_letter(original_letterscheme, custom_letterscheme, letter_pair[0]) + get_translated_letter(original_letterscheme, custom_letterscheme, letter_pair[1])).toUpperCase();
+}
+
+function translateAlgName(algName) {
+    if (trainerTitle.includes("BLD")) {
+        var key = trainerTitle.includes("UFR") ? 'letterSchemeCorners' : 'letterSchemeEdges';
+        return translate_blind_letter_pair(defaultSettings[key], currentSettings[key], algName);
+    }
+    return algName;
+}
+
+function getAlgName(caseId) {
+    return translateAlgName(algsInfo[caseId]["name"]);
+}
+
+function translateAlgGroup(group) {
+    if (trainerTitle.includes("BLD")) {
+        var key = trainerTitle.includes("UFR") ? 'letterSchemeCorners' : 'letterSchemeEdges';
+        var group = get_translated_letter(defaultSettings[key].toLowerCase(), currentSettings[key].toLowerCase(), group.toLowerCase()).toUpperCase();
+        return group;
+    }
+    return group;
+}
+
+function getAlgGroup(caseId) {
+    return translateAlgGroup(algsInfo[caseId]["group"]);
+}

@@ -26,6 +26,14 @@ function showMode(m)
     pr.style.display = (m != 'select') ? 'flex' : 'none';
     se.style.display = (m == 'select') ? 'flex' : 'none';
 
+    if (m == 'recap' || m == 'train') {
+        document.documentElement.style.setProperty("overscroll-behavior", "none");
+        document.documentElement.style.setProperty("overflow-x", "hidden");
+    } else {
+        document.documentElement.style.setProperty("overscroll-behavior", "auto");
+        document.documentElement.style.setProperty("overflow-x", "auto");
+    }
+
     if (m == 'recap') {
         // recap
         window.allowStartingTimer = true;

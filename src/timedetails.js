@@ -50,6 +50,12 @@ function renderTimeDetails(caseNum) {
     }
     var timesMs = times.map(time => time.ms); // Extract milliseconds from the times array
 
+    var algset = algsInfo[caseNum]['algset'];
+    var group = getAlgGroup(caseNum);
+    var name = getAlgName(caseNum);
+
+    document.getElementById("caseTimeDetailsCaseHeader").innerText = `${algset} ${group} ${name}`;
+
     // Calculate histogram data
     const histogram = computeHistogram(timesMs, 10);
     const maxCount = Math.max(...histogram.counts);
