@@ -159,7 +159,19 @@ function generateScramble() {
 
     var finalAlg = preRotation + preMove + alg + postMove + postRotation;
     if (trainerTitle.includes("Square-1")) {
+        var flipSlice = Math.random() > 0.5;
         var parts = alg.split("/");
+        var slice_flipped = parts.length % 2 == 0;
+        if (flipSlice != slice_flipped) {
+            var secondLast = parts.at(-2);
+            var slu = parseInt(secondLast.split(",")[0]);
+            var sld = secondLast.split(",")[1];
+            slu += 6
+            if (slu > 6) {
+                slu -= 12;
+            }
+            parts[parts.length - 2] = ` ${slu},${sld} `
+        }
         var firstMoveParts = parts[0].split(",");
         var preMoveParts = preMove.split(",");
         var preMove_u = parseInt(firstMoveParts[0]) + parseInt(preMoveParts[0]);
