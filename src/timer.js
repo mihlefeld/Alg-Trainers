@@ -171,6 +171,7 @@ function generateScramble() {
                 slu -= 12;
             }
             parts[parts.length - 2] = ` ${slu},${sld} `
+            parts.splice(parts.length - 1, 0, " 6,0 ")
         }
         var firstMoveParts = parts[0].split(",");
         var preMoveParts = preMove.split(",");
