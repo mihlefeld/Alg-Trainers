@@ -321,8 +321,7 @@ function deletePreset(name) {
     }
 }
 
-function usePreset(name) {
-    selCases = [...selectionPresets[name]['selCases']];
+function ensureSelCasesIncludeInverseWhenBlind() {
     if (trainerTitle.includes("BLD")) {
         var withInverse = []
         for (const caseId of selCases) {
@@ -336,8 +335,37 @@ function usePreset(name) {
         }
         selCases = [...withInverse];
     }
+}
+
+function ensureAlgsetsAreSelected() {
+    for (const i of selCases) {
+        selectAlgsets[algsInfo[i].algset] = true;
+    }
+}
+
+function presetsPost(name) {
+    ensureSelCasesIncludeInverseWhenBlind();
     Object.assign(selectedAlgSets, selectionPresets[name]['selectedAlgSets']);
     renderSelection();
+    saveSelection();
+}
+
+function usePreset(name) {
+    selCases = [...selectionPresets[name]['selCases']];
+    presetsPost(name);
+}
+
+function addPresetToSelection(name) {
+    selCases.push(...selectionPresets[name]['selCases']);
+    selCases = [...new Set(selCases)];
+    presetsPost(name);
+}
+
+function removePresetFromSelection(name) {
+    var selCaseSet = new Set(selCases);
+    var presetSet = new Set(selectionPresets[name]['selCases'])
+    selCases = [...selCaseSet.difference(presetSet)];
+    presetsPost(name);
 }
 
 
@@ -349,6 +377,8 @@ function renderPresets() {
     var s = "";
     for (const [name, preset] of Object.entries(selectionPresets)) {
         s += `<div class='settingsEntry'><span>${name}</span><div class='plusMinus'>\
+        <span onclick='addPresetToSelection("${name}")' style='width: 1em' class='abutton'>+</span>\
+        <span onclick='removePresetFromSelection("${name}")' style='width: 1em' class='abutton'>-</span>\
         <span onclick='deletePreset("${name}")' class='abutton'>Del</span>\
         <span onclick='updatePreset("${name}")' class='abutton'>Set</span>\
         <span onclick='usePreset("${name}")' class='abutton'>Use</span></span></div></div>`;
