@@ -162,7 +162,21 @@ function generateScramble() {
         var flipSlice = Math.random() > 0.5;
         var parts = alg.split("/");
         var slice_flipped = parts.length % 2 == 0;
-        if (flipSlice != slice_flipped) {
+        if (trainerTitle.includes("OBL") && flipSlice) {
+            console.log("x2 done")
+            var second = parts.at(1);
+            var slu = parseInt(second.split(",")[0]);
+            var sld = parseInt(second.split(",")[1]);
+            slu += 6
+            sld += 6
+            if (slu > 6) {
+                slu -= 12;
+            }
+            if (sld > 6) {
+                sld -= 12;
+            }
+            parts[1] = ` ${slu},${sld} `
+        } else if (flipSlice != slice_flipped) {
             var secondLast = parts.at(-2);
             var slu = parseInt(secondLast.split(",")[0]);
             var sld = secondLast.split(",")[1];

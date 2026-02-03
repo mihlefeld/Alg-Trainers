@@ -75,7 +75,7 @@
 
 	<dialog id='hintWindow' class="colFlex" onclick="dialogClick(event, this)" onkeydown="if(dialogOpen && event.target.id == 'hintWindow' && event.code == 'KeyH') {closeDialog(dialogOpenId);}" autofocus=''>
 		<div class="dialogDiv colFlex borderedContainer">
-			<span onclick="this.parentElement.parentElement.close()" class="material-symbols-outlined abutton closeButton">Close</span>
+			<span onclick="closeDialog('hintWindow')" class="material-symbols-outlined abutton closeButton">Close</span>
 			<div class="borderedContainer rowFlex pad center" style="justify-content: space-between;">
 				<span id='prevButton' onclick="previousCase()"
 					class="material-symbols-outlined abutton prevNext">arrow_back</span>
@@ -112,7 +112,7 @@
 
 	<dialog id="caseTimeDetails" class="colFlex" onclick="dialogClick(event, this)" autofocus="">
 		<div class="dialogDiv colFlex borderedContainer">
-			<span onclick="this.parentElement.parentElement.close()" class="material-symbols-outlined abutton closeButton">Close</span>
+			<span onclick="closeDialog('caseTimeDetails')" class="material-symbols-outlined abutton closeButton">Close</span>
 			<div class="borderedContainer pad rowFlex" style="justify-content: center;"><b id="caseTimeDetailsCaseHeader">Case</b></div>
 			<div class="borderedContainer pad">
 				<canvas id="timeHistogram"></canvas>
@@ -130,7 +130,7 @@
 
 	<dialog id="settings" class='colFlex borderedContainer' autofocus="">
 		<div class="dialogDiv colFlex borderedContainer">
-			<span onclick="this.parentElement.parentElement.close()" class="material-symbols-outlined abutton closeButton">Close</span>
+			<span onclick="closeDialog('settings')" class="material-symbols-outlined abutton closeButton">Close</span>
 			<div class="settingsEntry">
 				<div>Weighted choice</div>
 				<!-- Rounded switch -->
@@ -278,7 +278,7 @@
 
 	<dialog id="hotkeysDialog" onclick="dialogClick(event, this)" autofocus=''>
 		<div class="dialogDiv colFlex borderedContainer">
-			<span onclick="this.parentElement.parentElement.close()" class="material-symbols-outlined abutton closeButton">Close</span>
+			<span onclick="closeDialog('hotkeysDialog')" class="material-symbols-outlined abutton closeButton">Close</span>
 			<div class="borderedContainer pad rowFlex hotkeyRow" style="flex-wrap: wrap; gap: 2em">
 				<span class="hotKeyText">Delete last time</span><span class="hotkeyValue"><kbd class="hotkey">Delete</kbd></span>
 			</div>
@@ -306,7 +306,7 @@
 
 	<dialog id="aboutDialog" onclick="dialogClick(event, this)" autofocus=''>
 		<div class="dialogDiv colFlex borderedContainer">
-			<span onclick="this.parentElement.parentElement.close()" class="material-symbols-outlined abutton closeButton">Close</span>
+			<span onclick="closeDialog('aboutDialog')" class="material-symbols-outlined abutton closeButton">Close</span>
 			<div class="borderedContainer pad rowFlex" style="flex-wrap: wrap; gap: 2em">
 				<div class="colFlex">
 					<span>Alg-sheets</span>

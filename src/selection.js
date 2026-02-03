@@ -227,7 +227,12 @@ function makeDivNormal(groupname) {
             var content = `<span class='caseSpan'>${alg_name}</span>`;
         } 
         else if (trainerTitle.includes("Square-1")) {
-            var content = `<span class='caseSpan'>${alg_name}</span><img oncontextmenu='return false;' class='caseImage' id='sel${i}' src='${blobUrls[i]}'>`;
+            var caseSpan = `<span class='caseSpan'>${alg_name}</span>`
+            if (trainerTitle.includes('OBL')) {
+                var nameParts = alg_name.split("|");
+                caseSpan =  `<span class='caseSpan'>${nameParts[0]}</span><span class='caseSpan'>${nameParts[1]}</span>`
+            }
+            var content = `${caseSpan}<img oncontextmenu='return false;' class='caseImage' id='sel${i}' src='${blobUrls[i]}'>`;
         } else {
             var content = `<img oncontextmenu='return false;' class='caseImage' id='sel${i}' src='${blobUrls[i]}'>`;
         }
