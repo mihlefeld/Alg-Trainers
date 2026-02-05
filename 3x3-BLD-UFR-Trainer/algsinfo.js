@@ -1,5 +1,5 @@
-const timesArrayKey = "3x3bldufTimes";
-const selectionArrayKey = "3x3bldufSelection";
+const timesArrayKey = "3x3bldCornersTimes";
+const selectionArrayKey = "3x3bldCornersSelection";
 var trainerTitle = "3x3 BLD UFR Trainer";
 var preRotations = [''];
 var postRotations = [''];

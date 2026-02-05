@@ -216,7 +216,9 @@ function generateScramble() {
     }
     if (trainerTitle.includes("BLD")) {
         var key = trainerTitle.includes("UFR") ? 'letterSchemeCorners' : 'letterSchemeEdges';
-        finalAlg = alg_name = translate_blind_letter_pair(defaultSettings[key], currentSettings[key], alg)
+        var algset = algsInfo[caseNum]['algset']
+        finalAlg = translate_blind_letter_pair(defaultSettings[key], currentSettings[key], alg)
+        finalAlg = `(${algset}) ${finalAlg}`
     }
 
     window.lastScramble = finalAlg;
@@ -427,7 +429,18 @@ function renderHint(i) {
             setup = [translateAlgName(setup[0])];
         }
     }
-    document.getElementById("boxTitle").innerHTML = `${algsInfo[i]['algset']} ${group} ${name}`;
+    var algset = algsInfo[i]['algset'];
+    var group_name = `${group} ${name}`
+    if (name.startsWith(group)) {
+        group_name = name;
+    }
+    if (group.startsWith(algset)) {
+        document.getElementById("boxTitle").innerHTML = group_name;
+    }
+    else {
+
+        document.getElementById("boxTitle").innerHTML = `${algset} ${group_name}`;
+    }
     var longestAlgLength = 0;
     var currentAlgs = algsInfo[i]["a"]
     if (i in customAlgs) {
@@ -449,7 +462,12 @@ function renderHint(i) {
     } else {
         document.getElementById("boxsetup").innerHTML = "Setup:<br/>";
     }
-    document.getElementById("boxImg").src = blobUrls[i];
+    if (trainerTitle.includes("BLD")) {
+        document.getElementById("boxImg").outerHTML = `<div id='boxImg' style='font-size: 8em; color: var(--secondaryText);'>${name}</div>`
+    } 
+    else {
+        document.getElementById("boxImg").src = blobUrls[i];
+    }
 }
 
 function showHint(element, i) {

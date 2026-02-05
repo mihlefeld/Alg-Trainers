@@ -144,9 +144,12 @@ function getAlgName(caseId) {
 
 function translateAlgGroup(group) {
     if (trainerTitle.includes("BLD")) {
+        var bufferGroup = group.split(" ");
+        var buffer = bufferGroup[0];
+        var group = bufferGroup[1];
         var key = trainerTitle.includes("UFR") ? 'letterSchemeCorners' : 'letterSchemeEdges';
         var group = get_translated_letter(defaultSettings[key].toLowerCase(), currentSettings[key].toLowerCase(), group.toLowerCase()).toUpperCase();
-        return group;
+        return `${buffer} ${group}`;
     }
     return group;
 }

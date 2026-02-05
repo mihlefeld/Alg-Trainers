@@ -107,8 +107,9 @@ function setSelectionStatus(i, index, active) {
 }
 
 function getBldInverseCase(caseId) {
+    var algset = algsInfo[caseId]['algset'];
     var alg_name = algsInfo[caseId]['name'];
-    var inverse_group = alg_name[1];
+    var inverse_group = `${algset} ${alg_name[1]}`;
     var group_candidates = algsGroups[inverse_group];
     for (inverseCaseId of group_candidates) {
         if (algsInfo[inverseCaseId]['name'][1] == alg_name[0]) {
