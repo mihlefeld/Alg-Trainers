@@ -112,6 +112,14 @@ function downloadLocalStorage() {
     window.URL.revokeObjectURL(url)
 }
 
+function get_blind_word_from_letter_pair(letter_pair) {
+    try {
+        return currentSettings['letterpairs'][letter_pair];
+    } catch (e) {
+        return e;
+    }
+}
+
 function get_translated_letter(original_letterscheme, custom_letterscheme, letter) {
     var oi = original_letterscheme.indexOf(letter);
     if (custom_letterscheme.length > oi) {

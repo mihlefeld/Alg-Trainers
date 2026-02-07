@@ -64,7 +64,7 @@
 			<div id="presetsSettings" class="colFlex" style="width: fit-content; max-width: 100%;"></div>
 			<div style="width: 100%; display: flex; justify-content: space-between; align-items: end;">
 				<a onclick="openDialog('hotkeysDialog')">Hotkeys</a>
-				<span class="version">v1.6.0</span>
+				<span class="version">v1.6.1</span>
 				<a onclick="openDialog('aboutDialog')">Credits</a>
 			</div>
 		</div>
@@ -135,7 +135,7 @@
 				<div>Weighted choice</div>
 				<!-- Rounded switch -->
 				<label class="switch">
-					<input onclick="toggleWeightedChoice(this);" type="checkbox" id="weighted_choice_on_off" value="using">
+					<input onclick="toggleSetting(this, 'weightedChoice');" type="checkbox" id="weighted_choice_on_off" value="using">
 					<span class="slider round"></span>
 				</label>
 			</div>
@@ -210,6 +210,31 @@
 			</div>
 			<div class="settingsEntry">
 				<div> Edges Letterscheme</div><input type="text" value="abcdefghijklmnopqrstuvwx" class="settinginput" id="edgeSchemeInput" onchange="changeSettingsKey(event, 'letterSchemeEdges')">
+			</div>
+			<div class="settingsEntry">
+				<div>Change Letter Pairs</div>
+				<div class="plusMinus">
+					<label for="uploadLP" id="uploadLPLabel" class="material-symbols-outlined abutton" >
+						upload
+					</label><input type="file" id="uploadLP" style="display: none;" onchange="uploadLetterPairs()">
+					<button onclick="" type="button" class="material-symbols-outlined abutton">download</button>
+				</div>
+			</div>
+			<div class="settingsEntry">
+				<div>Corner Letter Pair Words</div>
+				<!-- Rounded switch -->
+				<label class="switch">
+					<input onclick="toggleSetting(this, 'useCornersLetterPairs');" type="checkbox" id="corners_letter_pairs_on_off" value="using">
+					<span class="slider round"></span>
+				</label>
+			</div>
+			<div class="settingsEntry">
+				<div>Edges Letter Pair Words</div>
+				<!-- Rounded switch -->
+				<label class="switch">
+					<input onclick="toggleSetting(this, 'useEdgesLetterPairs');" type="checkbox" id="edges_letter_pairs_on_off" value="using">
+					<span class="slider round"></span>
+				</label>
 			</div>
 			<div class="settingsEntry">
 				<div>Cube Colors</div>

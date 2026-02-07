@@ -217,8 +217,13 @@ function generateScramble() {
     if (trainerTitle.includes("BLD")) {
         var key = trainerTitle.includes("UFR") ? 'letterSchemeCorners' : 'letterSchemeEdges';
         var algset = algsInfo[caseNum]['algset']
-        finalAlg = translate_blind_letter_pair(defaultSettings[key], currentSettings[key], alg)
-        finalAlg = `(${algset}) ${finalAlg}`
+        var letter_pair = translate_blind_letter_pair(defaultSettings[key], currentSettings[key], alg)
+        var key = trainerTitle.includes("UFR") ? 'useCornersLetterPairs' : 'useEdgesLetterPairs';
+        if (currentSettings[key]) {
+            finalAlg = `(${algset}) ${get_blind_word_from_letter_pair(letter_pair)} (${letter_pair})`
+        } else {
+            finalAlg = `(${algset}) ${letter_pair}`
+        }
     }
 
     window.lastScramble = finalAlg;

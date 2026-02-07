@@ -37,7 +37,10 @@ var defaultSettings = {
     },
     'selectedAlgSets': {},
     'letterSchemeCorners': "abcdefghijklmnopqrstuvwx",
-    'letterSchemeEdges': "abcdefghijklmnopqrstuvwx"
+    'letterSchemeEdges': "abcdefghijklmnopqrstuvwx",
+    'letterpairs': {},
+    'useEdgesLetterPairs': false,
+    'useCornersLetterPairs': false,
 };
 
 var defaultCubeColors = {
@@ -190,6 +193,8 @@ function applySettings() {
         document.getElementById("weighted_choice_on_off").checked = currentSettings['weightedChoice'];
         document.getElementById('cornerSchemeInput').value = currentSettings['letterSchemeCorners'];
         document.getElementById('edgeSchemeInput').value = currentSettings['letterSchemeEdges'];
+        document.getElementById('edges_letter_pairs_on_off').checked = currentSettings['useEdgesLetterPairs'];
+        document.getElementById('corners_letter_pairs_on_off').checked = currentSettings['useCornersLetterPairs'];
     } catch(e) {}
     document.body.style.fontSize = currentSettings['baseSize'] + "em";
     computeColors();
@@ -253,8 +258,31 @@ function resetStyle(dark) {
     saveSettings();
 }
 
-function toggleWeightedChoice(element) {
-    currentSettings['weightedChoice'] = !currentSettings["weightedChoice"];
-    element.checked = currentSettings['weightedChoice'];
+function toggleSetting(element, key) {
+    currentSettings[key] = !currentSettings[key];
+    element.checked = currentSettings[key];
     saveSettings();
+}
+
+function uploadLetterPairs() {
+    var files = document.getElementById('uploadLP').files;
+    if (files.length != 1) {
+        return false;
+    }
+
+    var fr = new FileReader();
+    
+    fr.onload = function(e) { 
+        try {
+            var result = JSON.parse(e.target.result);
+            currentSettings['letterpairs'] = result;
+            saveSettings();
+            window.alert("Letter pair words changed successfully!")
+        } catch (e) {
+            console.error(e);
+            window.alert("Something went wrong while parsing your letter pairs. The file should be a json mapping from your letter pair to a word.")
+        }
+        
+    }
+    fr.readAsText(files.item(0));
 }
