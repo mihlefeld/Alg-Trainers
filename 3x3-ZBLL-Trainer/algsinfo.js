@@ -1,6 +1,6 @@
 const timesArrayKey = "3x3zbllTimes";
 const selectionArrayKey = "3x3zbllselection";
-var trainerTitle = "3x3 ZBLL Trainer";
+var trainerTitle = "3×3 ZBLL Trainer";
 var preRotations = [''];
 var postRotations = [''];
 var preMoves = ["", "U", "U'", "U2"];

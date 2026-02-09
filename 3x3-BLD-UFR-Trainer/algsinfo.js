@@ -1,6 +1,6 @@
 const timesArrayKey = "3x3bldCornersTimes";
 const selectionArrayKey = "3x3bldCornersSelection";
-var trainerTitle = "3x3 BLD UFR Trainer";
+var trainerTitle = "3×3 BLD UFR Trainer";
 var preRotations = [''];
 var postRotations = [''];
 var preMoves = [""];
