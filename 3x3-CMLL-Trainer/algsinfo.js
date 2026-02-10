@@ -1,6 +1,6 @@
 const timesArrayKey = "3x3cmllTimes";
 const selectionArrayKey = "3x3cmllselection";
-var trainerTitle = "3x3 CMLL Trainer";
+var trainerTitle = "3×3 CMLL Trainer";
 var preRotations = [''];
 var postRotations = [''];
 var preMoves = ["", "U", "U'", "U2"];
