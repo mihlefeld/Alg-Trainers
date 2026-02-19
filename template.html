@@ -132,10 +132,18 @@
 		<div class="dialogDiv colFlex borderedContainer">
 			<span onclick="closeDialog('settings')" class="material-symbols-outlined abutton closeButton">Close</span>
 			<div class="settingsEntry">
-				<div>Weighted choice</div>
+				<div>Weighted choice (# of Solves)</div>
 				<!-- Rounded switch -->
 				<label class="switch">
 					<input onclick="toggleSetting(this, 'weightedChoice');" type="checkbox" id="weighted_choice_on_off" value="using">
+					<span class="slider round"></span>
+				</label>
+			</div>
+			<div class="settingsEntry">
+				<div>Weighted choice (Mean time)</div>
+				<!-- Rounded switch -->
+				<label class="switch">
+					<input onclick="toggleSetting(this, 'weightedChoiceTime');" type="checkbox" id="weighted_choice_time_on_off" value="using">
 					<span class="slider round"></span>
 				</label>
 			</div>

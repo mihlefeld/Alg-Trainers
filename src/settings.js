@@ -19,6 +19,7 @@ var defaultSettings = {
     'timerSize': 5.0,
     'scrambleSize': 2,
     'weightedChoice': true,
+    'weightedChoiceTime' : false,
     'colors': {},
     'cubecolors': {
         "white": "#fafafa",
@@ -191,6 +192,7 @@ function applySettings() {
         document.getElementById('timer').style.fontSize = currentSettings['timerSize'] + "em";
         document.getElementById('scramble').style.fontSize = currentSettings['scrambleSize'] + "em";
         document.getElementById("weighted_choice_on_off").checked = currentSettings['weightedChoice'];
+        document.getElementById("weighted_choice_time_on_off").checked = currentSettings['weightedChoiceTime']
         document.getElementById('cornerSchemeInput').value = currentSettings['letterSchemeCorners'];
         document.getElementById('edgeSchemeInput').value = currentSettings['letterSchemeEdges'];
         document.getElementById('edges_letter_pairs_on_off').checked = currentSettings['useEdgesLetterPairs'];

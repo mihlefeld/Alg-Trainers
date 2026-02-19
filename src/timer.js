@@ -116,24 +116,34 @@ function generateScramble() {
         if (window.history.state == 'recap') {
             window.history.replaceState('train', '', baseUrl + "?train")
         }
-        if (currentSettings['weightedChoice']) {
+        if (currentSettings['weightedChoice'] || currentSettings['weightedChoiceTime']) {
             var selCasesCounts = []; // count how often each case has appeared already
+            var selCasesMeans = []; // the mean of each selected case
             for (var i = 0; i < selCases.length; i++) {
                 var count = 0;
+                var mean = 0;
                 var currentCase = selCases[i];
                 for (var j = 0; j < window.timesArray.length; j++) {
-                    if (window.timesArray[j]["case"] == currentCase)
+                    if (window.timesArray[j]["case"] == currentCase) {
                         count += 1;
+                        mean += window.timesArray[j]["ms"]
+                    }
                 }
                 selCasesCounts.push(count);
+                selCasesMeans.push(0.001*mean/count) // may be NaN for 0 count, dealt with later
             }
+
+            // any unseen case will be as likely as the slowest case until timed
+            const maxMean = Math.max(0, ...selCasesMeans.filter(Number.isFinite))
+            selCasesMeans = selCasesMeans.map(v => Number.isFinite(v) ? v : maxMean)
 
             var selCaseWeights = []; // calculate the weights with which the next case is to be chosen. weights are arranged cumulatively
             for (var i = 0; i < selCasesCounts.length; i++) {
+                const weight = (currentSettings['weightedChoice'] * ((selCasesCounts[i] + 0.1) ** -0.8) || 1) * (currentSettings['weightedChoiceTime'] * selCasesMeans[i] ** 0.8 || 1)
                 if (i == 0)
-                    selCaseWeights.push((selCasesCounts[i] + 0.1) ** -0.8);
+                    selCaseWeights.push(weight);
                 else
-                    selCaseWeights.push(selCaseWeights[i - 1] + (selCasesCounts[i] + 0.1) ** -0.8);
+                    selCaseWeights.push(selCaseWeights[i - 1] + weight);
             }
             caseNum = weightedRandomElement(selCases, selCaseWeights)
         }
