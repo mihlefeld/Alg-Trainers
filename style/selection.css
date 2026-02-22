@@ -12,7 +12,6 @@ div.itemSel {
     -moz-user-select: none; /* Firefox */
     -ms-user-select: none; /* IE10+/Edge */
     user-select: none; /* Standard */
-    -webkit-touch-callout: none; /* Safari don't zoom */
 }
 
 div.itemSel > {
@@ -40,7 +39,6 @@ div.itemUnsel {
     -moz-user-select: none; /* Firefox */
     -ms-user-select: none; /* IE10+/Edge */
     user-select: none; /* Standard */
-    -webkit-touch-callout: none; /* Safari don't zoom */
 }
 
 div#cases_selection {
@@ -51,7 +49,6 @@ div#cases_selection {
 
 img.caseImage {
     width: 5em;
-    -webkit-touch-callout: none; /* Safari don't zoom */
 }
 
 span.caseSpan {
