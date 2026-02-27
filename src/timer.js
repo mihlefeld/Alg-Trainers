@@ -2,8 +2,7 @@ var allowStartingTimer;
 var timesArray = JSON.parse(loadLocal(timesArrayKey, "[]"));
 if (timesArray == null) // todo fix when figure out why JSON.parse("[]") returns 0
     timesArray = [];
-var lastScramble = "";
-var lastCase = 0;
+var currentScramble = "";
 var hintCase = 0;
 var customAlgs = {};
 
@@ -19,7 +18,7 @@ function showScramble() {
         s = generateScramble();
         window.allowStartingTimer = true;
     }
-    var onclickS = `onclick='showHint(this, ${window.lastCase})'`;
+    var onclickS = `onclick='showHint(this, ${window.currentCase})'`;
     document.getElementById("scramble").innerHTML = `<span ${onclickS}> ${s} </span><span class='inlineButton' style='font-size: 1em !important;' ${onclickS}>?</span>`;
 }
 
@@ -102,11 +101,11 @@ function displayPracticeInfo() {
 }
 
 function generateScramble() {
-    if (window.lastScramble != "") {
-        document.getElementById("last_scramble").innerHTML = `<span>Last scramble: ${window.lastScramble}`
-        + ` <span id='showHintLastCaseButton' onclick='showHint(this,${lastCase})' class='caseNameStats'>(${getAlgName(lastCase)})</span></span><span id='last-scramble-buttons'>`
-        + getBookmarkButton(lastCase)
-        + `<span class='material-symbols-outlined inlineButton' onclick='confirmUnsel(${lastCase})'>close</span>`
+    if (window.currentScramble != "") {
+        document.getElementById("last_scramble").innerHTML = `<span>Last scramble: ${window.currentScramble}`
+        + ` <span id='showHintcurrentCaseButton' onclick='showHint(this,${window.currentCase})' class='caseNameStats'>(${getAlgName(window.currentCase)})</span></span><span id='last-scramble-buttons'>`
+        + getBookmarkButton(window.currentCase)
+        + `<span class='material-symbols-outlined inlineButton' onclick='confirmUnsel(${window.currentCase})'>close</span>`
         + `<span class='material-symbols-outlined inlineButton' onclick='confirmRemLast();'>undo</span></span>`;
     }
     displayPracticeInfo();
@@ -124,7 +123,7 @@ function generateScramble() {
                 var mean = 0;
                 var currentCase = selCases[i];
                 for (var j = 0; j < window.timesArray.length; j++) {
-                    if (window.timesArray[j]["case"] == currentCase) {
+                    if (window.timesArray[j]["case"] == window.currentCase) {
                         count += 1;
                         mean += window.timesArray[j]["ms"]
                     }
@@ -235,9 +234,9 @@ function generateScramble() {
             finalAlg = `(${algset}) ${letter_pair}`
         }
     }
-
-    window.lastScramble = finalAlg;
-    window.lastCase = caseNum;
+    window.lastCase = window.currentCase;
+    window.currentScramble = finalAlg;
+    window.currentCase = caseNum;
 
     return finalAlg;
 }
@@ -361,7 +360,7 @@ function escapeHtml(text) {
 
 // invoked right after the timer stopped
 function appendStats() {
-    // assuming the time can be grabbed from timer label, and the case - window.lastCase
+    // assuming the time can be grabbed from timer label, and the case - window.currentCase
     window.timesArray.push(makeResultInstance());
     displayStats();
 }
@@ -601,7 +600,7 @@ function displayStats() {
 
 function makeResultInstance() {
     var currentTime = document.getElementById("timer").innerHTML;
-    var details = window.lastScramble;
+    var details = window.currentScramble;
     var index = window.timesArray.length;
 
     return {
@@ -609,7 +608,7 @@ function makeResultInstance() {
         "ms": timeStringToMseconds(currentTime) * 10, // *10 because current time 1.23 display only hundreths, not thousandth of a second
         "details": details,
         "index": index,
-        "case": window.lastCase
+        "case": window.currentCase
     };
 }
 

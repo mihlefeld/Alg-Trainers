@@ -94,9 +94,9 @@ function main() {
         if (event.code == "KeyH" && !running && window.history.state != "select") {
             if (event.target.id != "hintWindow" && dialogOpenId != "hintWindow" && !dialogOpen) {
                 if (event.shiftKey) {
-                    document.getElementById("showHintLastCaseButton").click();
+                    document.getElementById("showHintcurrentCaseButton").click();
                 } else {
-                    showHint(null, window.lastCase);
+                    showHint(null, window.currentCase);
                 }
             }
         }
