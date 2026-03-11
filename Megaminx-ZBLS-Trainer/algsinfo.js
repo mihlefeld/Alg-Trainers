@@ -1,6 +1,6 @@
 const timesArrayKey = "megazblTimesArray";
 const selectionArrayKey = "megazblSelection";
-var trainerTitle = "Megaminx WV Trainer";
+var trainerTitle = "Megaminx ZBLS Trainer";
 var preRotations = [''];
 var postRotations = [''];
 var preMoves = ["", "U", "U'", "U2", "U2'"];
