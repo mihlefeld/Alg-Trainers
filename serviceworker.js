@@ -21,7 +21,7 @@ var assets = [
   "https://colorjs.io/dist/color.global.js",
   "https://cdn.jsdelivr.net/npm/chart.js"
 ];
-const trainerCache = "alg-trainer-cache-1.6.11";
+const trainerCache = "alg-trainer-cache-1.6.12";
 
 function refreshCache() {
   caches.keys().then((keys) => {
@@ -66,7 +66,6 @@ var algsInTrainers = {
   '3x3-BLD-UFR-Trainer': 378,
   '3x3-BLD-UF-Trainer': 440,
   '3x3-CMLL-Trainer': 42,
-  '3x3-OH-PLL-Trainer': 21,
   '3x3-OH-CMLL-Trainer': 42,
   '3x3-OH-OLL-Trainer': 57,
   '3x3-OH-PLL-Trainer': 21,
@@ -76,13 +75,19 @@ var algsInTrainers = {
   '3x3-ZBLL-Trainer': 472,
   '3x3-ZBLS-Trainer': 302,
   '5x5-L2E-Trainer': 15,
+  '5x5-LCE-Trainer': 398,
   'Megaminx-OLL-Trainer': 259, 
   'Megaminx-PLL-Trainer': 151, 
+  'Megaminx-WV-Trainer': 81, 
+  'Megaminx-ZBLS-Trainer': 692, 
   'Octaminx-TCP-Trainer': 18,
   'Octaminx-L3T-Trainer': 12,
   'Pyraminx-L4E-Trainer': 35, 
+  'Skewb-L6C-Trainer': 11,
   'Skewb-NS2-Trainer': 267,
+  'Skewb-TCLL-Trainer': 120,
   'Sq1-CPEP-Trainer': 57,
+  'Sq1-OBL-Trainer': 185,
   'Sq1-PBL-Trainer': 967,
 };
 

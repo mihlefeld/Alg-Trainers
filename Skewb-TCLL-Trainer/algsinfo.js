@@ -1,0 +1,9 @@
+const timesArrayKey = "skewbtcllTimesArray";
+const selectionArrayKey = "skewbtcllSelection";
+var trainerTitle = "Skewb TCLL Trainer";
+var preRotations = ['', 'y', 'y2', "y'", "x", "x y", "x y2", "x y'", "z'", "z' y", "z' y2", "z' y'", "z", "z y", "z y2", "z y'", "z2 y'", "z2", "x2", "z2 y"];
+var postRotations = [''];
+var preMoves = [""];
+var postMoves = preMoves;
+var selCases = [];
+var maxAlgsPerRow = 8;
