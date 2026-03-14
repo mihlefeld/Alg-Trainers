@@ -107,7 +107,7 @@ function main() {
             allowed = false;
 
         if (running) {
-            if (event.code = "Escape") {
+            if (event.code == "Escape") {
                 timerAbort();
             }
             else {
