@@ -331,7 +331,6 @@ function timerAbort() {
 function timerSetReady() {
     holdPassed = false;
     waiting = false;
-    timer.innerHTML = "0.00";
     holdTimeout = setTimeout(() => {
         if (!waiting) {
             timer.style.color = "#008500";
