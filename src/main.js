@@ -107,8 +107,13 @@ function main() {
             allowed = false;
 
         if (running) {
-            // stop timer on any button
-            timerStop();
+            if (event.code = "Escape") {
+                timerAbort();
+            }
+            else {
+                // stop timer on any button other than escape
+                timerStop();
+            }
             return;
         }
         else if (event.code == "Space") {
