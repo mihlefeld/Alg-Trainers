@@ -1,5 +1,5 @@
-const timesArrayKey = "skewbtcllTimesArray";
-const selectionArrayKey = "skewbtcllSelection";
+const timesArrayKey = "skewbtcll2TimesArray";
+const selectionArrayKey = "skewbtcll2Selection";
 var trainerTitle = "Skewb TCLL Trainer";
 var preRotations = ['', 'y', 'y2', "y'", "x", "x y", "x y2", "x y'", "z'", "z' y", "z' y2", "z' y'", "z", "z y", "z y2", "z y'", "z2 y'", "z2", "x2", "z2 y"];
 var postRotations = [''];
