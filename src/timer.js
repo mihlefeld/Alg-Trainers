@@ -331,12 +331,18 @@ function timerAbort() {
 function timerSetReady() {
     holdPassed = false;
     waiting = false;
-    holdTimeout = setTimeout(() => {
-        if (!waiting) {
-            timer.style.color = "#008500";
-            holdPassed = true;
-        }
-    }, 200);
+    if (currentSettings['enableHoldDelay']) {
+        holdTimeout = setTimeout(() => {
+            if (!waiting) {
+                timer.style.color = "#008500";
+                holdPassed = true;
+            }
+        }, 200);
+    }
+    else {
+        timer.style.color = "#008500";
+        holdPassed = true;
+    }
 }
 
 function timerStart() {
