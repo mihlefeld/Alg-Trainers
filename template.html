@@ -64,7 +64,7 @@
 			<div id="presetsSettings" class="colFlex" style="width: fit-content; max-width: 100%;"></div>
 			<div style="width: 100%; display: flex; justify-content: space-between; align-items: end;">
 				<a onclick="openDialog('hotkeysDialog')">Hotkeys</a>
-				<span class="version">v1.6.18</span>
+				<span class="version">v1.6.19</span>
 				<a onclick="openDialog('aboutDialog')">Credits</a>
 			</div>
 		</div>
@@ -131,6 +131,14 @@
 	<dialog id="settings" class='colFlex borderedContainer' autofocus="">
 		<div class="dialogDiv colFlex borderedContainer">
 			<span onclick="closeDialog('settings')" class="material-symbols-outlined abutton closeButton">Close</span>
+			<div class="settingsEntry">
+				<div>Hold down delay</div>
+				<!-- Rounded switch -->
+				<label class="switch">
+					<input onclick="toggleSetting(this, 'enableHoldDelay');" type="checkbox" id="hold_delay_on_off" value="using">
+					<span class="slider round"></span>
+				</label>
+			</div>
 			<div class="settingsEntry">
 				<div>Weighted choice (# of Solves)</div>
 				<!-- Rounded switch -->
