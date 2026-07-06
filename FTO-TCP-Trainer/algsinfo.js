@@ -1,5 +1,5 @@
-const timesArrayKey = "octaminxTCPTimesArray";
-const selectionArrayKey = "octaminxTCPSelection";
+const timesArrayKey = "ftoTCPTimesArray";
+const selectionArrayKey = "ftoTCPSelection";
 var trainerTitle = "FTO TCP Trainer"
 var maxAlgsPerRow = 6;
 var preRotations = [''];
