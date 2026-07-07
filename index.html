@@ -88,6 +88,7 @@
 
                     const iconPath = entries && entries.length ? `${entries[0].location}/icon.png` : "icon.png";
                     const icon = document.createElement("img");
+                    icon.style.height = "1.4em";
                     icon.src = iconPath;
                     header.appendChild(icon);
 
