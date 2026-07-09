@@ -22,7 +22,7 @@ var assets = [
   "https://colorjs.io/dist/color.global.js",
   "https://cdn.jsdelivr.net/npm/chart.js"
 ];
-const trainerCache = "alg-trainer-cache-1.6.27";
+const trainerCache = "alg-trainer-cache-1.6.28";
 
 function refreshCache() {
   caches.keys().then((keys) => {
@@ -85,6 +85,7 @@ var algsInTrainers = {
   'FTO-L3T-Trainer': 179,
   'FTO-L6X-Trainer': 38,
   'FTO-L3C-Trainer': 5,
+  'FTO-BTLT-Trainer': 23,
   'Pyraminx-L4E-Trainer': 35, 
   'Skewb-L6C-Trainer': 11,
   'Skewb-NS2-Trainer': 267,

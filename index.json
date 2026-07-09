@@ -135,6 +135,10 @@
         {
             "name": "L3C",
             "location": "FTO-L3C-Trainer"
+        },
+        {
+            "name": "BTLT",
+            "location": "FTO-BTLT-Trainer"
         }
     ],
     "Square-1": [
