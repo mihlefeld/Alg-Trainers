@@ -1,9 +1,9 @@
-const timesArrayKey = "ftolbtTimesArray";
-const selectionArrayKey = "ftolbtSelection";
+const timesArrayKey = "ftolbtTimesArray.1";
+const selectionArrayKey = "ftolbtSelection.1";
 var trainerTitle = "FTO LBT Trainer";
 var preRotations = [""];
 var postRotations = [""];
 var preMoves = ["U", "U'"];
 var postMoves = preMoves;
 var selCases = [];
-var maxAlgsPerRow = 4;
+var maxAlgsPerRow = 8;

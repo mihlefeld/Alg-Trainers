@@ -94,6 +94,7 @@ var algsInTrainers = {
   'FTO-L6X-Trainer': 38,
   'FTO-L3C-Trainer': 5,
   'FTO-BTLT-Trainer': 23,
+  'FTO-LBT-Trainer': 95,
   'Pyraminx-L4E-Trainer': 35, 
   'Skewb-L6C-Trainer': 11,
   'Skewb-NS2-Trainer': 267,
