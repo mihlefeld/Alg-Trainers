@@ -207,7 +207,8 @@ fetchAll("selected_algsets.json", "groups_info.json", "algsets_info.json", "algs
         .then((bodyHTML) => {
             applySettings();
             document.body.outerHTML = bodyHTML;
-            window.requestAnimationFrame(() => {window.requestAnimationFrame(main)})
+            window.requestAnimationFrame(() => {window.requestAnimationFrame(main)});
+            document.getElementById("versionLabel").textContent = `v${APP_VERSION}`;
         });
     }
 )

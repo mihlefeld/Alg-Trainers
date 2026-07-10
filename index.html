@@ -50,12 +50,16 @@
     </style>
     <script src="https://colorjs.io/dist/color.global.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="src/version.js"></script>
     <script src="src/utils.js"></script>
     <script src="src/settings.js"></script>
 </head>
 
 <body id="bodyid" class="niceBody colFlex" style="background-color: var(--backgroundDarker);">
-    <div class="colFlex pad"><h3>Welcome to ALLG-Trainer</h3></div>
+    <div class="colFlex pad">
+        <h3>Welcome to ALLG-Trainer</h3>
+        <span class="version" id="versionLabel" style="position: absolute; right: 0.2em; bottom: 0.2em;"></span>
+    </div>
     <div id="algtrainer-selections" class="rowFlex pad"></div>
 </body>
 <script>
@@ -122,5 +126,6 @@
     renderTrainerSelections();
     loadSettings();
     applySettings();
+    document.getElementById("versionLabel").textContent = `v${APP_VERSION}`;
 </script>
 </html>

@@ -22,19 +22,27 @@ var assets = [
   "https://colorjs.io/dist/color.global.js",
   "https://cdn.jsdelivr.net/npm/chart.js"
 ];
-const trainerCache = "alg-trainer-cache-1.6.28";
+importScripts('/Alg-Trainers/src/version.js');
+const trainerCache = `alg-trainer-cache-${APP_VERSION}`;
 
 function refreshCache() {
-  caches.keys().then((keys) => {
-    for (key of keys) {
-      if (key != trainerCache) {
-        caches.delete(key);
-      }
-    }
-    caches.open(trainerCache).then((cache) => {
-      cache.addAll(assets);
-    })
-  })
+  return caches.keys().then((keys) => {
+    const deletions = keys
+      .filter((k) => k !== trainerCache)
+      .map((k) => caches.delete(k));
+
+    return Promise.all(deletions).then(() =>
+      caches.open(trainerCache).then((cache) => {
+        return Promise.all(
+          assets.map((url) =>
+            cache.add(url).catch((err) => {
+              console.warn(`Failed to cache ${url}:`, err);
+            })
+          )
+        );
+      })
+    );
+  });
 }
 
 self.addEventListener('fetch', (event) => {

@@ -119,7 +119,7 @@
             "location": "Skewb-L6C-Trainer"
         }
     ],
-    "FTO": [
+    "FTO Bencisco": [
         {
             "name": "TCP",
             "location": "FTO-TCP-Trainer"
@@ -127,7 +127,9 @@
         {
             "name": "L3T",
             "location": "FTO-L3T-Trainer"
-        },
+        }
+    ],
+    "FTO Nautilus": [
         {
             "name": "L6X",
             "location": "FTO-L6X-Trainer"
