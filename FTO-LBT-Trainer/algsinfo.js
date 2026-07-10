@@ -1,0 +1,9 @@
+const timesArrayKey = "fto<built-in method lower of str object at 0x000001B43A8EBDB0>TimesArray";
+const selectionArrayKey = "fto<built-in method lower of str object at 0x000001B43A8EBDB0>Selection";
+var trainerTitle = "FTO LBT Trainer";
+var preRotations = "";
+var postRotations = "";
+var preMoves = ["U", "U'"];
+var postMoves = preMoves;
+var selCases = [];
+var maxAlgsPerRow = 4;
