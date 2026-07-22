@@ -145,6 +145,10 @@
         {
             "name": "BTLT",
             "location": "FTO-BTLT-Trainer"
+        },
+        {
+            "name": "FTLT",
+            "location": "FTO-FTLT-Trainer"
         }
     ],
     "Square-1": [
