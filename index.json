@@ -121,19 +121,23 @@
     ],
     "FTO Bencisco": [
         {
+            "name": "LBT",
+            "location": "FTO-LBT-Trainer"
+        },
+        {
             "name": "TCP",
             "location": "FTO-TCP-Trainer"
         },
         {
             "name": "L3T",
             "location": "FTO-L3T-Trainer"
-        },
-        {
-            "name": "LBT",
-            "location": "FTO-LBT-Trainer"
         }
     ],
     "FTO Nautilus": [
+        {
+            "name": "FTLT",
+            "location": "FTO-FTLT-Trainer"
+        },
         {
             "name": "L6X",
             "location": "FTO-L6X-Trainer"
@@ -145,10 +149,6 @@
         {
             "name": "BTLT",
             "location": "FTO-BTLT-Trainer"
-        },
-        {
-            "name": "FTLT",
-            "location": "FTO-FTLT-Trainer"
         }
     ],
     "Square-1": [
