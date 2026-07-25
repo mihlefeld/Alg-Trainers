@@ -46,6 +46,11 @@ function main() {
     /// handles keypup and keydown events. Starts timer etc.
     document.getElementById("bodyid").addEventListener("keydown", function (event) {
         if (dialogOpen) {
+            if ( this !== event.target && 
+                ( /textarea|select/i.test( event.target.nodeName ) ||
+                event.target.type === "text") ) {
+                return;
+            }
             if (event.code == "Escape") {
                 dialogOpen = false;
                 window.allowStartingTimer = true;

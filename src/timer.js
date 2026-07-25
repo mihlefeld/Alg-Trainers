@@ -452,6 +452,21 @@ function editAlg() {
 
 }
 
+function resetAlg() {
+    if (confirm("Do you want to reset the custom algs for this case?")) {
+        delete customAlgs[hintCase]
+        saveAlgs();
+        showHint(hintCase);
+    }
+}
+
+function resetAllAlgs() {
+    if (confirm("Do yo want to reset all your custom algs entered to this trainer?")) {
+        customAlgs = {};
+        saveAlgs();
+    }
+}
+
 function renderHint(i) {
     document.getElementById('editAlgButton').innerText = "edit"
     var setup = scramblesMap[i];
