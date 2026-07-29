@@ -224,10 +224,10 @@ function makeDivNormal(groupname) {
         allSelected &= sel;
 
         var alg_name = getAlgName(i);
-        if (trainerTitle == "Square-1 PBL Trainer" || trainerTitle.includes("BLD")) {
+        if (trainerTitle == "Square-1 PBL Trainer" || trainerTitle.includes("BLD") ) {
             var content = `<span class='caseSpan'>${alg_name}</span>`;
         } 
-        else if (trainerTitle.includes("Square-1")) {
+        else if (trainerTitle.includes("Square-1") || trainerTitle == "FTO L3T Trainer") {
             var caseSpan = `<span class='caseSpan'>${alg_name}</span>`
             if (trainerTitle.includes('OBL')) {
                 var nameParts = alg_name.split("|");
