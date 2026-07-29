@@ -40,6 +40,11 @@ function main() {
         trainerNotes.innerText = "Hint: use F BL' R D' R' D R' B R B' BL F' to hide extra triangles."
         trainerNotes.style.display = "flex";
     }
+    if (trainerTitle == "FTO FTLT Trainer" || trainerTitle == "FTO LT Trainer") {
+        const trainerNotes = document.getElementById("trainerNotes")
+        trainerNotes.innerText = "Hint: use U' r R' U' R BR r2' F' r R' F r R BR' r' U' to hide extra triangles."
+        trainerNotes.style.display = "flex";
+    }
     var splitUrl = window.location.href.split('?');
     baseUrl = splitUrl[0];
     var startState = splitUrl.length > 1 ? splitUrl[1] : 'select';
