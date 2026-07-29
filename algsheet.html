@@ -1,0 +1,161 @@
+<!doctype html>
+<html>
+<head>
+	<title>
+		FTO L3T Trainer
+	</title>
+	<script async data-id="101460922" src="//static.getclicky.com/js"></script>
+	<link rel="icon" type="image/png" href="icon.png">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0, minimum-scale=1.0, maximum-scale=1.0">
+	<meta http-equiv="Content-Type" content="text/html;charset=UTF-8" />
+	<link rel="stylesheet" type="text/css" href="style/main.css">
+	<link rel="stylesheet" type="text/css" href="style/selection.css">
+	<link rel="stylesheet" type="text/css" href="style/timer.css">
+	<link rel="stylesheet" type="text/css" href="style/settings.css">
+	<link rel="stylesheet" type="text/css" href="style/hint.css">
+	<link rel="stylesheet" type="text/css" href="style/algsheet.css">
+	<link rel="preconnect" href="https://fonts.googleapis.com">
+	<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+	<link
+		href="https://fonts.googleapis.com/css2?family=Titillium+Web:ital,wght@0,200;0,300;0,400;0,600;0,700;0,900;1,200;1,300;1,400;1,600;1,700&display=swap"
+		rel="stylesheet">
+	<link rel="stylesheet"
+		href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" />
+	<style>
+		.material-symbols-outlined {
+			font-variation-settings:
+				'FILL' 0,
+				'wght' 400,
+				'GRAD' 0,
+				'opsz' 24
+		}
+	</style>
+	<script src="https://colorjs.io/dist/color.global.js"></script>
+	<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+	<script src="src/version.js"></script>
+    <script src="src/utils.js"></script>
+    <script src="src/settings.js"></script>
+</head>
+<body class="niceBody" id="bodyid">
+<h1 id="algsheetTitle">No Valid Algset Selected</h1>
+<div id="algsheet" class="algsheetGrid" style="width: 80vw;"></div>
+</body>
+<script>
+loadSettings();
+applySettings();
+
+let algsetData = {};
+
+async function loadAlgsetData() {
+	const algset = new URLSearchParams(window.location.search).get('algset');
+	const title = document.getElementById('algsheetTitle');
+	if (!algset) {
+		title.textContent = 'No Valid Algset Selected';
+		algsetData = {};
+		return;
+	}
+	const files = ['algs_info.json', 'combined.json', 'groups_info.json', 'algsets_info.json'];
+	try {
+		const results = await Promise.all(
+			files.map(f => fetch(`${algset}/${f}`).then(r => r.ok ? r.json() : null).catch(() => null))
+		);
+		const [algs_info, combined, groups_info, algsets_info] = results;
+		algsetData = { algset, algs_info, combined, groups_info, algsets_info };
+		if (results.every(r => r === null)) {
+			title.textContent = 'No Valid Algset Selected';
+		} else {
+			title.textContent = algset;
+		}
+	} catch (e) {
+		title.textContent = 'No Valid Algset Selected';
+		algsetData = {};
+	}
+
+	renderAlgsheet();
+}
+
+function svgToImgSrc(svg) {
+	return `data:image/svg+xml;base64,${btoa(unescape(encodeURIComponent(svg)))}`;
+}
+
+function renderAlgsheet() {
+	const container = document.getElementById('algsheet');
+	container.innerHTML = '';
+	const { algsets_info, groups_info, combined, algs_info } = algsetData;
+	if (!algsets_info || !groups_info || !combined) return;
+
+	for (const [algsetName, groupNames] of Object.entries(algsets_info)) {
+        const algsetTitle = document.createElement('div');
+        algsetTitle.innerHTML = `<b>${algsetName}</b>`;
+        algsetTitle.classList = "borderedContainer itemUnsel pad groupNameDiv fullSpan";
+        algsetTitle.dataset.algset = algsetName;
+        container.appendChild(algsetTitle);
+
+		for (const groupName of groupNames) {
+            const groupTitle = document.createElement('div');
+            groupTitle.className = "borderedContainer itemUnsel pad groupNameDiv fullSpan";
+            groupTitle.innerText = groupName;
+            groupTitle.dataset.group = groupName;
+            container.appendChild(groupTitle);
+
+			const caseIds = groups_info[groupName] || [];
+			for (const caseId of caseIds) {
+				const svg = combined[caseId];
+				if (!svg) continue;
+                const caseDiv = document.createElement('div');
+                caseDiv.classList = "colFlex";
+                caseDiv.dataset.group = groupName;
+
+                const imgDiv = document.createElement('div');
+                imgDiv.classList = "itemUnsel borderedContainer";
+
+                const caseName = document.createElement('span');
+                caseName.innerText = algs_info[caseId].name;
+                caseName.classList = "caseName";
+                imgDiv.appendChild(caseName);
+                
+                const caseSetup = document.createElement('span');
+                caseSetup.innerText = algs_info[caseId].s;
+                caseSetup.classList = "caseSetup";
+                imgDiv.appendChild(caseSetup);
+                
+				const img = document.createElement('img');
+				img.src = svgToImgSrc(svg);
+				img.alt = `${groupName} ${caseId}`;
+                img.style.width = '10em';
+                img.classList = "caseImage itemUnsel";
+				img.dataset.caseId = caseId;
+                imgDiv.appendChild(img)
+                
+
+                const algsDiv = document.createElement('div');
+                algsDiv.classList = "colFlex";
+                for (const alg of algs_info[caseId]['a']) {
+                    const algDiv = document.createElement('div');
+                    algDiv.classList = "borderedContainer pad";
+                    algDiv.style.background = "var(--backgroundDarker)";
+                    algDiv.style.color = "var(--backgroundText)";
+                    algDiv.innerText = alg;
+                    algsDiv.appendChild(algDiv);
+                }
+
+                caseDiv.appendChild(imgDiv);
+                caseDiv.appendChild(algsDiv);
+				container.appendChild(caseDiv);
+			}
+		}
+	}
+}
+
+window.addEventListener('popstate', loadAlgsetData);
+window.addEventListener('hashchange', loadAlgsetData);
+(function(history){
+	const push = history.pushState;
+	const replace = history.replaceState;
+	history.pushState = function() { const r = push.apply(this, arguments); loadAlgsetData(); return r; };
+	history.replaceState = function() { const r = replace.apply(this, arguments); loadAlgsetData(); return r; };
+})(window.history);
+
+loadAlgsetData();
+</script>
+</html>
