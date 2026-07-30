@@ -1,4 +1,4 @@
-const APP_VERSION = "1.7.8";
+const APP_VERSION = "1.7.8a";
 
 // Export for service worker (importScripts) and expose globally for pages
 if (typeof self !== "undefined") {
