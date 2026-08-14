@@ -149,6 +149,10 @@
     {
       "name": "LT",
       "location": "FTO-LT-Trainer"
+    },
+    {
+      "name": "LL",
+      "location": "FTO-LL-Trainer"
     }
   ],
   "Square-1": [

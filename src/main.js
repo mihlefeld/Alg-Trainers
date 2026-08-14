@@ -45,17 +45,6 @@ function main() {
         trainerNotes.innerText = "Hint: use U' r R' U' R BR r2' F' r R' F r R BR' r' U' to hide extra triangles."
         trainerNotes.style.display = "flex";
     }
-    if (trainerTitle == "FTO LT Trainer") {
-        const trainerNotes = document.getElementById("trainerNotes")
-        const warning = document.createElement("div");
-        warning.innerText = "Not fully genned yet, do not rely on recommended algs."
-        warning.style.display = "flex";
-        warning.style.paddingTop = "1em";
-        warning.style.fontSize = "0.8em";
-        warning.style.color = "var(--accent)";
-        trainerNotes.parentElement.insertBefore(warning, trainerNotes);
-        
-    }
     var splitUrl = window.location.href.split('?');
     baseUrl = splitUrl[0];
     var startState = splitUrl.length > 1 ? splitUrl[1] : 'select';
