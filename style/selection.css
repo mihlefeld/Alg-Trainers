@@ -52,8 +52,9 @@ img.caseImage {
 }
 
 span.caseSpan {
-    width: 5em;
+    width: 6.25em;
     text-align: center;
+    font-size: 0.8em;
 }
 
 .version {

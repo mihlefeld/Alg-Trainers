@@ -2,7 +2,7 @@
 <html>
 <head>
 	<title>
-		FTO L3T Trainer
+		Algsheets
 	</title>
 	<script async data-id="101460922" src="//static.getclicky.com/js"></script>
 	<link rel="icon" type="image/png" href="icon.png">
@@ -38,6 +38,7 @@
 </head>
 <body class="niceBody" id="bodyid">
 <h1 id="algsheetTitle">No Valid Algset Selected</h1>
+<h2><a href="/Alg-Trainers/" id="backToTrainerLink">Go to Trainer</a></h2>
 <div id="algsheet" class="algsheetGrid" style="width: 80vw;"></div>
 </body>
 <script>
@@ -64,7 +65,7 @@ async function loadAlgsetData() {
 		if (results.every(r => r === null)) {
 			title.textContent = 'No Valid Algset Selected';
 		} else {
-			title.textContent = algset;
+			title.textContent = algset.replaceAll("-", " ").replaceAll("Trainer", "Algs");
 		}
 	} catch (e) {
 		title.textContent = 'No Valid Algset Selected';
@@ -79,6 +80,9 @@ function svgToImgSrc(svg) {
 }
 
 function renderAlgsheet() {
+	const backToTrainerLink = document.getElementById('backToTrainerLink');
+	backToTrainerLink.setAttribute("href", `/Alg-Trainers/${algsetData.algset}`);
+
 	const container = document.getElementById('algsheet');
 	container.innerHTML = '';
 	const { algsets_info, groups_info, combined, algs_info } = algsetData;

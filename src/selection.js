@@ -208,6 +208,20 @@ function touchend(i) {
 }
 
 function makeDivNormal(groupname) {
+    const namedTrainers = [
+        "3×3 PLL Trainer",
+        "OH PLL Trainer",
+        "FTO TCP Trainer",
+        "FTO L3T Trainer",
+        "FTO LL Trainer",
+        "FTO L6X Trainer",
+        "FTO LL Trainer",
+        "FTO FTLT Trainer",
+        "Square-1 CPEP Trainer",
+        "Square-1 OBL Trainer",
+        "Square-1 PBL Trainer",
+    ];
+    const includeNames = namedTrainers.includes(trainerTitle);
     var s = "";
     var indeces = algsGroups[groupname];
     var displayGroupname = translateAlgGroup(groupname) 
@@ -227,14 +241,15 @@ function makeDivNormal(groupname) {
         if (trainerTitle == "Square-1 PBL Trainer" || trainerTitle.includes("BLD") ) {
             var content = `<span class='caseSpan'>${alg_name}</span>`;
         } 
-        else if (trainerTitle.includes("Square-1") || trainerTitle == "FTO L3T Trainer" || trainerTitle == "FTO LL Trainer") {
+        else if (includeNames) {
             var caseSpan = `<span class='caseSpan'>${alg_name}</span>`
             if (trainerTitle.includes('OBL')) {
                 var nameParts = alg_name.split("|");
                 caseSpan =  `<span class='caseSpan'>${nameParts[0]}</span><span class='caseSpan'>${nameParts[1]}</span>`
             }
             var content = `${caseSpan}<img oncontextmenu='return false;' class='caseImage' id='sel${i}' src='${blobUrls[i]}'>`;
-        } else {
+        } 
+        else {
             var content = `<img oncontextmenu='return false;' class='caseImage' id='sel${i}' src='${blobUrls[i]}'>`;
         }
         s += `<div id='itemTd${i}' ${dblclick} onclick='itemClicked(${i})' class='${(sel ? "itemSel" : "itemUnsel")} borderedContainer' title='${alg_name}' name='${alg_name}'>${content}</div>`

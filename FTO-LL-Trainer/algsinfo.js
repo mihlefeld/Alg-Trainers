@@ -6,4 +6,4 @@ var postRotations = [""];
 var preMoves = ["U", "U'"];
 var postMoves = preMoves;
 var selCases = [];
-var maxAlgsPerRow = 6;
+var maxAlgsPerRow = 12;

@@ -35,6 +35,7 @@ function main() {
     timer = document.getElementById('timer');
     timer.innerHTML = "ready";
     document.getElementById("trainerTitle").innerHTML = trainerTitle + ' | <a href="../index.html">Back</a>';
+    document.getElementById("algsheetLink").setAttribute("href", `../algsheet.html?algset=${window.location.pathname.split("/")[2]}`);
     if (trainerTitle == "FTO LBT Trainer") {
         const trainerNotes = document.getElementById("trainerNotes")
         trainerNotes.innerText = "Hint: use F BL' R D' R' D R' B R B' BL F' to hide extra triangles."

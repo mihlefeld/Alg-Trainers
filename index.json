@@ -168,5 +168,11 @@
       "name": "PBL",
       "location": "Sq1-PBL-Trainer"
     }
+  ],
+  "3×3 FSLL": [
+    {
+      "name": "FSO",
+      "location": "3x3-FSO-Trainer"
+    }
   ]
 }
