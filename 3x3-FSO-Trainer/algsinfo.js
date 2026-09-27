@@ -1,5 +1,5 @@
-const timesArrayKey = "3x3fsoTimesArray";
-const selectionArrayKey = "3x3fsoSelection";
+const timesArrayKey = "3x3fsoTimesArray.1";
+const selectionArrayKey = "3x3fsoSelection.1";
 var trainerTitle = "3x3 FSO Trainer";
 var preRotations = [""];
 var postRotations = [""];
