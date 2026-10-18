@@ -11,6 +11,11 @@
     <link rel="manifest" href="manifest.json" />
     <title>ALLG Trainer</title>
     <script>
+        var preRotations = [''];
+        var postRotations = [''];
+        var preMoves = [''];
+        var postMoves = [''];
+        var selectionArrayKey = "Index";
         var selectedAlgSets = {};
         const registerServiceWorker = async () => {
 			if ("serviceWorker" in navigator) {
