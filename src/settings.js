@@ -38,6 +38,7 @@ var defaultSettings = {
         "orange": "#F28E2B"
     },
     'selectedAlgSets': {},
+    'trainerScrambleOverrides': {},
     'letterSchemeCorners': "abcdefghijklmnopqrstuvwx",
     'letterSchemeEdges': "abcdefghijklmnopqrstuvwx",
     'letterpairs': {},
@@ -83,6 +84,14 @@ var currentSettings = {};
 Object.assign(currentSettings, defaultSettings);
 Object.assign(currentSettings['colors'], defaultColors[getColorScheme()]);
 Object.assign(currentSettings['selectedAlgSets'], window.selectedAlgSets);
+
+var defaultTrainerScrambleOptions = {
+    preRotations: [...preRotations],
+    postRotations: [...postRotations],
+    preMoves: [...preMoves],
+    postMoves: [...postMoves]
+};
+var trainerScrambleOptionNames = ['preRotations', 'postRotations', 'preMoves', 'postMoves'];
 
 
 function loadSettings() {
@@ -200,8 +209,45 @@ function applySettings() {
         document.getElementById('edges_letter_pairs_on_off').checked = currentSettings['useEdgesLetterPairs'];
         document.getElementById('corners_letter_pairs_on_off').checked = currentSettings['useCornersLetterPairs'];
     } catch(e) {}
+    applyTrainerScrambleOverrides();
     document.body.style.fontSize = currentSettings['baseSize'] + "em";
     computeColors();
+}
+
+function applyTrainerScrambleOverrides() {
+    var trainerOverrides = currentSettings['trainerScrambleOverrides'][selectionArrayKey] || {};
+    for (const key of trainerScrambleOptionNames) {
+        var override = trainerOverrides[key];
+        window[key] = Array.isArray(override) && override.length > 0
+            ? [...override]
+            : [...defaultTrainerScrambleOptions[key]];
+
+        var input = document.getElementById(`trainerScramble-${key}`);
+        if (input) {
+            input.value = Array.isArray(override) ? override.join('\n') : '';
+        }
+    }
+}
+
+function changeTrainerScrambleOverride(event, key) {
+    var value = event.target.value;
+    var trainerOverrides = currentSettings['trainerScrambleOverrides'][selectionArrayKey];
+    if (!trainerOverrides) {
+        trainerOverrides = {};
+        currentSettings['trainerScrambleOverrides'][selectionArrayKey] = trainerOverrides;
+    }
+
+    if (value.trim() === '') {
+        delete trainerOverrides[key];
+    } else {
+        trainerOverrides[key] = value.split(/\r?\n/).map(option => option.trim());
+    }
+    if (Object.keys(trainerOverrides).length === 0) {
+        delete currentSettings['trainerScrambleOverrides'][selectionArrayKey];
+    }
+
+    applyTrainerScrambleOverrides();
+    saveSettings();
 }
 
 

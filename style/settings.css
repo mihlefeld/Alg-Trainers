@@ -48,6 +48,29 @@ summary.settingsSummary:hover {
     padding: 0.3em;
 }
 
+.trainerScrambleHelp {
+    font-size: 0.8em;
+    padding: 0.3em;
+}
+
+.trainerScrambleEntry label {
+    align-self: center;
+}
+
+.trainerScrambleEntry textarea {
+    width: 12em;
+    max-width: 60%;
+    min-height: 3em;
+    resize: vertical;
+    margin: 0;
+    padding: 0.2em;
+    border: var(--borderWidth) solid var(--text);
+    border-radius: var(--borderRadius);
+    background-color: var(--background);
+    color: var(--text);
+    font: inherit;
+}
+
 dialog#settings button, #settingsUploadCustomAlgsLabel, #uploadLSLabel, #uploadLPLabel {
     width: 3em;
     height: 100%;

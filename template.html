@@ -180,6 +180,28 @@
 				</div>
 			</div>
 			<details class="settingsDetails" name="mainSettings">
+				<summary class="settingsSummary">Scramble options</summary>
+				<div class="colFlex">
+					<div class="trainerScrambleHelp">Enter one option per line. Leave a field blank to use this trainer's defaults.</div>
+					<div class="settingsEntry trainerScrambleEntry">
+						<label for="trainerScramble-preRotations">Pre-rotations</label>
+						<textarea id="trainerScramble-preRotations" rows="2" onchange="changeTrainerScrambleOverride(event, 'preRotations')" placeholder="Trainer default"></textarea>
+					</div>
+					<div class="settingsEntry trainerScrambleEntry">
+						<label for="trainerScramble-postRotations">Post-rotations</label>
+						<textarea id="trainerScramble-postRotations" rows="2" onchange="changeTrainerScrambleOverride(event, 'postRotations')" placeholder="Trainer default"></textarea>
+					</div>
+					<div class="settingsEntry trainerScrambleEntry">
+						<label for="trainerScramble-preMoves">Pre-moves</label>
+						<textarea id="trainerScramble-preMoves" rows="2" onchange="changeTrainerScrambleOverride(event, 'preMoves')" placeholder="Trainer default"></textarea>
+					</div>
+					<div class="settingsEntry trainerScrambleEntry">
+						<label for="trainerScramble-postMoves">Post-moves</label>
+						<textarea id="trainerScramble-postMoves" rows="2" onchange="changeTrainerScrambleOverride(event, 'postMoves')" placeholder="Trainer default"></textarea>
+					</div>
+				</div>
+			</details>
+			<details class="settingsDetails" name="mainSettings">
 				<summary class="settingsSummary">Styling</summary>
 				<div class="colFlex">
 
