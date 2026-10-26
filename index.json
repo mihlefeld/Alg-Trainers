@@ -173,6 +173,10 @@
     {
       "name": "FSO",
       "location": "3x3-FSO-Trainer"
+    },
+    {
+      "name": "FSP",
+      "location": "3x3-FSP-Trainer"
     }
   ]
 }
