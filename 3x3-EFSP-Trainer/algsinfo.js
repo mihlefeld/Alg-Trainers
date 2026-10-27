@@ -1,0 +1,9 @@
+const timesArrayKey = "3x3efspTimesArray";
+const selectionArrayKey = "3x3efspSelection";
+var trainerTitle = "3x3 EFSP Trainer";
+var preRotations = [""];
+var postRotations = [""];
+var preMoves = ["U", "U'", "U2"];
+var postMoves = preMoves;
+var selCases = [];
+var maxAlgsPerRow = 8;

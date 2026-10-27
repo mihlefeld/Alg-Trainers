@@ -1,0 +1,9 @@
+const timesArrayKey = "3x3cfsoTimesArray";
+const selectionArrayKey = "3x3cfsoSelection";
+var trainerTitle = "3x3 CFSO Trainer";
+var preRotations = [""];
+var postRotations = [""];
+var preMoves = ["U", "U'", "U2"];
+var postMoves = preMoves;
+var selCases = [];
+var maxAlgsPerRow = 8;

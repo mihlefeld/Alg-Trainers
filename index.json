@@ -178,5 +178,23 @@
       "name": "FSP",
       "location": "3x3-FSP-Trainer"
     }
+  ],
+  "3×3 4L-FSLL": [
+    {
+      "name": "EFSO",
+      "location": "3x3-EFSO-Trainer"
+    },
+    {
+      "name": "CFSO",
+      "location": "3x3-CFSO-Trainer"
+    },
+    {
+      "name": "CFSP",
+      "location": "3x3-CFSP-Trainer"
+    },
+    {
+      "name": "EFSP",
+      "location": "3x3-EFSP-Trainer"
+    }
   ]
 }
