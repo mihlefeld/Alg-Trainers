@@ -57,14 +57,13 @@ function main() {
     /// handles keypup and keydown events. Starts timer etc.
     document.getElementById("bodyid").addEventListener("keydown", function (event) {
         if (dialogOpen) {
-            if ( this !== event.target && 
+            if ( this !== event.target &&
                 ( /textarea|select/i.test( event.target.nodeName ) ||
                 event.target.type === "text") ) {
                 return;
             }
-            if (event.code == "Escape") {
-                dialogOpen = false;
-                window.allowStartingTimer = true;
+          if (event.code == "Escape") {
+                closeDialog(dialogOpenId);
             }
             if (event.code == "ArrowLeft") {
                 previousCase();
@@ -194,7 +193,7 @@ fetchAll("selected_algsets.json", "groups_info.json", "algsets_info.json", "algs
             window.algsInfo = dicts[3];
             window.scramblesMap = dicts[4];
             combined = dicts[5];
-            
+
             Object.assign(selectionPresets['Default']['selCases'], selCases);
             Object.assign(selectionPresets['Default']['selectedAlgSets'], window.selectedAlgSets);
             loadSettings();
