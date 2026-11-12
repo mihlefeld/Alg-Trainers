@@ -77,3 +77,53 @@ function find(arr, x , start=0, end=arr.length) {
 function weightedRandomElement(items, weights) {
     return items[find(weights, Math.random()*weights[weights.length-1])];
 };
+
+const MAX_WEIGHT_RATIO = 5;
+
+function isWeightedChoiceActive() {
+    return currentSettings['weightedChoice'] || currentSettings['weightedChoiceTime'] || currentSettings['weightedChoiceStd'];
+}
+
+/// scales weights to a mean of 1 and raises small weights so that max <= MAX_WEIGHT_RATIO * min
+function normalizeMetricWeights(weights) {
+    const max = Math.max(...weights);
+    if (!(max > 0)) return weights.map(() => 1);
+    const floor = max / MAX_WEIGHT_RATIO;
+    const clamped = weights.map(w => Math.max(Number.isFinite(w) ? w : 0, floor));
+    const mean = clamped.reduce((a, b) => a + b, 0) / clamped.length;
+    return clamped.map(w => w / mean);
+}
+
+/// \returns the probability of each case in \param cases being chosen next, based on the enabled weighting metrics
+function computeCaseProbabilities(cases) {
+    const n = cases.length;
+    if (n == 0) return [];
+    var combined = new Array(n).fill(1);
+    if (isWeightedChoiceActive()) {
+        const times = {};
+        for (const c of cases) times[c] = [];
+        for (const r of window.timesArray) {
+            if (times[r["case"]] !== undefined) times[r["case"]].push(0.001 * r["ms"]);
+        }
+        const counts = cases.map(c => times[c].length);
+        // unseen cases get the largest value of the metric until they are timed
+        const fillMax = values => {
+            const finite = values.filter(Number.isFinite);
+            const max = finite.length ? Math.max(...finite) : 0;
+            return values.map(v => Number.isFinite(v) ? v : max);
+        };
+        var metrics = [];
+        if (currentSettings['weightedChoice'])
+            metrics.push(counts.map(c => (c + 0.1) ** -0.8));
+        if (currentSettings['weightedChoiceTime'])
+            metrics.push(fillMax(cases.map(c => times[c].length ? meanArray(times[c]) : NaN)).map(m => m ** 0.8));
+        if (currentSettings['weightedChoiceStd'])
+            metrics.push(fillMax(cases.map(c => times[c].length > 1 ? meanStdArray(times[c]).std : NaN)));
+        for (const metric of metrics) {
+            const normalized = normalizeMetricWeights(metric);
+            for (var i = 0; i < n; i++) combined[i] *= normalized[i];
+        }
+    }
+    const total = combined.reduce((a, b) => a + b, 0);
+    return combined.map(w => w / total);
+}
