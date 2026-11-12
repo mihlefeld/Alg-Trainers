@@ -12,10 +12,7 @@ function closeDialog(id) {
 
 function openDialog(id) {
     if (id == 'settings') {
-        for (const [key, value] of Object.entries(currentSettings['cubecolors'])) {
-            var target = document.getElementById(`cc-${key}`);
-            changeUiElementColor(target, value);
-        }   
+        openCubeSchemeSettings();
     }
     document.getElementById(id).showModal();
     dialogOpen = true;

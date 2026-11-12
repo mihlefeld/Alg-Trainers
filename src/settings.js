@@ -80,6 +80,14 @@ var defaultCubeColors = {
     }
 }
 
+var defaultCubeSchemeNames = {
+    default: 'Default',
+    redgreen: 'Red-Green color blind',
+    blueyellow: 'Blue-Yellow color blind'
+};
+var editingCubeScheme = 'default';
+var cubeTrainerList;
+
 var currentSettings = {};
 Object.assign(currentSettings, defaultSettings);
 Object.assign(currentSettings['colors'], defaultColors[getColorScheme()]);
@@ -104,6 +112,20 @@ function loadSettings() {
             }
         }
     };
+    if (!currentSettings.cubeColorSchemes) {
+        var oldColors = {...defaultCubeColors.default, ...currentSettings.cubecolors};
+        var matchingPreset = Object.keys(defaultCubeColors).find(preset =>
+            Object.keys(defaultCubeColors[preset]).every(key =>
+                String(oldColors[key]).toLowerCase() === defaultCubeColors[preset][key].toLowerCase()));
+        currentSettings.cubeColorSchemes = [];
+        currentSettings.defaultCubeScheme = matchingPreset || 'legacy';
+        currentSettings.trainerCubeSchemes = {};
+        if (!matchingPreset) {
+            currentSettings.cubeColorSchemes.push({id: 'legacy', name: 'Previous custom colors', colors: oldColors});
+        }
+        saveSettings();
+    }
+    if (!currentSettings.puzzleCubeSchemes) currentSettings.puzzleCubeSchemes = {};
 }
 
 function saveSettings() {
@@ -279,9 +301,18 @@ function changeColor(event) {
 }
 
 function changeCubeColor(event, key) {
-    changeUiElementColor(event.srcElement, event.srcElement.value)
-    currentSettings['cubecolors'][key]  = event.srcElement.value;
+    var scheme = currentSettings.cubeColorSchemes.find(item => item.id === editingCubeScheme);
+    if (!scheme) return;
+    try {
+        changeUiElementColor(event.target, event.target.value);
+    } catch (error) {
+        alert('Please enter a valid color.');
+        changeUiElementColor(event.target, scheme.colors[key]);
+        return;
+    }
+    scheme.colors[key] = event.target.value;
     saveSettings();
+    refreshCubeImages();
 }
 
 function changeSettingsKey(event, key) {
@@ -289,12 +320,182 @@ function changeSettingsKey(event, key) {
     saveSettings();
 }
 
-function resetCubeColors(key) {
-    for ([key, value] of Object.entries(defaultCubeColors[key])) {
-        changeUiElementColor(document.getElementById(`cc-${key}`), value);
-        currentSettings['cubecolors'][key] = value;
+function cubeSchemeColors(id) {
+    var custom = currentSettings.cubeColorSchemes.find(item => item.id === id);
+    return custom ? custom.colors : defaultCubeColors[id] || defaultCubeColors.default;
+}
+
+function currentTrainerLocation() {
+    var parts = window.location.pathname.split('/').filter(Boolean);
+    if (parts[parts.length - 1] === 'index.html') parts.pop();
+    return parts[parts.length - 1];
+}
+
+function activeCubeColors() {
+    var trainer = currentTrainerLocation();
+    var puzzle = Object.values(currentSettings.puzzleCubeSchemes).find(override => override.trainers.includes(trainer));
+    var id = currentSettings.trainerCubeSchemes[trainer] || (puzzle && puzzle.scheme) || currentSettings.defaultCubeScheme;
+    return cubeSchemeColors(id);
+}
+
+function cubeSchemeOptions(select, fallbackLabel) {
+    select.replaceChildren();
+    function option(value, label) {
+        var element = document.createElement('option');
+        element.value = value;
+        element.textContent = label;
+        select.appendChild(element);
     }
+    if (fallbackLabel) option('', fallbackLabel);
+    for (const [id, name] of Object.entries(defaultCubeSchemeNames)) option(id, name);
+    for (const scheme of currentSettings.cubeColorSchemes) option(scheme.id, scheme.name);
+}
+
+function renderCubeSchemeSettings() {
+    var global = document.getElementById('cube-scheme-global');
+    var editor = document.getElementById('cube-scheme-editor');
+    cubeSchemeOptions(global);
+    cubeSchemeOptions(editor);
+    global.value = currentSettings.defaultCubeScheme;
+    editor.value = editingCubeScheme;
+    var scheme = currentSettings.cubeColorSchemes.find(item => item.id === editingCubeScheme);
+    var name = document.getElementById('cube-scheme-name');
+    name.value = scheme ? scheme.name : defaultCubeSchemeNames[editingCubeScheme];
+    name.disabled = !scheme;
+    document.getElementById('cube-scheme-delete').disabled = !scheme;
+    for (const [key, value] of Object.entries(cubeSchemeColors(editingCubeScheme))) {
+        var input = document.getElementById(`cc-${key}`);
+        if (input) {
+            input.disabled = !scheme;
+            changeUiElementColor(input, value);
+        }
+    }
+    var list = document.getElementById('cube-trainers');
+    if (!cubeTrainerList) return;
+    list.replaceChildren();
+    for (const [puzzle, entries] of Object.entries(cubeTrainerList)) {
+        var group = document.createElement('div');
+        group.className = 'cubeTrainerGroup';
+        var heading = document.createElement('label');
+        heading.className = 'settingsEntry cubeTrainerEntry cubePuzzleEntry';
+        var title = document.createElement('b');
+        title.textContent = puzzle;
+        let puzzleSelect = document.createElement('select');
+        puzzleSelect.setAttribute('aria-label', `${puzzle} puzzle scheme`);
+        cubeSchemeOptions(puzzleSelect, 'Use global scheme');
+        puzzleSelect.value = currentSettings.puzzleCubeSchemes[puzzle]?.scheme || '';
+        puzzleSelect.addEventListener('change', () => {
+            if (puzzleSelect.value) {
+                currentSettings.puzzleCubeSchemes[puzzle] = {
+                    scheme: puzzleSelect.value,
+                    trainers: entries.map(entry => entry.location)
+                };
+            } else {
+                delete currentSettings.puzzleCubeSchemes[puzzle];
+            }
+            saveSettings();
+            if (entries.some(entry => entry.location === currentTrainerLocation())) refreshCubeImages();
+        });
+        heading.append(title, puzzleSelect);
+        group.appendChild(heading);
+        for (const entry of entries) {
+            var row = document.createElement('label');
+            row.className = 'settingsEntry cubeTrainerEntry';
+            var label = document.createElement('span');
+            label.textContent = entry.name;
+            let select = document.createElement('select');
+            select.setAttribute('aria-label', `${puzzle} ${entry.name} scheme`);
+            cubeSchemeOptions(select, 'Use puzzle scheme');
+            select.value = currentSettings.trainerCubeSchemes[entry.location] || '';
+            select.addEventListener('change', () => {
+                if (select.value) currentSettings.trainerCubeSchemes[entry.location] = select.value;
+                else delete currentSettings.trainerCubeSchemes[entry.location];
+                saveSettings();
+                if (entry.location === currentTrainerLocation()) refreshCubeImages();
+            });
+            row.append(label, select);
+            group.appendChild(row);
+        }
+        list.appendChild(group);
+    }
+}
+
+async function openCubeSchemeSettings() {
+    renderCubeSchemeSettings();
+    if (cubeTrainerList) return;
+    try {
+        var response = await fetch('../index.json');
+        if (!response.ok) throw new Error('Unable to load trainer list');
+        cubeTrainerList = await response.json();
+        var changed = false;
+        for (const [puzzle, override] of Object.entries(currentSettings.puzzleCubeSchemes)) {
+            if (!cubeTrainerList[puzzle]) continue;
+            var trainers = cubeTrainerList[puzzle].map(entry => entry.location);
+            if (JSON.stringify(override.trainers) !== JSON.stringify(trainers)) {
+                override.trainers = trainers;
+                changed = true;
+            }
+        }
+        if (changed) {
+            saveSettings();
+            refreshCubeImages();
+        }
+        renderCubeSchemeSettings();
+    } catch (error) {
+        console.error('Unable to load trainer list:', error);
+        document.getElementById('cube-trainers').textContent = 'Unable to load trainer list. Reopen settings to retry.';
+    }
+}
+
+function selectGlobalCubeScheme(value) {
+    currentSettings.defaultCubeScheme = value;
     saveSettings();
+    refreshCubeImages();
+}
+
+function addCubeScheme() {
+    var id;
+    do {
+        id = 'custom-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2);
+    } while (currentSettings.cubeColorSchemes.some(item => item.id === id));
+    currentSettings.cubeColorSchemes.push({
+        id: id,
+        name: 'Custom scheme ' + (currentSettings.cubeColorSchemes.length + 1),
+        colors: {...cubeSchemeColors(editingCubeScheme)}
+    });
+    editingCubeScheme = id;
+    saveSettings();
+    renderCubeSchemeSettings();
+}
+
+function renameCubeScheme(value) {
+    var scheme = currentSettings.cubeColorSchemes.find(item => item.id === editingCubeScheme);
+    if (!scheme) return;
+    if (!value.trim()) {
+        alert('Please enter a scheme name.');
+        renderCubeSchemeSettings();
+        return;
+    }
+    scheme.name = value.trim();
+    saveSettings();
+    renderCubeSchemeSettings();
+}
+
+function deleteCubeScheme() {
+    var scheme = currentSettings.cubeColorSchemes.find(item => item.id === editingCubeScheme);
+    if (!scheme || !confirm(`Delete "${scheme.name}"? Overrides using it will fall back to their inherited scheme.`)) return;
+    currentSettings.cubeColorSchemes = currentSettings.cubeColorSchemes.filter(item => item.id !== scheme.id);
+    if (currentSettings.defaultCubeScheme === scheme.id) currentSettings.defaultCubeScheme = 'default';
+    for (const [trainer, id] of Object.entries(currentSettings.trainerCubeSchemes)) {
+        if (id === scheme.id) delete currentSettings.trainerCubeSchemes[trainer];
+    }
+    for (const [puzzle, override] of Object.entries(currentSettings.puzzleCubeSchemes)) {
+        if (override.scheme === scheme.id) delete currentSettings.puzzleCubeSchemes[puzzle];
+    }
+    editingCubeScheme = 'default';
+    saveSettings();
+    renderCubeSchemeSettings();
+    refreshCubeImages();
 }
 
 function resetStyle(dark) {

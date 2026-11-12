@@ -185,6 +185,27 @@ function fetchAll(...resources) {
     return Promise.all(destination)
 }
 
+function refreshCubeImages() {
+    var oldUrls = blobUrls;
+    var newUrls = {};
+    for (const [key, original] of Object.entries(combined)) {
+        var svg = original;
+        for (const [color, value] of Object.entries(defaultSettings.cubecolors)) {
+            svg = svg.replaceAll(value, `cc-${color}`);
+        }
+        for (const [color, value] of Object.entries(activeCubeColors())) {
+            svg = svg.replaceAll(`cc-${color}`, value);
+        }
+        newUrls[key] = URL.createObjectURL(new Blob([svg], {type: 'image/svg+xml'}));
+    }
+    var replacements = new Map(Object.keys(oldUrls).map(key => [oldUrls[key], newUrls[key]]));
+    for (const image of document.querySelectorAll('img')) {
+        if (replacements.has(image.src)) image.src = replacements.get(image.src);
+    }
+    blobUrls = newUrls;
+    for (const url of Object.values(oldUrls)) URL.revokeObjectURL(url);
+}
+
 Promise.all([initializeStorage(), fetchAll("selected_algsets.json", "groups_info.json", "algsets_info.json", "algs_info.json", "scrambles.json", "combined.json")])
     .then(
         ([_, dicts]) => {
@@ -198,24 +219,7 @@ Promise.all([initializeStorage(), fetchAll("selected_algsets.json", "groups_info
             Object.assign(selectionPresets['Default']['selCases'], selCases);
             Object.assign(selectionPresets['Default']['selectedAlgSets'], window.selectedAlgSets);
             loadSettings();
-            Object.entries(combined).map((entry) => {
-                if (k in blobUrls) {
-                    return;
-                }
-                var k = entry[0];
-                var svg = entry[1];
-                for (const [key, value] of Object.entries(defaultSettings['cubecolors'])) {
-                    svg = svg.replaceAll(value, `cc-${key}`)
-                }
-                for (const [key, value] of Object.entries(currentSettings['cubecolors'])) {
-                    svg = svg.replaceAll(`cc-${key}`, value)
-
-                }
-                const blob = new Blob([svg], {type: 'image/svg+xml'});
-                const url = URL.createObjectURL(blob);
-                blobUrls[k] = url;
-                }
-            )
+            refreshCubeImages();
         }
     ).then((_) => {
         return fetch("../template.html")

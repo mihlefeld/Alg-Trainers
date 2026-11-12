@@ -25,6 +25,12 @@ details.settingsDetails:open {
     gap: 0.2em;
 }
 
+details.settingsDetails details.settingsDetails {
+    border: var(--borderWidth) solid var(--secondary);
+    border-radius: var(--borderRadius);
+    padding: 0.3em;
+}
+
 summary.settingsSummary {
     padding: 0.3em;
     user-select: none;
@@ -98,14 +104,56 @@ dialog#settings span {
     gap: 0.2em;;
 }
 
-div#cubeColorPresets button {
-    width: 7em;
-    height: min-content;
+.cubeSchemeEntry, .cubeTrainerEntry {
+    align-items: center;
 }
 
-div#cubeColorPresets {
+.cubeSchemeActions {
     display: flex;
     flex-wrap: wrap;
-    flex-direction: row;
     gap: 0.2em;
+}
+
+dialog#settings .cubeSchemeActions button {
+    width: auto;
+    padding: 0.1em 0.4em;
+}
+
+dialog#settings select {
+    max-width: 60%;
+    min-width: 0;
+    padding: 0.2em;
+    border: var(--borderWidth) solid var(--text);
+    border-radius: var(--borderRadius);
+    background: var(--background);
+    color: var(--text);
+    font: inherit;
+}
+
+dialog#settings input:disabled, dialog#settings button:disabled {
+    opacity: 0.65;
+    cursor: default;
+}
+
+.cubeTrainerList {
+    max-height: 18em;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 0.8em;
+}
+
+.cubeTrainerGroup {
+    display: flex;
+    flex-direction: column;
+    gap: 0.3em;
+}
+
+.cubePuzzleEntry {
+    background-color: var(--backgroundDarker);
+}
+
+dialog#settings .cubeTrainerEntry span {
+    width: auto;
+    height: auto;
 }

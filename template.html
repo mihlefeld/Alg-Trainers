@@ -303,15 +303,32 @@
 			<details class="settingsDetails" name="mainSettings">
 				<summary class="settingsSummary">Cube colors</summary>
 				<div class="colFlex">
-
+					<div class="trainerScrambleHelp">Choose a global scheme and optional puzzle or trainer overrides. Changes apply immediately. Schemes are included in settings exports.</div>
+					<div class="settingsEntry cubeSchemeEntry">
+						<label for="cube-scheme-global">Global scheme</label>
+						<select id="cube-scheme-global" onchange="selectGlobalCubeScheme(this.value)"></select>
+					</div>
+					<details class="settingsDetails">
+						<summary class="settingsSummary">Trainer overrides</summary>
+						<div class="trainerScrambleHelp">Each puzzle can override the global scheme. Individual trainers can override their puzzle's scheme.</div>
+						<div id="cube-trainers" class="cubeTrainerList" aria-live="polite">Loading trainers...</div>
+					</details>
 					<div class="settingsEntry">
-						<div>Cube Colors</div>
-						<div id="cubeColorPresets">
-							<button onclick="resetCubeColors('default')" class="abutton">Default</button>
-							<button onclick="resetCubeColors('redgreen')" class="abutton">Red-Green</button>
-							<button onclick="resetCubeColors('blueyellow')" class="abutton">Blue-Yellow</button>
+						<label for="cube-scheme-editor">Manage scheme</label>
+						<select id="cube-scheme-editor" onchange="editingCubeScheme = this.value; renderCubeSchemeSettings()"></select>
+					</div>
+					<div class="settingsEntry cubeSchemeEntry">
+						<label for="cube-scheme-name">Name</label>
+						<input type="text" id="cube-scheme-name" onchange="renameCubeScheme(this.value)">
+					</div>
+					<div class="settingsEntry">
+						<div>Custom schemes</div>
+						<div class="cubeSchemeActions">
+							<button type="button" class="abutton" onclick="addCubeScheme()">Add copy</button>
+							<button type="button" class="abutton" id="cube-scheme-delete" onclick="deleteCubeScheme()">Delete</button>
 						</div>
 					</div>
+					<div class="trainerScrambleHelp">Default schemes cannot be edited. Add a copy to customize its colors.</div>
 					<div class="settingsEntry">
 						<div>White</div> <input type='text' value='#FAFAFA' class='settinginput' id='cc-white'
 							onchange="changeCubeColor(event, 'white');" placeholder='#FAFAFA'/>
@@ -325,7 +342,7 @@
 							onchange="changeCubeColor(event, 'black');" placeholder='#222222'/>
 					</div>
 					<div class="settingsEntry">
-						<div>Ligtblue</div> <input type='text' value='#A0CBE8' class='settinginput' id='cc-lightblue'
+						<div>Lightblue</div> <input type='text' value='#A0CBE8' class='settinginput' id='cc-lightblue'
 							onchange="changeCubeColor(event, 'lightblue');" placeholder='#A0CBE8'/>
 					</div>
 					<div class="settingsEntry">
