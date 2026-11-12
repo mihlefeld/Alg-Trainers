@@ -95,9 +95,9 @@ var trainerScrambleOptionNames = ['preRotations', 'postRotations', 'preMoves', '
 
 
 function loadSettings() {
-    var loaded = localStorage.getItem('ALLGSettings');
+    var loaded = loadLocal('ALLGSettings');
     if (loaded != null) {    
-        currentSettings = JSON.parse(localStorage.getItem('ALLGSettings'));
+        currentSettings = JSON.parse(loaded);
         for (const [key, value] of Object.entries(defaultSettings)) {
             if (!(key in currentSettings)) {
                 currentSettings[key] = value;
@@ -107,7 +107,7 @@ function loadSettings() {
 }
 
 function saveSettings() {
-    localStorage.setItem('ALLGSettings', JSON.stringify(currentSettings));
+    saveLocal('ALLGSettings', JSON.stringify(currentSettings));
 }
 
 

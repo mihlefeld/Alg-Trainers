@@ -32,6 +32,10 @@
 	</style>
 	<script src="https://colorjs.io/dist/color.global.js"></script>
 	<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+	<script>
+		var preRotations = [''], postRotations = [''], preMoves = [''], postMoves = [''];
+		var selectionArrayKey = 'Index', selectedAlgSets = {};
+	</script>
 	<script src="src/version.js"></script>
     <script src="src/utils.js"></script>
     <script src="src/settings.js"></script>
@@ -42,8 +46,10 @@
 <div id="algsheet" class="algsheetGrid" style="width: 80vw;"></div>
 </body>
 <script>
-loadSettings();
-applySettings();
+initializeStorage().then(() => {
+	loadSettings();
+	applySettings();
+}).catch(reportStorageError);
 
 let algsetData = {};
 

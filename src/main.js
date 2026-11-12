@@ -32,6 +32,7 @@ function resize(event) {
 function main() {
     loadSettings();
     applySettings();
+    timesArray = JSON.parse(loadLocal(timesArrayKey, "[]")) || [];
     timer = document.getElementById('timer');
     timer.innerHTML = "ready";
     document.getElementById("trainerTitle").innerHTML = trainerTitle + ' | <a href="../index.html">Back</a>';
@@ -184,9 +185,9 @@ function fetchAll(...resources) {
     return Promise.all(destination)
 }
 
-fetchAll("selected_algsets.json", "groups_info.json", "algsets_info.json", "algs_info.json", "scrambles.json", "combined.json")
+Promise.all([initializeStorage(), fetchAll("selected_algsets.json", "groups_info.json", "algsets_info.json", "algs_info.json", "scrambles.json", "combined.json")])
     .then(
-        (dicts) => {
+        ([_, dicts]) => {
             window.selectedAlgSets = dicts[0];
             window.algsGroups = dicts[1];
             window.algsets = dicts[2];
@@ -217,7 +218,7 @@ fetchAll("selected_algsets.json", "groups_info.json", "algsets_info.json", "algs
             )
         }
     ).then((_) => {
-        fetch("../template.html")
+        return fetch("../template.html")
         .then((response) => response.text())
         .then((bodyHTML) => {
             applySettings();
@@ -226,4 +227,7 @@ fetchAll("selected_algsets.json", "groups_info.json", "algsets_info.json", "algs
             document.getElementById("versionLabel").textContent = `v${APP_VERSION}`;
         });
     }
-)
+).catch(error => {
+    console.error('Unable to initialize trainer:', error);
+    alert('Unable to initialize the trainer or load saved data. Check your browser storage and network settings.');
+});

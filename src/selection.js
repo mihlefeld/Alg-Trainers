@@ -318,7 +318,7 @@ function addPreset(name_) {
     };
     Object.assign(selectionPresets[name]['selCases'], selCases);
     Object.assign(selectionPresets[name]['selectedAlgSets'], selectedAlgSets);
-    localStorage.setItem(selectionArrayKey + 'Presets', JSON.stringify(selectionPresets));
+    saveLocal(selectionArrayKey + 'Presets', JSON.stringify(selectionPresets));
     renderPresets();
 }
 
@@ -330,14 +330,14 @@ function updatePreset(name) {
         };
         Object.assign(selectionPresets[name]['selCases'], selCases);
         Object.assign(selectionPresets[name]['selectedAlgSets'], selectedAlgSets);
-        localStorage.setItem(selectionArrayKey + 'Presets', JSON.stringify(selectionPresets));
+        saveLocal(selectionArrayKey + 'Presets', JSON.stringify(selectionPresets));
     }
 }
 
 function deletePreset(name) {
     if (window.confirm(`Are you sure you want to delete preset ${name}?`)) {
         delete selectionPresets[name];
-        localStorage.setItem(selectionArrayKey + 'Presets', JSON.stringify(selectionPresets));
+        saveLocal(selectionArrayKey + 'Presets', JSON.stringify(selectionPresets));
         renderPresets();
     }
 }
@@ -494,8 +494,8 @@ function renderSelection() {
 
 
 function saveSelection() {
-    localStorage.setItem(selectionArrayKey, JSON.stringify(selCases));
-    localStorage.setItem(selectionArrayKey + "AlgSets", JSON.stringify(selectedAlgSets));
+    saveLocal(selectionArrayKey, JSON.stringify(selCases));
+    saveLocal(selectionArrayKey + "AlgSets", JSON.stringify(selectedAlgSets));
 }
 
 function loadSelection() {
@@ -511,7 +511,7 @@ function loadSelection() {
             }
         }
     }
-    var preset = localStorage.getItem(selectionArrayKey + 'Presets')
+    var preset = loadLocal(selectionArrayKey + 'Presets')
     if (preset != null) {
         selectionPresets = JSON.parse(preset);
     }

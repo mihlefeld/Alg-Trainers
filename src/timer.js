@@ -1,7 +1,5 @@
 var allowStartingTimer;
-var timesArray = JSON.parse(loadLocal(timesArrayKey, "[]"));
-if (timesArray == null) // todo fix when figure out why JSON.parse("[]") returns 0
-    timesArray = [];
+var timesArray = [];
 var currentScramble = "";
 var hintCase = 0;
 var customAlgs = {};
@@ -75,7 +73,7 @@ function bookmarkCase(i) {
         presetAlgsets[algset] = true;
         document.getElementById('bookmarkButton').innerText = "bookmark_remove";
     }
-    localStorage.setItem(selectionArrayKey + 'Presets', JSON.stringify(selectionPresets));
+    saveLocal(selectionArrayKey + 'Presets', JSON.stringify(selectionPresets));
 }
 
 function getBookmarkButton(i) {

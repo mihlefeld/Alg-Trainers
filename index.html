@@ -129,8 +129,10 @@
     }
 
     renderTrainerSelections();
-    loadSettings();
-    applySettings();
+    initializeStorage().then(() => {
+        loadSettings();
+        applySettings();
+    }).catch(reportStorageError);
     document.getElementById("versionLabel").textContent = `v${APP_VERSION}`;
 </script>
 </html>

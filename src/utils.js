@@ -50,13 +50,86 @@ function getColorScheme() {
     return "light";
 }
 
+var storageCache = new Map();
+var storageDatabase;
+
+function storageTransaction(storeName, mode, action) {
+    return new Promise((resolve, reject) => {
+        var transaction = storageDatabase.transaction(storeName, mode);
+        var result;
+        transaction.oncomplete = () => resolve(result);
+        transaction.onabort = () => reject(transaction.error || new Error('Storage transaction aborted'));
+        transaction.onerror = () => {};
+        try {
+            result = action(transaction.objectStore(storeName));
+        } catch (error) {
+            transaction.abort();
+            reject(error);
+        }
+    });
+}
+
+function reportStorageError(error) {
+    console.error('IndexedDB storage error:', error);
+    alert('Unable to access saved trainer data. Your changes may not be saved. Check your browser storage settings.');
+}
+
+async function initializeStorage() {
+    storageDatabase = await new Promise((resolve, reject) => {
+        var request = indexedDB.open('alg-trainers', 1);
+        request.onupgradeneeded = () => {
+            request.result.createObjectStore('data');
+            request.result.createObjectStore('metadata');
+        };
+        request.onsuccess = () => resolve(request.result);
+        request.onerror = () => reject(request.error);
+        request.onblocked = () => reject(new Error('IndexedDB upgrade blocked by another tab'));
+    });
+    storageDatabase.onversionchange = () => storageDatabase.close();
+
+    // The marker and imported values commit together, so interrupted migrations can retry.
+    await new Promise((resolve, reject) => {
+        var transaction = storageDatabase.transaction(['data', 'metadata'], 'readwrite');
+        var data = transaction.objectStore('data');
+        var metadata = transaction.objectStore('metadata');
+        var marker = metadata.get('localStorageMigrated');
+        marker.onsuccess = () => {
+            if (marker.result) return;
+            try {
+                for (var i = 0; i < localStorage.length; i++) {
+                    var key = localStorage.key(i);
+                    data.put(localStorage.getItem(key), key);
+                }
+                metadata.put(true, 'localStorageMigrated');
+            } catch (error) {
+                transaction.abort();
+                reject(error);
+            }
+        };
+        transaction.oncomplete = resolve;
+        transaction.onabort = () => reject(transaction.error || new Error('Storage migration aborted'));
+        transaction.onerror = () => {};
+    });
+
+    await storageTransaction('data', 'readonly', store => {
+        var cursor = store.openCursor();
+        cursor.onsuccess = () => {
+            if (cursor.result) {
+                storageCache.set(cursor.result.key, cursor.result.value);
+                cursor.result.continue();
+            }
+        };
+    });
+}
+
 function loadLocal(key, fallback) {
-    var loaded = localStorage.getItem(key);
-    return loaded == null ? fallback : loaded;
+    return storageCache.has(key) ? storageCache.get(key) : fallback;
 }
 
 function saveLocal(key, value) {
-    localStorage.setItem(key, value);
+    storageCache.set(key, value);
+    return storageTransaction('data', 'readwrite', store => store.put(value, key))
+        .catch(reportStorageError);
 }
 
 /// \param r - result instance (see makeResultInstance)
@@ -78,26 +151,50 @@ function uploadLocalStorage() {
     
     var fr = new FileReader();
     
-    fr.onload = function(e) { 
+    fr.onload = async function(e) {
         try {
-            var result = JSON.parse(e.target.result)
-            for ([key, value] of Object.entries(result)) {
-                saveLocal(key, value);
+            var result = JSON.parse(e.target.result);
+            if (!result || typeof result !== 'object' || Array.isArray(result) ||
+                Object.values(result).some(value => typeof value !== 'string')) {
+                throw new Error('Invalid trainer backup');
             }
-            location.reload()
+            await storageTransaction('data', 'readwrite', store => {
+                for (const [key, value] of Object.entries(result)) {
+                    store.put(value, key);
+                }
+            });
+            location.reload();
         } catch (e) {
-            console.error(e);
+            console.error('Unable to import trainer backup:', e);
+            alert('Unable to import trainer backup. Check the file and your browser storage settings.');
         }
-        
     }
+    fr.onerror = () => reportStorageError(fr.error);
 
     fr.readAsText(files.item(0));
 }
 
-function downloadLocalStorage() {
+async function downloadLocalStorage() {
+    var data = {};
+    try {
+        await storageTransaction('data', 'readonly', store => {
+            var cursor = store.openCursor();
+            cursor.onsuccess = () => {
+                if (cursor.result) {
+                    Object.defineProperty(data, cursor.result.key, {
+                        value: cursor.result.value, enumerable: true, configurable: true
+                    });
+                    cursor.result.continue();
+                }
+            };
+        });
+    } catch (error) {
+        reportStorageError(error);
+        return;
+    }
     var date = new Date();
     var datestring = `${date.getFullYear()}-${date.getMonth()+1}-${date.getDate()}T${date.getHours()}${date.getMinutes()}`
-    const file = new File([JSON.stringify(localStorage)], `${datestring}-alg-trainers-export.json`, {
+    const file = new File([JSON.stringify(data)], `${datestring}-alg-trainers-export.json`, {
         type: 'application/json',
       })
     const link = document.createElement('a')
