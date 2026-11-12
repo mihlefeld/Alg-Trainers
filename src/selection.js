@@ -72,6 +72,20 @@ function updateTitle() {
         }
     }
     document.getElementById("csi").innerHTML = selCases.length;
+    updateProbabilities();
+}
+
+/// shows the current chance of each selected case being chosen next
+function updateProbabilities() {
+    const show = currentSettings['showProbabilities'];
+    const probabilities = show ? computeCaseProbabilities(selCases) : [];
+    for (const el of document.querySelectorAll('.caseProbability')) {
+        el.textContent = '';
+    }
+    selCases.forEach((c, idx) => {
+        const el = document.getElementById('prob' + c);
+        if (el && show) el.textContent = (probabilities[idx] * 100).toFixed(1) + '%';
+    });
 }
 
 function setSelectionStatus(i, index, active) {
@@ -87,7 +101,7 @@ function setSelectionStatus(i, index, active) {
         selCases.push(i);
     }
     var element = document.getElementById("itemTd" + i);
-    element.className = (active ? "itemSel" : "itemUnsel") + " borderedContainer";
+    element.className = (active ? "itemSel" : "itemUnsel") + " borderedContainer caseItem";
     var groupElement = element.parentElement.previousElementSibling;
     var groupWasSelected = groupElement.classList[1] == 'itemSel';
     if (groupWasSelected && !active) {
@@ -252,7 +266,8 @@ function makeDivNormal(groupname) {
         else {
             var content = `<img oncontextmenu='return false;' class='caseImage' id='sel${i}' src='${blobUrls[i]}'>`;
         }
-        s += `<div id='itemTd${i}' ${dblclick} onclick='itemClicked(${i})' class='${(sel ? "itemSel" : "itemUnsel")} borderedContainer' title='${alg_name}' name='${alg_name}'>${content}</div>`
+        content += `<span class='caseProbability' id='prob${i}'></span>`;
+        s += `<div id='itemTd${i}' ${dblclick} onclick='itemClicked(${i})' class='${(sel ? "itemSel" : "itemUnsel")} borderedContainer caseItem' title='${alg_name}' name='${alg_name}'>${content}</div>`
     }
     s = "<div class='colFlex' style='width: fit-content'> <div class='borderedContainer " + (allSelected ? "itemSel" : "itemUnsel") + " pad groupNameDiv'" + s;
     s += "</div></div>";

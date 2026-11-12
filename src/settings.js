@@ -20,6 +20,8 @@ var defaultSettings = {
     'scrambleSize': 2,
     'weightedChoice': true,
     'weightedChoiceTime' : false,
+    'weightedChoiceStd': false,
+    'showProbabilities': false,
     'enableHoldDelay': true,
     'colors': {},
     'cubecolors': {
@@ -226,6 +228,8 @@ function applySettings() {
         document.getElementById("hold_delay_on_off").checked = currentSettings['enableHoldDelay'];
         document.getElementById("weighted_choice_on_off").checked = currentSettings['weightedChoice'];
         document.getElementById("weighted_choice_time_on_off").checked = currentSettings['weightedChoiceTime']
+        document.getElementById("weighted_choice_std_on_off").checked = currentSettings['weightedChoiceStd'];
+        document.getElementById("show_probabilities_on_off").checked = currentSettings['showProbabilities'];
         document.getElementById('cornerSchemeInput').value = currentSettings['letterSchemeCorners'];
         document.getElementById('edgeSchemeInput').value = currentSettings['letterSchemeEdges'];
         document.getElementById('edges_letter_pairs_on_off').checked = currentSettings['useEdgesLetterPairs'];
@@ -513,6 +517,7 @@ function toggleSetting(element, key) {
     currentSettings[key] = !currentSettings[key];
     element.checked = currentSettings[key];
     saveSettings();
+    if (typeof updateProbabilities == 'function') updateProbabilities();
 }
 
 function uploadLetterPairs() {
