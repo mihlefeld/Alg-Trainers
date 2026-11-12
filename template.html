@@ -144,36 +144,39 @@
 					<span class="slider round"></span>
 				</label>
 			</div>
-			<div class="settingsEntry">
-				<div>Weighted choice (# of Solves)</div>
-				<!-- Rounded switch -->
-				<label class="switch">
-					<input onclick="toggleSetting(this, 'weightedChoice');" type="checkbox" id="weighted_choice_on_off" value="using">
-					<span class="slider round"></span>
-				</label>
-			</div>
-			<div class="settingsEntry">
-				<div>Weighted choice (Mean time)</div>
-				<!-- Rounded switch -->
-				<label class="switch">
-					<input onclick="toggleSetting(this, 'weightedChoiceTime');" type="checkbox" id="weighted_choice_time_on_off" value="using">
-					<span class="slider round"></span>
-				</label>
-			</div>
-			<div class="settingsEntry">
-				<div>Weighted choice (Standard deviation)</div>
-				<label class="switch">
-					<input onclick="toggleSetting(this, 'weightedChoiceStd');" type="checkbox" id="weighted_choice_std_on_off" value="using">
-					<span class="slider round"></span>
-				</label>
-			</div>
-			<div class="settingsEntry">
-				<div>Show case probabilities</div>
-				<label class="switch">
-					<input onclick="toggleSetting(this, 'showProbabilities');" type="checkbox" id="show_probabilities_on_off" value="using">
-					<span class="slider round"></span>
-				</label>
-			</div>
+			<details class="settingsDetails" name="mainSettings">
+				<summary class="settingsSummary">Weighting</summary>
+				<div class="colFlex">
+					<div class="settingsEntry">
+						<div>Weighted choice (# of Solves)</div>
+						<label class="switch">
+							<input onclick="toggleSetting(this, 'weightedChoice');" type="checkbox" id="weighted_choice_on_off" value="using">
+							<span class="slider round"></span>
+						</label>
+					</div>
+					<div class="settingsEntry">
+						<div>Weighted choice (Mean time)</div>
+						<label class="switch">
+							<input onclick="toggleSetting(this, 'weightedChoiceTime');" type="checkbox" id="weighted_choice_time_on_off" value="using">
+							<span class="slider round"></span>
+						</label>
+					</div>
+					<div class="settingsEntry">
+						<div>Weighted choice (Standard deviation)</div>
+						<label class="switch">
+							<input onclick="toggleSetting(this, 'weightedChoiceStd');" type="checkbox" id="weighted_choice_std_on_off" value="using">
+							<span class="slider round"></span>
+						</label>
+					</div>
+					<div class="settingsEntry">
+						<div>Show case probabilities</div>
+						<label class="switch">
+							<input onclick="toggleSetting(this, 'showProbabilities');" type="checkbox" id="show_probabilities_on_off" value="using">
+							<span class="slider round"></span>
+						</label>
+					</div>
+				</div>
+			</details>
 			<div class="settingsEntry">
 				<div title="Existing browser data is migrated to IndexedDB automatically. Exports include times, settings, selections, and custom algorithms.">Import/export</div>
 				<div class="plusMinus">
