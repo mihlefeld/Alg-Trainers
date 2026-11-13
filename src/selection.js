@@ -11,7 +11,7 @@ function getAlgsetIds(algset) {
     if (algsets[algset]) {
         var algsetIds = []
         for (const group of algsets[algset]) {
-            algsetIds = algsetIds.concat(algsGroups[group]);
+            algsetIds = algsetIds.concat(getGroupIds(group));
         }
         return algsetIds;
     }
@@ -28,11 +28,11 @@ function getAllValidGroups() {
     return valid;
 }
 
-function getAllValid() {
+function getAllValid(ignoreSearch) {
     var valid = [];
     var validGroups = getAllValidGroups();
     for (const group of validGroups) {
-        valid = valid.concat(algsGroups[group]);
+        valid = valid.concat(ignoreSearch ? algsGroups[group] : getGroupIds(group));
     }
     return valid;
 }
@@ -58,9 +58,13 @@ function isAlgsetAllSelected(algset) {
 
 
 function updateTitle() {
-    var algs = getAllValid().length;
+    var validIds = getAllValid();
+    var algs = validIds.length;
     var allSelector = document.getElementById('allSelector');
-    if (selCases.length == algs) {
+    if (isSearchActive()) {
+        document.getElementById('allSelectorCount').innerText = validIds.filter(i => selCases.includes(i)).length;
+    }
+    if (validIds.every(i => selCases.includes(i)) && (algs > 0 || selCases.length == 0)) {
         allSelector.className = 'borderedContainer itemSel pad';
     } else {
         allSelector.className = 'borderedContainer itemUnsel pad';
@@ -71,7 +75,8 @@ function updateTitle() {
             document.getElementById(`${algset}csi`).innerText = countAlgsetSelected(algset);
         }
     }
-    document.getElementById("csi").innerHTML = selCases.length;
+    var csi = document.getElementById("csi");
+    if (csi) csi.innerHTML = selCases.length;
     updateProbabilities();
 }
 
@@ -158,12 +163,15 @@ function itemClicked(i) {
 
 function selectAllNone() {
     var validAlgs = getAllValid();
-    var algs = validAlgs.length;
-    var allSelected = selCases.length == algs;
-    if (!allSelected) {
-        selCases = [];
-        for (const i of validAlgs)
-            selCases.push(i);
+    var allSelected = validAlgs.length > 0 && validAlgs.every(i => selCases.includes(i));
+    if (isSearchActive()) {
+        if (allSelected) {
+            selCases = selCases.filter(i => !validAlgs.includes(i));
+        } else {
+            selCases = [...new Set([...selCases, ...validAlgs])];
+        }
+    } else if (!allSelected) {
+        selCases = [...validAlgs];
     } else {
         selCases = [];
     }
@@ -174,7 +182,7 @@ function selectAllNone() {
 
 /// \returns true if at least one case selected in group groupName
 function areAllSelected(groupName) {
-    var indeces = algsGroups[groupName];
+    var indeces = getGroupIds(groupName);
     for (var i in indeces) {
         if (selCases.indexOf(indeces[i]) == -1)
             return false;
@@ -185,7 +193,7 @@ function areAllSelected(groupName) {
 // select or deselect all cases in the group
 function selectCaseGroup(name) {
     var allSelected = areAllSelected(name);
-    var indeces = algsGroups[name];
+    var indeces = getGroupIds(name);
     var firstChild = document.getElementById(`itemTd${indeces[0]}`);
     var groupNameDiv = firstChild.parentElement.previousSibling;
     for (var i = 0; i < indeces.length; i++) {
@@ -237,7 +245,10 @@ function makeDivNormal(groupname) {
     ];
     const includeNames = namedTrainers.includes(trainerTitle);
     var s = "";
-    var indeces = algsGroups[groupname];
+    var indeces = getGroupIds(groupname);
+    if (indeces.length == 0) {
+        return "";
+    }
     var displayGroupname = translateAlgGroup(groupname) 
 
     s += ` onclick='selectCaseGroup("${groupname}")'><b>${displayGroupname}</b></div><div class='rowFlex' style='flex-wrap: wrap'>`
@@ -275,7 +286,7 @@ function makeDivNormal(groupname) {
 }
 
 function ensureSelectionMatchesShown() {
-    var algs = getAllValid();
+    var algs = getAllValid(true);
     var newSelected = selCases.filter((value) => { return algs.includes(value); })
     selCases = newSelected;
 }
@@ -481,7 +492,13 @@ function renderSelection() {
     var groups = getAllValidGroups();
     var algs = getAllValid().length;
     var s = "";
-    s += `<div id='allSelector' class='borderedContainer  ${(selCases.length == algs ? "itemSel" : "itemUnsel")} pad' onclick='selectAllNone()'><b>All Cases (<span id='csi'></span>/${algs})</b></div>`;
+    var searching = isSearchActive();
+    s += `<div class='rowFlex' style='align-items: stretch; gap: 0.3em;'><div id='allSelector' class='borderedContainer  ${(selCases.length == algs ? "itemSel" : "itemUnsel")} pad' style='flex-grow: 1;' onclick='selectAllNone()'><b>${searching ? "Search Results" : "All Cases"} (<span id='${searching ? "allSelectorCount" : "csi"}'></span>/${algs})</b></div>`;
+    var tabStyle = searchState.open
+        ? "background-color: var(--backgroundDarker); color: var(--accent); border-color: transparent; border-bottom-left-radius: 0; border-bottom-right-radius: 0; box-shadow: 0 0.2em 0 var(--backgroundDarker); position: relative;"
+        : "";
+    s += `<div class='borderedContainer pad ${searching ? "itemSel" : "itemUnsel"}' style='display: flex; flex-direction: column; justify-content: center; padding-left: 1em; padding-right: 1em; ${tabStyle}' title='Search' onclick='toggleSearchPanel()'><span class='material-symbols-outlined'>search</span></div></div>`;
+    s += "<div id='searchSlot'></div>";
     if (Object.keys(selectedAlgSets).length > 1) {
         s += "<div class='rowFlex' style='flex-wrap: wrap;'>"
         for (const [algset, isShown] of Object.entries(selectedAlgSets)) {
@@ -502,6 +519,7 @@ function renderSelection() {
     }
 
     document.getElementById("cases_selection").innerHTML = s;
+    mountSearchPanel();
     ensureSelectionMatchesShown();
     updateTitle();
     renderPresets();
@@ -530,4 +548,212 @@ function loadSelection() {
     if (preset != null) {
         selectionPresets = JSON.parse(preset);
     }
+}
+
+
+// ---- Search ----
+var searchState = {text: '', cells: {}, open: false, color: null};
+var searchMatches = null; // Set of case ids matching the current search, or null when inactive
+var searchPanel = null;
+var caseFillsCache = {};
+
+function isSearchActive() {
+    return searchMatches !== null;
+}
+
+function getGroupIds(group) {
+    var ids = algsGroups[group] || [];
+    return searchMatches ? ids.filter(i => searchMatches.has(i)) : ids;
+}
+
+function searchColorNames() {
+    return Object.keys(defaultSettings.cubecolors).filter(c => c != 'black');
+}
+
+function getCaseFills(caseId) {
+    if (!caseFillsCache[caseId]) {
+        var svg = combined[caseId] || '';
+        caseFillsCache[caseId] = [...svg.matchAll(/<polygon[^>]*?fill=['"]([^'"]+)['"]/g)].map(m => m[1].toLowerCase());
+    }
+    return caseFillsCache[caseId];
+}
+
+function searchTemplateKey() {
+    var best = null, bestCount = -1;
+    for (const key of Object.keys(combined)) {
+        var count = getCaseFills(key).length;
+        if (count > bestCount) { best = key; bestCount = count; }
+    }
+    return best;
+}
+
+function fuzzyMatches(query, text) {
+    var q = query.toLowerCase().replace(/\s+/g, '');
+    var t = text.toLowerCase().replace(/\s+/g, '');
+    var pos = 0;
+    for (const ch of q) {
+        pos = t.indexOf(ch, pos);
+        if (pos < 0) return false;
+        pos++;
+    }
+    return true;
+}
+
+function caseMatchesSearch(caseId) {
+    var info = algsInfo[caseId];
+    if (searchState.text.trim() && !fuzzyMatches(searchState.text, `${info.algset}${info.group}${info.name}`)) {
+        return false;
+    }
+    // Search colours are abstract labels: positions sharing a label must share a case colour,
+    // and different labels must map to different case colours.
+    var fills = getCaseFills(caseId);
+    var labelToColor = {};
+    var usedColors = new Set();
+    for (const [idx, label] of Object.entries(searchState.cells)) {
+        var fill = fills[idx];
+        if (fill === undefined) return false;
+        if (labelToColor[label] === undefined) {
+            if (usedColors.has(fill)) return false;
+            labelToColor[label] = fill;
+            usedColors.add(fill);
+        } else if (labelToColor[label] !== fill) {
+            return false;
+        }
+    }
+    return true;
+}
+
+function updateSearchMatches() {
+    if (!searchState.text.trim() && Object.keys(searchState.cells).length == 0) {
+        searchMatches = null;
+    } else {
+        searchMatches = new Set(Object.keys(algsInfo).map(Number).filter(caseMatchesSearch));
+    }
+}
+
+function applySearch() {
+    updateSearchMatches();
+    var active = document.activeElement;
+    var refocus = active && active.id == 'searchTextInput';
+    var cursor = refocus ? active.selectionStart : 0;
+    renderSelection();
+    if (refocus) {
+        var input = document.getElementById('searchTextInput');
+        input.focus();
+        input.setSelectionRange(cursor, cursor);
+    }
+    resize();
+}
+
+function toggleSearchPanel() {
+    searchState.open = !searchState.open;
+    renderSelection();
+    resize();
+}
+
+function clearSearch() {
+    searchState.text = '';
+    searchState.cells = {};
+    applySearch();
+}
+
+function buildSearchPanel() {
+    var panel = document.createElement('div');
+    panel.className = 'borderedContainer pad colFlex';
+    panel.style.backgroundColor = 'var(--backgroundDarker)';
+    panel.style.borderTopRightRadius = '0';
+    panel.style.gap = '0.5em';
+    panel.style.alignItems = 'center';
+
+    var input = document.createElement('input');
+    input.type = 'text';
+    input.id = 'searchTextInput';
+    input.placeholder = 'Search algset, group and name';
+    input.style.flexGrow = '1';
+    input.style.minWidth = '0';
+    input.style.padding = '0.5em';
+    input.value = searchState.text;
+    input.addEventListener('input', () => {
+        searchState.text = input.value;
+        applySearch();
+    });
+
+    var key = searchTemplateKey();
+    var imageContainer = document.createElement('div');
+    imageContainer.className = 'borderedContainer itemUnsel pad';
+    imageContainer.style.position = 'relative';
+    imageContainer.style.cursor = 'default';
+    imageContainer.style.maxWidth = '100%';
+    imageContainer.style.boxSizing = 'border-box';
+    var box = document.createElement('div');
+    box.style.width = '16em';
+    box.style.maxWidth = '100%';
+    var doc = new DOMParser().parseFromString(combined[key], 'image/svg+xml');
+    var svg = document.importNode(doc.documentElement, true);
+    var colors = activeCubeColors();
+    svg.querySelectorAll('polygon').forEach((poly, idx) => {
+        var color = searchState.cells[idx];
+        poly.setAttribute('fill', color ? colors[color] : '#222');
+        poly.style.cursor = 'pointer';
+        poly.addEventListener('click', () => {
+            if (searchState.cells[idx] == searchState.color) {
+                delete searchState.cells[idx];
+            } else {
+                searchState.cells[idx] = searchState.color;
+            }
+            applySearch();
+        });
+    });
+    box.appendChild(svg);
+    imageContainer.appendChild(box);
+    var clearImage = document.createElement('span');
+    clearImage.className = 'material-symbols-outlined';
+    clearImage.textContent = 'close';
+    clearImage.title = 'Clear image';
+    clearImage.style.cssText = 'position: absolute; right: 0.2em; bottom: 0.2em; font-size: 1.2em; cursor: pointer;';
+    clearImage.addEventListener('click', () => {
+        searchState.cells = {};
+        applySearch();
+    });
+    imageContainer.appendChild(clearImage);
+    panel.appendChild(imageContainer);
+
+    var palette = document.createElement('div');
+    palette.className = 'rowFlex';
+    palette.style.flexWrap = 'wrap';
+    palette.style.justifyContent = 'center';
+    palette.style.gap = '0.3em';
+    for (const name of searchColorNames()) {
+        var swatch = document.createElement('div');
+        swatch.title = name;
+        swatch.style.cssText = `width: 1.8em; height: 1.8em; border-radius: 0.3em; cursor: pointer; background: ${colors[name]}; border: 3px solid ${name == searchState.color ? 'var(--accent)' : 'var(--text)'}; box-sizing: border-box;`;
+        swatch.addEventListener('click', () => {
+            searchState.color = name;
+            renderSelection();
+        });
+        palette.appendChild(swatch);
+    }
+    panel.appendChild(palette);
+
+    var bottomRow = document.createElement('div');
+    bottomRow.className = 'rowFlex';
+    bottomRow.style.cssText = 'width: 100%; align-items: center; justify-content: space-between; gap: 0.5em;';
+    bottomRow.appendChild(input);
+
+    var clear = document.createElement('span');
+    clear.className = 'material-symbols-outlined';
+    clear.textContent = 'close';
+    clear.title = 'Clear search';
+    clear.style.cssText = 'color: var(--accent); cursor: pointer; font-size: 1.8em;';
+    clear.addEventListener('click', clearSearch);
+    bottomRow.appendChild(clear);
+    panel.appendChild(bottomRow);
+    return panel;
+}
+
+function mountSearchPanel() {
+    var slot = document.getElementById('searchSlot');
+    if (!slot || !searchState.open) return;
+    if (!searchState.color) searchState.color = searchColorNames()[0];
+    slot.replaceChildren(buildSearchPanel());
 }
