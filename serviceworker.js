@@ -115,6 +115,7 @@ for (const [trainer, algs] of Object.entries(algsInTrainers)) {
   assets.push(`/Alg-Trainers/${trainer}/icon.png`);
   assets.push(`/Alg-Trainers/${trainer}/scrambles.json`);
   assets.push(`/Alg-Trainers/${trainer}/selected_algsets.json`);
+  assets.push(`/Alg-Trainers/${trainer}/u_move.json`);
 }
 
 self.addEventListener("install", installEvent => {

@@ -177,6 +177,10 @@ function main() {
     // document.body.style.display = "unset !important";
 }
 
+function fetchOptionalJson(resource) {
+    return fetch(resource).then((response) => response.ok ? response.json() : null).catch(() => null);
+}
+
 function fetchAll(...resources) {
     var destination = []
     resources.forEach(it => {
@@ -206,15 +210,16 @@ function refreshCubeImages() {
     for (const url of Object.values(oldUrls)) URL.revokeObjectURL(url);
 }
 
-Promise.all([initializeStorage(), fetchAll("selected_algsets.json", "groups_info.json", "algsets_info.json", "algs_info.json", "scrambles.json", "combined.json")])
+Promise.all([initializeStorage(), fetchAll("selected_algsets.json", "groups_info.json", "algsets_info.json", "algs_info.json", "scrambles.json", "combined.json"), fetchOptionalJson("u_move.json")])
     .then(
-        ([_, dicts]) => {
+        ([_, dicts, uMove]) => {
             window.selectedAlgSets = dicts[0];
             window.algsGroups = dicts[1];
             window.algsets = dicts[2];
             window.algsInfo = dicts[3];
             window.scramblesMap = dicts[4];
             combined = dicts[5];
+            uMoveCycles = uMove;
 
             Object.assign(selectionPresets['Default']['selCases'], selCases);
             Object.assign(selectionPresets['Default']['selectedAlgSets'], window.selectedAlgSets);

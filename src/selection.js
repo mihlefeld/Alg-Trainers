@@ -552,10 +552,14 @@ function loadSelection() {
 
 
 // ---- Search ----
-var searchState = {text: '', cells: {}, open: false, color: null};
+var searchState = {text: '', cells: {}, open: false, color: null, allAngles: true};
 var searchMatches = null; // Set of case ids matching the current search, or null when inactive
 var searchPanel = null;
 var caseFillsCache = {};
+var caseAnglesCache = {};
+// Cycles of sticker positions for a U move, loaded from u_move.json (null if the trainer has none).
+// A sticker at a position moves to the next position in its cycle.
+var uMoveCycles = null;
 
 function isSearchActive() {
     return searchMatches !== null;
@@ -576,6 +580,37 @@ function getCaseFills(caseId) {
         caseFillsCache[caseId] = [...svg.matchAll(/<polygon[^>]*?fill=['"]([^'"]+)['"]/g)].map(m => m[1].toLowerCase());
     }
     return caseFillsCache[caseId];
+}
+
+function hasUMove() {
+    return Array.isArray(uMoveCycles) && uMoveCycles.length > 0;
+}
+
+function applyUMove(fills) {
+    var moved = fills.slice();
+    for (const cycle of uMoveCycles) {
+        for (var k = 0; k < cycle.length; k++) {
+            moved[cycle[(k + 1) % cycle.length]] = fills[cycle[k]];
+        }
+    }
+    return moved;
+}
+
+function uMoveOrder() {
+    var gcd = (a, b) => b ? gcd(b, a % b) : a;
+    return uMoveCycles.reduce((order, cycle) => order * cycle.length / gcd(order, cycle.length), 1);
+}
+
+/// the fills of a case after 0, 1, ... U moves, until the original position is reached again
+function getCaseAngles(caseId) {
+    if (!caseAnglesCache[caseId]) {
+        var angles = [getCaseFills(caseId)];
+        for (var k = 1; k < uMoveOrder(); k++) {
+            angles.push(applyUMove(angles[k - 1]));
+        }
+        caseAnglesCache[caseId] = angles;
+    }
+    return caseAnglesCache[caseId];
 }
 
 function searchTemplateKey() {
@@ -604,9 +639,13 @@ function caseMatchesSearch(caseId) {
     if (searchState.text.trim() && !fuzzyMatches(searchState.text, `${info.algset}${info.group}${info.name}`)) {
         return false;
     }
-    // Search colours are abstract labels: positions sharing a label must share a case colour,
-    // and different labels must map to different case colours.
-    var fills = getCaseFills(caseId);
+    var angles = searchState.allAngles && hasUMove() ? getCaseAngles(caseId) : [getCaseFills(caseId)];
+    return angles.some(fillsMatchPattern);
+}
+
+// Search colours are abstract labels: positions sharing a label must share a case colour,
+// and different labels must map to different case colours.
+function fillsMatchPattern(fills) {
     var labelToColor = {};
     var usedColors = new Set();
     for (const [idx, label] of Object.entries(searchState.cells)) {
@@ -717,6 +756,28 @@ function buildSearchPanel() {
     });
     imageContainer.appendChild(clearImage);
     panel.appendChild(imageContainer);
+
+    if (hasUMove()) {
+        var angleRow = document.createElement('div');
+        angleRow.className = 'rowFlex';
+        angleRow.style.cssText = 'align-items: center; gap: 0.5em;';
+        var angleLabel = document.createElement('span');
+        angleLabel.textContent = 'Search all angles';
+        var angleSwitch = document.createElement('label');
+        angleSwitch.className = 'switch';
+        var angleInput = document.createElement('input');
+        angleInput.type = 'checkbox';
+        angleInput.checked = searchState.allAngles;
+        angleInput.addEventListener('change', () => {
+            searchState.allAngles = angleInput.checked;
+            applySearch();
+        });
+        var angleSlider = document.createElement('span');
+        angleSlider.className = 'slider round';
+        angleSwitch.append(angleInput, angleSlider);
+        angleRow.append(angleLabel, angleSwitch);
+        panel.appendChild(angleRow);
+    }
 
     var palette = document.createElement('div');
     palette.className = 'rowFlex';
