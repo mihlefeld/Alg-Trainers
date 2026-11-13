@@ -136,17 +136,17 @@
 	<dialog id="settings" class='colFlex borderedContainer' autofocus="">
 		<div class="dialogDiv colFlex borderedContainer">
 			<span onclick="closeDialog('settings')" class="material-symbols-outlined abutton closeButton">Close</span>
-			<div class="settingsEntry">
-				<div>Hold down delay</div>
-				<!-- Rounded switch -->
-				<label class="switch">
-					<input onclick="toggleSetting(this, 'enableHoldDelay');" type="checkbox" id="hold_delay_on_off" value="using">
-					<span class="slider round"></span>
-				</label>
-			</div>
 			<details class="settingsDetails" name="mainSettings">
-				<summary class="settingsSummary">Weighting</summary>
+				<summary class="settingsSummary">Behavior</summary>
 				<div class="colFlex">
+					<div class="settingsEntry">
+						<div>Hold down delay</div>
+						<!-- Rounded switch -->
+						<label class="switch">
+							<input onclick="toggleSetting(this, 'enableHoldDelay');" type="checkbox" id="hold_delay_on_off" value="using">
+							<span class="slider round"></span>
+						</label>
+					</div>
 					<div class="settingsEntry">
 						<div>Weighted choice (# of Solves)</div>
 						<label class="switch">
@@ -177,25 +177,30 @@
 					</div>
 				</div>
 			</details>
-			<div class="settingsEntry">
-				<div title="Existing browser data is migrated to IndexedDB automatically. Exports include times, settings, selections, and custom algorithms.">Import/export</div>
-				<div class="plusMinus">
-					<label for="uploadLS" id="uploadLSLabel" class="material-symbols-outlined abutton" >
-						upload
-					</label><input type="file" id="uploadLS" style="display: none;" onchange="uploadLocalStorage()">
-					<button onclick="downloadLocalStorage()" type="button" class="material-symbols-outlined abutton">download</button>
+			<details class="settingsDetails" name="mainSettings">
+				<summary class="settingsSummary">Import/Export</summary>
+				<div class="colFlex">
+					<div class="settingsEntry">
+						<div title="Existing browser data is migrated to IndexedDB automatically. Exports include times, settings, selections, and custom algorithms.">Import/export</div>
+						<div class="plusMinus">
+							<label for="uploadLS" id="uploadLSLabel" class="material-symbols-outlined abutton" >
+								upload
+							</label><input type="file" id="uploadLS" style="display: none;" onchange="uploadLocalStorage()">
+							<button onclick="downloadLocalStorage()" type="button" class="material-symbols-outlined abutton">download</button>
+						</div>
+					</div>
+					<div class="settingsEntry">
+						<div>Algs</div>
+						<div class="plusMinus">
+							<label for="settingsUploadCustomAlgs" id="settingsUploadCustomAlgsLabel" class="material-symbols-outlined abutton" >
+								upload
+							</label><input type="file" id="settingsUploadCustomAlgs" style="display: none;" onchange="uploadCustomAlgs()">
+							<button onclick="downloadCustomAlgs()" type="button" class="material-symbols-outlined abutton">download</button>
+							<button onclick="resetAllAlgs()" type="button" class="material-symbols-outlined abutton">refresh</button>
+						</div>
+					</div>
 				</div>
-			</div>
-			<div class="settingsEntry">
-				<div>Algs</div>
-				<div class="plusMinus">
-					<label for="settingsUploadCustomAlgs" id="settingsUploadCustomAlgsLabel" class="material-symbols-outlined abutton" >
-						upload
-					</label><input type="file" id="settingsUploadCustomAlgs" style="display: none;" onchange="uploadCustomAlgs()">
-					<button onclick="downloadCustomAlgs()" type="button" class="material-symbols-outlined abutton">download</button>
-					<button onclick="resetAllAlgs()" type="button" class="material-symbols-outlined abutton">refresh</button>
-				</div>
-			</div>
+			</details>
 			<details class="settingsDetails" name="mainSettings">
 				<summary class="settingsSummary">Scramble options</summary>
 				<div class="colFlex">
