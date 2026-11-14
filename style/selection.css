@@ -52,6 +52,11 @@ div#cases_selection {
     font-variant-numeric: tabular-nums;
 }
 
+span.hiddenCaseCount {
+    font-size: 0.8em;
+    text-align: center;
+}
+
 span.caseProbability {
     text-align: center;
     font-size: 0.6em;

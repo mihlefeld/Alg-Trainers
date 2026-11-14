@@ -7,11 +7,11 @@ var selectionPresets = {
     }
 }
 
-function getAlgsetIds(algset) {
+function getAlgsetIds(algset, ignoreSearch) {
     if (algsets[algset]) {
         var algsetIds = []
         for (const group of algsets[algset]) {
-            algsetIds = algsetIds.concat(getGroupIds(group));
+            algsetIds = algsetIds.concat(ignoreSearch ? algsGroups[group] : getGroupIds(group));
         }
         return algsetIds;
     }
@@ -56,6 +56,14 @@ function isAlgsetAllSelected(algset) {
     return allSelected;
 }
 
+function getHiddenCaseCounts(algset) {
+    var hidden = getAlgsetIds(algset, true).filter(i =>
+        !selectedAlgSets[algset] || (isSearchActive() && !searchMatches.has(i)));
+    return {
+        total: hidden.length,
+        selected: hidden.filter(i => selCases.includes(i)).length
+    };
+}
 
 function updateTitle() {
     var validIds = getAllValid();
@@ -69,12 +77,25 @@ function updateTitle() {
     } else {
         allSelector.className = 'borderedContainer itemUnsel pad';
     }
+    var hiddenTotal = 0;
+    var hiddenSelected = 0;
     for (const [algset, isShown] of Object.entries(selectedAlgSets)) {
-        if (isShown && Object.keys(selectedAlgSets).length > 1) {
-            document.getElementById(`${algset}Selector`).className = `borderedContainer ${isAlgsetAllSelected(algset) ? "itemSel" : "itemUnsel"} pad`
-            document.getElementById(`${algset}csi`).innerText = countAlgsetSelected(algset);
+        var hidden = getHiddenCaseCounts(algset);
+        hiddenTotal += hidden.total;
+        hiddenSelected += hidden.selected;
+        if (Object.keys(selectedAlgSets).length > 1) {
+            if (isShown) {
+                document.getElementById(`${algset}Selector`).className = `borderedContainer ${isAlgsetAllSelected(algset) ? "itemSel" : "itemUnsel"} pad`
+                document.getElementById(`${algset}csi`).innerText = countAlgsetSelected(algset);
+            }
+            var algsetHidden = document.getElementById(`${algset}Hidden`);
+            algsetHidden.textContent = `Hidden: ${hidden.total} (${hidden.selected} selected)`;
+            algsetHidden.hidden = !isSearchActive();
         }
     }
+    var allHidden = document.getElementById('allHidden');
+    allHidden.textContent = `Hidden: ${hiddenTotal} (${hiddenSelected} selected)`;
+    allHidden.hidden = !isSearchActive();
     var csi = document.getElementById("csi");
     if (csi) csi.innerHTML = selCases.length;
     updateProbabilities();
@@ -322,7 +343,8 @@ function makeAlgsetTitle(algset, enabled) {
      ${(enabled ? "itemSel" : "itemUnsel")} pad' 
      style='width: 7em; opacity: ${enabled ? 1.0 : 0.5}' 
      onclick='selectAlgset("${algset}")'><b>${algset} 
-     (<span id='${algset}csi'>${enabled ? "0" : "-"}</span>/${getAlgsetIds(algset).length})</b></div>`;
+     (<span id='${algset}csi'>${enabled ? "0" : "-"}</span>/${getAlgsetIds(algset).length})</b>
+     <span id='${algset}Hidden' class='hiddenCaseCount'></span></div>`;
 }
 
 function addPreset(name_) {
@@ -493,7 +515,7 @@ function renderSelection() {
     var algs = getAllValid().length;
     var s = "";
     var searching = isSearchActive();
-    s += `<div class='rowFlex' style='align-items: stretch; gap: 0.3em;'><div id='allSelector' class='borderedContainer  ${(selCases.length == algs ? "itemSel" : "itemUnsel")} pad' style='flex-grow: 1;' onclick='selectAllNone()'><b>${searching ? "Search Results" : "All Cases"} (<span id='${searching ? "allSelectorCount" : "csi"}'></span>/${algs})</b></div>`;
+    s += `<div class='rowFlex' style='align-items: stretch; gap: 0.3em;'><div id='allSelector' class='borderedContainer  ${(selCases.length == algs ? "itemSel" : "itemUnsel")} pad' style='flex-grow: 1;' onclick='selectAllNone()'><b>${searching ? "Search Results" : "All Cases"} (<span id='${searching ? "allSelectorCount" : "csi"}'></span>/${algs})</b><span id='allHidden' class='hiddenCaseCount'></span></div>`;
     var tabStyle = searchState.open
         ? "background-color: var(--backgroundDarker); color: var(--accent); border-color: transparent; border-bottom-left-radius: 0; border-bottom-right-radius: 0; box-shadow: 0 0.2em 0 var(--backgroundDarker); position: relative;"
         : "";

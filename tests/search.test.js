@@ -52,3 +52,55 @@ test('stickers outside every cycle stay in place when the U move is applied', ()
     assert.deepEqual([...context.applyUMove(['#a', '#b', '#c', '#d'])], ['#c', '#a', '#b', '#d']);
     assert.equal(context.uMoveOrder(), 3);
 });
+
+test('hidden counts update for search filters, selection changes and disabled algsets', () => {
+    const context = createContext([['#a'], ['#b'], ['#c'], ['#d']], null);
+    context.algsets = {First: ['first'], Second: ['second']};
+    context.algsGroups = {first: [0, 1], second: [2, 3]};
+    context.selectedAlgSets = {First: true, Second: false};
+    context.selCases = [0, 1];
+    context.searchMatches = new Set([0, 2]);
+    const elements = Object.fromEntries(
+        ['allSelector', 'allSelectorCount', 'allHidden', 'FirstSelector', 'Firstcsi',
+            'FirstHidden', 'SecondHidden'].map(id => [id, {}])
+    );
+    context.document = {
+        getElementById: id => elements[id] || null,
+        querySelectorAll: () => []
+    };
+    context.currentSettings = {showProbabilities: false};
+
+    context.updateTitle();
+    assert.equal(elements.allHidden.textContent, 'Hidden: 3 (1 selected)');
+    assert.equal(elements.FirstHidden.textContent, 'Hidden: 1 (1 selected)');
+    assert.equal(elements.SecondHidden.textContent, 'Hidden: 2 (0 selected)');
+    assert.equal(elements.allHidden.hidden, false);
+    assert.equal(elements.FirstHidden.hidden, false);
+    assert.equal(elements.SecondHidden.hidden, false);
+    assert.equal(elements.allSelectorCount.innerText, 1);
+
+    context.renderSelection = () => context.updateTitle();
+    context.saveSelection = () => {};
+    context.resize = () => {};
+    context.selectAllNone();
+    assert.deepEqual([...context.selCases], [1]);
+    assert.equal(elements.allHidden.textContent, 'Hidden: 3 (1 selected)');
+
+    context.selCases = [0];
+    context.updateTitle();
+    assert.equal(elements.allHidden.textContent, 'Hidden: 3 (0 selected)');
+    assert.equal(elements.FirstHidden.textContent, 'Hidden: 1 (0 selected)');
+
+    context.searchMatches = null;
+    context.selectedAlgSets.Second = true;
+    elements.SecondSelector = {};
+    elements.Secondcsi = {};
+    elements.csi = {};
+    context.updateTitle();
+    assert.equal(elements.allHidden.textContent, 'Hidden: 0 (0 selected)');
+    assert.equal(elements.FirstHidden.textContent, 'Hidden: 0 (0 selected)');
+    assert.equal(elements.SecondHidden.textContent, 'Hidden: 0 (0 selected)');
+    assert.equal(elements.allHidden.hidden, true);
+    assert.equal(elements.FirstHidden.hidden, true);
+    assert.equal(elements.SecondHidden.hidden, true);
+});
