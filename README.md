@@ -8,7 +8,9 @@
 4. Open `http://localhost:8000`.
 
 The stack starts PostgreSQL and the Rocket server. SeaORM migrations run when the server starts.
-Trainer definitions are imported into PostgreSQL on the first startup. Set
+Trainer definitions are imported into PostgreSQL before the server starts
+accepting connections on the first startup. Follow progress with
+`docker compose logs -f alg-trainers-server`. Set
 `FORCE_CATALOG_SEED=1` when intentionally rebuilding catalog content from the
 checked-in trainer JSON files.
 

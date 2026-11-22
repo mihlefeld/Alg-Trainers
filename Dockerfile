@@ -1,7 +1,7 @@
 FROM rust:latest AS chef
 ENV CARGO_BUILD_JOBS=1
-RUN --mount=type=cache,target=/usr/local/cargo/registry \
-    --mount=type=cache,target=/usr/local/cargo/git \
+RUN --mount=type=cache,id=alg-trainers-chef-registry,target=/usr/local/cargo/registry \
+    --mount=type=cache,id=alg-trainers-chef-git,target=/usr/local/cargo/git \
     cargo install cargo-chef --version 0.1.72 --locked
 WORKDIR /app
 COPY Cargo.toml Cargo.lock* ./
@@ -26,8 +26,8 @@ RUN set -eu; \
       | tar -xz -C /usr/local/bin; \
     trunk --version
 RUN --mount=type=cache,id=alg-trainers-frontend-target,target=/app/target \
-    --mount=type=cache,target=/usr/local/cargo/registry \
-    --mount=type=cache,target=/usr/local/cargo/git \
+    --mount=type=cache,id=alg-trainers-frontend-registry,target=/usr/local/cargo/registry \
+    --mount=type=cache,id=alg-trainers-frontend-git,target=/usr/local/cargo/git \
     cargo chef cook --recipe-path recipe.json --release \
       --target wasm32-unknown-unknown --package alg-trainers-frontend
 
@@ -35,20 +35,20 @@ FROM frontend-tools AS frontend-builder
 COPY frontend frontend
 COPY Trunk.toml Trunk.toml
 RUN --mount=type=cache,id=alg-trainers-frontend-target,target=/app/target \
-    --mount=type=cache,target=/usr/local/cargo/registry \
-    --mount=type=cache,target=/usr/local/cargo/git \
+    --mount=type=cache,id=alg-trainers-frontend-registry,target=/usr/local/cargo/registry \
+    --mount=type=cache,id=alg-trainers-frontend-git,target=/usr/local/cargo/git \
     cd frontend && trunk build --release
 
 FROM chef AS backend-builder
 COPY --from=chef /app/recipe.json recipe.json
 RUN --mount=type=cache,id=alg-trainers-backend-target,target=/app/target \
-    --mount=type=cache,target=/usr/local/cargo/registry \
-    --mount=type=cache,target=/usr/local/cargo/git \
+    --mount=type=cache,id=alg-trainers-backend-registry,target=/usr/local/cargo/registry \
+    --mount=type=cache,id=alg-trainers-backend-git,target=/usr/local/cargo/git \
     cargo chef cook --recipe-path recipe.json --release --package alg-trainers-server
 COPY backend backend
 RUN --mount=type=cache,id=alg-trainers-backend-target,target=/app/target \
-    --mount=type=cache,target=/usr/local/cargo/registry \
-    --mount=type=cache,target=/usr/local/cargo/git \
+    --mount=type=cache,id=alg-trainers-backend-registry,target=/usr/local/cargo/registry \
+    --mount=type=cache,id=alg-trainers-backend-git,target=/usr/local/cargo/git \
     cargo build --release -p alg-trainers-server \
     && cp /app/target/release/alg-trainers-server /app/alg-trainers-server
 

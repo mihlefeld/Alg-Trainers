@@ -1,4 +1,7 @@
-use sea_orm::{ConnectionTrait, DatabaseBackend, DatabaseConnection, DbErr, Statement};
+use sea_orm::{
+    ConnectionTrait, DatabaseBackend, DatabaseConnection, DatabaseTransaction, DbErr, Statement,
+    TransactionTrait,
+};
 use serde::{Deserialize, Serialize};
 use std::{collections::BTreeMap, fs, path::Path};
 
@@ -159,19 +162,24 @@ pub async fn seed(db: &DatabaseConnection, root: &Path) -> Result<(), CatalogErr
             return Ok(());
         }
     }
+    eprintln!("Importing {expected} trainers into the catalog...");
+    let transaction = db.begin().await?;
     let mut order = 0;
     for (puzzle, entries) in index {
         let entries: Vec<IndexEntry> = serde_json::from_value(entries)?;
         for entry in entries {
             order += 1;
-            seed_trainer(db, root, &puzzle, &entry, order).await?;
+            eprintln!("Importing trainer {order}/{expected}: {}", entry.location);
+            seed_trainer(&transaction, root, &puzzle, &entry, order).await?;
         }
     }
+    transaction.commit().await?;
+    eprintln!("Catalog import complete.");
     Ok(())
 }
 
 async fn seed_trainer(
-    db: &DatabaseConnection,
+    db: &DatabaseTransaction,
     root: &Path,
     puzzle: &str,
     entry: &IndexEntry,
@@ -371,7 +379,7 @@ async fn seed_trainer(
 }
 
 async fn execute(
-    db: &DatabaseConnection,
+    db: &DatabaseTransaction,
     sql: &str,
     values: Vec<sea_orm::Value>,
 ) -> Result<(), DbErr> {
@@ -385,7 +393,7 @@ async fn execute(
 }
 
 async fn execute_returning_id(
-    db: &DatabaseConnection,
+    db: &DatabaseTransaction,
     sql: &str,
     values: Vec<sea_orm::Value>,
 ) -> Result<i64, CatalogError> {
