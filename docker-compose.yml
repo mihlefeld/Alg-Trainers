@@ -1,0 +1,40 @@
+services:
+  psql:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: alg_trainers
+      POSTGRES_USER: alg_trainers
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-alg_trainers}
+    volumes:
+      - psql-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U alg_trainers -d alg_trainers"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  alg-trainers-server:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    depends_on:
+      psql:
+        condition: service_healthy
+    environment:
+      ROCKET_ADDRESS: 0.0.0.0
+      ROCKET_PORT: 8000
+      ROCKET_SECRET_KEY: ${ROCKET_SECRET_KEY:-0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef}
+      DATABASE_URL: postgres://alg_trainers:${POSTGRES_PASSWORD:-alg_trainers}@psql:5432/alg_trainers
+      WCA_BASE_URL: ${WCA_BASE_URL:-https://www.worldcubeassociation.org}
+      WCA_CLIENT_ID: ${WCA_CLIENT_ID:-}
+      WCA_CLIENT_SECRET: ${WCA_CLIENT_SECRET:-}
+      WCA_REDIRECT_URL: ${WCA_REDIRECT_URL:-http://localhost:8000/api/auth/wca/callback}
+      CATALOG_ROOT: /app/catalog
+      FORCE_CATALOG_SEED: ${FORCE_CATALOG_SEED:-}
+    ports:
+      - "${ALG_TRAINERS_PORT:-8000}:8000"
+
+volumes:
+  psql-data:

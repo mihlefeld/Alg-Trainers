@@ -83,12 +83,116 @@ span.caseSpan {
     font-size: 0.5em;
 }
 
+#selectionLayout {
+    width: min(calc(100vw - 1em), 26em) !important;
+    max-width: 100%;
+    box-sizing: border-box;
+}
+
+#selectionLayout > div:first-child {
+    width: 100%;
+}
+
+#selectionLayout section > .rowFlex {
+    width: 100%;
+}
+
+button.caseNameStats,
+button.inlineButton {
+    border: 0;
+    padding: 0;
+    background: transparent;
+    font: inherit;
+}
+
+.lastScrambleText {
+    min-width: 0;
+    overflow-wrap: anywhere;
+}
+
 div#modeButtons {
-    position: fixed;
-    bottom: 0.5em;
+    position: static;
     gap: 0.3em;
     /* font-size: 1.3em; */
     transition: all 0.3s;
+}
+
+.startPracticeButton {
+    position: fixed;
+    right: 0.5em;
+    bottom: 0.5em;
+    z-index: 10;
+}
+
+.presetRow {
+    align-items: center;
+    width: fit-content;
+    max-width: 100%;
+}
+
+.presetName {
+    min-width: 6em;
+    overflow-wrap: anywhere;
+}
+
+.presetActions {
+    flex-wrap: nowrap;
+}
+
+.algsetSelectors > button {
+    flex: 1 1 7em;
+}
+
+dialog[open] {
+    position: fixed;
+    z-index: 1000;
+    max-width: none;
+    max-height: none;
+    overflow: auto;
+}
+
+body:has(dialog[open])::after {
+    content: "";
+    position: fixed;
+    inset: 0;
+    z-index: 999;
+    background: rgb(0 0 0 / 0.62);
+    pointer-events: none;
+}
+
+@media (max-width: 700px) {
+    #selectionLayout {
+        width: calc(100vw - 0.5em) !important;
+        margin: 0.25em !important;
+    }
+
+    #selectionLayout h1 {
+        font-size: 1.35em;
+        line-height: 1.15;
+    }
+
+    #presetsSettings {
+        width: 100%;
+    }
+
+    .presetRow {
+        width: 100%;
+        box-sizing: border-box;
+    }
+
+    .presetActions {
+        gap: 0.1em;
+    }
+
+    #presetsSettings .presetActions button {
+        width: auto;
+        min-width: 1.8em;
+    }
+
+    #last_scramble {
+        align-items: flex-start;
+        flex-wrap: wrap;
+    }
 }
 
 div#presetsSettings span {

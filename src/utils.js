@@ -125,6 +125,11 @@ function loadLocal(key, fallback) {
 
 function saveLocal(key, value) {
     storageCache.set(key, value);
+    if (typeof window !== 'undefined' && typeof CustomEvent !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('alg-trainers-change', {
+            detail: { key, value }
+        }));
+    }
     return storageTransaction('data', 'readwrite', store => store.put(value, key))
         .catch(reportStorageError);
 }

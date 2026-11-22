@@ -13,6 +13,7 @@ div#timerDiv {
     align-items: center;
     font-weight: 800;
     font-variant-numeric: tabular-nums;
+    touch-action: none;
 }
 
 div#stats {
@@ -55,6 +56,26 @@ input {
 
 span.timeResult {
     cursor: pointer;
+}
+
+.stoppedResult {
+    color: #850000;
+}
+
+@media (max-width: 700px) {
+    div#timer_and_stats {
+        min-height: 65vh;
+    }
+
+    div#timerDiv {
+        width: 68%;
+    }
+
+    div#stats {
+        width: 32%;
+        padding: 0.35em !important;
+        box-sizing: border-box;
+    }
 }
 
 span.timeResultBold {

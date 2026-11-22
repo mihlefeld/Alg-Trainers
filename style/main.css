@@ -10,6 +10,23 @@
     -webkit-tap-highlight-color: transparent;
 }
 
+.material-symbols-outlined {
+    font-family: "Material Symbols Outlined";
+    font-weight: normal;
+    font-style: normal;
+    font-size: 1.15em;
+    line-height: 1;
+    letter-spacing: normal;
+    text-transform: none;
+    white-space: nowrap;
+    word-wrap: normal;
+    direction: ltr;
+    -webkit-font-feature-settings: "liga";
+    font-feature-settings: "liga";
+    -webkit-font-smoothing: antialiased;
+    font-variation-settings: "FILL" 0, "wght" 400, "GRAD" 0, "opsz" 24;
+}
+
 .rowFlex {
     display: flex;
     flex-direction: row;
@@ -61,7 +78,7 @@ a:hover {
 
 
 body {
-    font-family: "Titilium Web", sans-serif;
+    font-family: "Titillium Web", sans-serif;
     font-weight: 400;
     font-size: 1.3em;
     --background: #222222;
@@ -71,11 +88,13 @@ body {
     --secondaryHover: var(--secondary);
     --secondaryText: var(--text);
     --primary: #658320;
-    --primaryText: var(--primary);
+    --primaryText: var(--text);
     --primaryTextHover: var(--primary);
     --accent: #abdf32;
     --accentHover: var(--accent);
     --accentText: var(--background);
+    --primaryBG: var(--primary);
+    --primaryBGHover: color-mix(in oklch, var(--primary), var(--background) 18%);
     --borderRadius: 0.3em;
     --borderWidth: 0.13em;
     background-color: var(--background);
@@ -84,12 +103,12 @@ body {
 
 #algtrainer-selections {
     justify-content: center; 
-    width: min(80vw, 62em);
+    width: min(80vw, 52em);
     flex-wrap: wrap;
 }
 
 #algtrainer-selections > div {
-    width: 19em;
+    width: 16em;
 }
 
 dialog::backdrop {
@@ -103,6 +122,7 @@ dialog {
 }
 
 dialog[open] {
+    inset: 0;
     width: 100%;
     height: 100%;
     scale: 1;
@@ -112,7 +132,8 @@ dialog[open] {
     display: flex;
     flex-direction: column;
     align-items: center;
-    overflow: scroll;
+    justify-content: center;
+    overflow: auto;
 }
 
 .dialogBackground {
@@ -139,6 +160,8 @@ dialog[open] {
     border-color: transparent;
     width: 32em;
     max-width: 95%;
+    max-height: 90vh;
+    overflow: auto;
 }
 
 dialog:focus {
@@ -211,6 +234,191 @@ html {
     box-shadow: 0px 0px 5px var(--primaryBGHover);
     background-color: var(--primaryBGHover);
     border-color: var(--primaryBGHover);
+}
+
+.abutton:disabled {
+    cursor: not-allowed;
+    opacity: 0.45;
+    transform: none;
+    box-shadow: none;
+}
+
+.linkButton {
+    border: 0;
+    padding: 0;
+    background: transparent;
+    color: var(--primaryBG);
+    font: inherit;
+    text-decoration: underline;
+    cursor: pointer;
+}
+
+.linkButton:hover {
+    color: var(--primaryBGHover);
+}
+
+.compactButton {
+    width: 2.2em !important;
+    height: 2.2em;
+    padding: 0.3em !important;
+}
+
+.practiceButton {
+    position: relative;
+    gap: 0.4em;
+    font-weight: 700;
+    white-space: nowrap;
+}
+
+.searchPanel {
+    width: 100%;
+    box-sizing: border-box;
+    align-items: center;
+    gap: 0.5em;
+    background: var(--backgroundDarker);
+}
+
+.searchPanel > .searchTextRow,
+.searchPanel > .searchPalette {
+    width: 100%;
+}
+
+.searchPanel .searchTextRow {
+    align-items: center;
+    gap: 0.5em;
+}
+
+.searchPanel .searchTextRow input {
+    min-width: 0;
+    flex: 1;
+    padding: 0.5em;
+    border: var(--borderWidth) solid var(--secondary);
+    background: var(--background);
+    color: var(--text);
+    font: inherit;
+}
+
+.searchDiagram {
+    position: relative;
+    width: min(16em, 100%);
+    box-sizing: border-box;
+    cursor: default;
+}
+
+.searchDiagram svg {
+    display: block;
+    width: 100%;
+    height: auto;
+}
+
+.searchDiagram polygon {
+    cursor: pointer;
+}
+
+.searchDiagramClear {
+    position: absolute;
+    right: 0.2em;
+    bottom: 0.2em;
+}
+
+.compactIconButton {
+    border: 0;
+    background: transparent;
+    color: var(--text);
+    font: inherit;
+    cursor: pointer;
+}
+
+.searchPalette {
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 0.3em;
+}
+
+.searchSwatch {
+    width: 1.8em;
+    height: 1.8em;
+    padding: 0;
+    border: 3px solid var(--text);
+    border-radius: 0.3em;
+    box-sizing: border-box;
+    cursor: pointer;
+}
+
+.searchSwatch.active {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 2px var(--background);
+}
+
+.searchAngleToggle {
+    align-items: center;
+    justify-content: center;
+    gap: 0.5em;
+}
+
+.hotkeyRow {
+    justify-content: space-between;
+    align-items: center;
+    gap: 1em !important;
+}
+
+kbd.hotkey {
+    padding: 0.15em 0.45em;
+    border: 1px solid var(--text);
+    border-bottom-width: 3px;
+    border-radius: 0.25em;
+    background: var(--background);
+}
+
+.creditsGrid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(14em, 1fr));
+    gap: 1em;
+}
+
+.algsheetGrid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(12em, 1fr));
+    gap: 0.45em;
+    width: min(88vw, 62em);
+    padding-bottom: 5em;
+}
+
+.algsheetGrid .fullSpan {
+    grid-column: 1 / -1;
+    text-align: center;
+}
+
+.algsheetCase {
+    min-width: 0;
+}
+
+.algsheetCaseImage {
+    align-items: center;
+    min-height: 10em;
+}
+
+.algsheetCaseImage img {
+    width: 10em;
+    max-width: 100%;
+}
+
+.algsheetAlgs > div {
+    overflow-wrap: anywhere;
+    background: var(--backgroundDarker);
+}
+
+@media (max-width: 850px) {
+    .algsheetGrid {
+        grid-template-columns: repeat(2, minmax(10em, 1fr));
+    }
+}
+
+@media (max-width: 560px) {
+    .algsheetGrid {
+        grid-template-columns: 1fr;
+        width: calc(100vw - 1em);
+    }
 }
 
 .closeButton:hover {

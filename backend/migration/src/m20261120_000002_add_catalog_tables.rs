@@ -1,0 +1,310 @@
+use sea_orm_migration::prelude::*;
+
+#[derive(DeriveMigrationName)]
+pub struct Migration;
+
+#[async_trait::async_trait]
+impl MigrationTrait for Migration {
+    async fn up(&self, db: &SchemaManager) -> Result<(), DbErr> {
+        db.create_table(
+            Table::create()
+                .table(Algs::Table)
+                .if_not_exists()
+                .col(ColumnDef::new(Algs::TrainerId).string().not_null())
+                .col(ColumnDef::new(Algs::CaseId).string().not_null())
+                .col(ColumnDef::new(Algs::Alg).text().not_null())
+                .col(ColumnDef::new(Algs::Position).integer().not_null())
+                .primary_key(
+                    Index::create()
+                        .col(Algs::TrainerId)
+                        .col(Algs::CaseId)
+                        .col(Algs::Position),
+                )
+                .to_owned(),
+        )
+        .await?;
+
+        db.create_table(
+            Table::create()
+                .table(Scrambles::Table)
+                .if_not_exists()
+                .col(ColumnDef::new(Scrambles::TrainerId).string().not_null())
+                .col(ColumnDef::new(Scrambles::CaseId).string().not_null())
+                .col(ColumnDef::new(Scrambles::Position).integer().not_null())
+                .col(ColumnDef::new(Scrambles::Scramble).text().not_null())
+                .primary_key(
+                    Index::create()
+                        .col(Scrambles::TrainerId)
+                        .col(Scrambles::CaseId)
+                        .col(Scrambles::Position),
+                )
+                .to_owned(),
+        )
+        .await?;
+
+        db.create_table(
+            Table::create()
+                .table(Groups::Table)
+                .if_not_exists()
+                .col(
+                    ColumnDef::new(Groups::Id)
+                        .big_integer()
+                        .not_null()
+                        .auto_increment()
+                        .primary_key(),
+                )
+                .col(ColumnDef::new(Groups::TrainerId).string().not_null())
+                .col(ColumnDef::new(Groups::Name).string().not_null())
+                .col(ColumnDef::new(Groups::Order).integer().not_null())
+                .to_owned(),
+        )
+        .await?;
+        db.create_index(
+            Index::create()
+                .name("idx_groups_trainer_name")
+                .table(Groups::Table)
+                .col(Groups::TrainerId)
+                .col(Groups::Name)
+                .unique()
+                .to_owned(),
+        )
+        .await?;
+
+        db.create_table(
+            Table::create()
+                .table(GroupAssignments::Table)
+                .if_not_exists()
+                .col(
+                    ColumnDef::new(GroupAssignments::GroupId)
+                        .big_integer()
+                        .not_null(),
+                )
+                .col(
+                    ColumnDef::new(GroupAssignments::TrainerId)
+                        .string()
+                        .not_null(),
+                )
+                .col(ColumnDef::new(GroupAssignments::CaseId).string().not_null())
+                .col(ColumnDef::new(GroupAssignments::Order).integer().not_null())
+                .primary_key(
+                    Index::create()
+                        .col(GroupAssignments::GroupId)
+                        .col(GroupAssignments::TrainerId)
+                        .col(GroupAssignments::CaseId),
+                )
+                .to_owned(),
+        )
+        .await?;
+
+        db.create_table(
+            Table::create()
+                .table(Algsets::Table)
+                .if_not_exists()
+                .col(
+                    ColumnDef::new(Algsets::Id)
+                        .big_integer()
+                        .not_null()
+                        .auto_increment()
+                        .primary_key(),
+                )
+                .col(ColumnDef::new(Algsets::TrainerId).string().not_null())
+                .col(ColumnDef::new(Algsets::Name).string().not_null())
+                .col(ColumnDef::new(Algsets::Order).integer().not_null())
+                .to_owned(),
+        )
+        .await?;
+        db.create_index(
+            Index::create()
+                .name("idx_algsets_trainer_name")
+                .table(Algsets::Table)
+                .col(Algsets::TrainerId)
+                .col(Algsets::Name)
+                .unique()
+                .to_owned(),
+        )
+        .await?;
+
+        db.create_table(
+            Table::create()
+                .table(AlgsetSources::Table)
+                .if_not_exists()
+                .col(
+                    ColumnDef::new(AlgsetSources::AlgsetId)
+                        .big_integer()
+                        .not_null(),
+                )
+                .col(ColumnDef::new(AlgsetSources::Name).string().not_null())
+                .col(ColumnDef::new(AlgsetSources::Person).string())
+                .col(ColumnDef::new(AlgsetSources::Link).text())
+                .primary_key(
+                    Index::create()
+                        .col(AlgsetSources::AlgsetId)
+                        .col(AlgsetSources::Name),
+                )
+                .to_owned(),
+        )
+        .await?;
+
+        db.create_table(
+            Table::create()
+                .table(AlgsetAssignments::Table)
+                .if_not_exists()
+                .col(
+                    ColumnDef::new(AlgsetAssignments::AlgsetId)
+                        .big_integer()
+                        .not_null(),
+                )
+                .col(
+                    ColumnDef::new(AlgsetAssignments::TrainerId)
+                        .string()
+                        .not_null(),
+                )
+                .col(
+                    ColumnDef::new(AlgsetAssignments::GroupId)
+                        .big_integer()
+                        .not_null(),
+                )
+                .primary_key(
+                    Index::create()
+                        .col(AlgsetAssignments::AlgsetId)
+                        .col(AlgsetAssignments::TrainerId)
+                        .col(AlgsetAssignments::GroupId),
+                )
+                .to_owned(),
+        )
+        .await?;
+
+        db.alter_table(
+            Table::alter()
+                .table(Cases::Table)
+                .add_column(ColumnDef::new(Cases::ImageSvg).text())
+                .to_owned(),
+        )
+        .await?;
+        db.alter_table(
+            Table::alter()
+                .table(Trainers::Table)
+                .add_column(
+                    ColumnDef::new(Trainers::Order)
+                        .integer()
+                        .not_null()
+                        .default(0),
+                )
+                .add_column(ColumnDef::new(Trainers::IconPath).text())
+                .add_column(ColumnDef::new(Trainers::Title).string())
+                .add_column(
+                    ColumnDef::new(Trainers::PreRotations)
+                        .json_binary()
+                        .not_null()
+                        .default("[]"),
+                )
+                .add_column(
+                    ColumnDef::new(Trainers::PostRotations)
+                        .json_binary()
+                        .not_null()
+                        .default("[]"),
+                )
+                .add_column(
+                    ColumnDef::new(Trainers::PreMoves)
+                        .json_binary()
+                        .not_null()
+                        .default("[]"),
+                )
+                .add_column(
+                    ColumnDef::new(Trainers::PostMoves)
+                        .json_binary()
+                        .not_null()
+                        .default("[]"),
+                )
+                .add_column(
+                    ColumnDef::new(Trainers::SelectedAlgsets)
+                        .json_binary()
+                        .not_null()
+                        .default("{}"),
+                )
+                .to_owned(),
+        )
+        .await?;
+
+        Ok(())
+    }
+
+    async fn down(&self, db: &SchemaManager) -> Result<(), DbErr> {
+        db.drop_table(
+            Table::drop()
+                .table(AlgsetAssignments::Table)
+                .if_exists()
+                .to_owned(),
+        )
+        .await?;
+        db.drop_table(
+            Table::drop()
+                .table(AlgsetSources::Table)
+                .if_exists()
+                .to_owned(),
+        )
+        .await?;
+        db.drop_table(Table::drop().table(Algsets::Table).if_exists().to_owned())
+            .await?;
+        db.drop_table(
+            Table::drop()
+                .table(GroupAssignments::Table)
+                .if_exists()
+                .to_owned(),
+        )
+        .await?;
+        db.drop_table(Table::drop().table(Groups::Table).if_exists().to_owned())
+            .await?;
+        db.drop_table(Table::drop().table(Scrambles::Table).if_exists().to_owned())
+            .await?;
+        db.drop_table(Table::drop().table(Algs::Table).if_exists().to_owned())
+            .await?;
+        Ok(())
+    }
+}
+
+macro_rules! table_enum {
+    ($name:ident, $table:expr, [$($variant:ident),+]) => {
+        #[derive(Iden)]
+        enum $name { #[iden=$table] Table, $($variant),+ }
+    };
+}
+
+table_enum!(
+    Trainers,
+    "trainers",
+    [
+        Order,
+        IconPath,
+        Title,
+        PreRotations,
+        PostRotations,
+        PreMoves,
+        PostMoves,
+        SelectedAlgsets
+    ]
+);
+table_enum!(Cases, "cases", [ImageSvg]);
+table_enum!(Algs, "algs", [TrainerId, CaseId, Alg, Position]);
+table_enum!(
+    Scrambles,
+    "scrambles",
+    [TrainerId, CaseId, Position, Scramble]
+);
+table_enum!(Groups, "groups", [Id, TrainerId, Name, Order]);
+table_enum!(
+    GroupAssignments,
+    "group_assignments",
+    [GroupId, TrainerId, CaseId, Order]
+);
+table_enum!(Algsets, "algsets", [Id, TrainerId, Name, Order]);
+table_enum!(
+    AlgsetSources,
+    "algset_sources",
+    [AlgsetId, Name, Person, Link]
+);
+table_enum!(
+    AlgsetAssignments,
+    "algset_assignments",
+    [AlgsetId, TrainerId, GroupId]
+);

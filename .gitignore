@@ -1,3 +1,4 @@
 /generators
 node_modules
 test-results
+.env

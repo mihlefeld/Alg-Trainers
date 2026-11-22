@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="description" content="Sleek modern algorithm trainers for a variety of algorithms and puzzles.">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, minimum-scale=1.0, maximum-scale=1.0">
+    <link rel="icon" href="/icon.png">
+    <link rel="manifest" href="/manifest.json">
+    <link rel="stylesheet" href="/style/main.css">
+    <link rel="stylesheet" href="/style/selection.css">
+    <link rel="stylesheet" href="/style/timer.css">
+    <link rel="stylesheet" href="/style/settings.css">
+    <link rel="stylesheet" href="/style/hint.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Titillium+Web:ital,wght@0,200;0,300;0,400;0,600;0,700;0,900;1,200;1,300;1,400;1,600;1,700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200">
+    <style>
+      #app { display: contents; }
+      #trainer-main #selectionLayout {
+        width: min(calc(100vw - 1em), 26em) !important;
+      }
+      #trainer-main #modeButtons {
+        right: 0.5em;
+      }
+      @media (prefers-color-scheme: light) {
+        body {
+          --text: oklch(25% 0 0);
+          --background: oklch(96% 0.01 97);
+          --backgroundDarker: oklch(86% 0.01 97);
+          --secondary: oklch(75% 0.09 99);
+          --primary: oklch(45% 0.08 136);
+          --primaryBG: var(--primary);
+          --primaryBGHover: oklch(35% 0.08 136);
+          --accent: oklch(85% 0.16 98);
+          --secondaryText: var(--text);
+          --primaryText: var(--text);
+          --accentText: var(--text);
+        }
+        .material-symbols-outlined {
+          font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+      }
+    </style>
+    <title>ALLG Trainer</title>
+  </head>
+  <body id="bodyid" class="niceBody">
+    <div id="app"></div>
+  </body>
+</html>
