@@ -1,0 +1,26 @@
+{
+  "trainerTitle": "Megaminx OLL Trainer",
+  "preRotations": [
+    ""
+  ],
+  "postRotations": [
+    ""
+  ],
+  "preMoves": [
+    "",
+    "U",
+    "U'",
+    "U2",
+    "U2'"
+  ],
+  "postMoves": [
+    "",
+    "U",
+    "U'",
+    "U2",
+    "U2'"
+  ],
+  "maxAlgsPerRow": 12,
+  "selectionArrayKey": "ollSelection",
+  "timesArrayKey": "ollTimesArray"
+}

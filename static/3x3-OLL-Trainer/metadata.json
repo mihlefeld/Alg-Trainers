@@ -1,0 +1,24 @@
+{
+  "trainerTitle": "3\u00d73 OLL Trainer",
+  "preRotations": [
+    ""
+  ],
+  "postRotations": [
+    ""
+  ],
+  "preMoves": [
+    "",
+    "U",
+    "U'",
+    "U2"
+  ],
+  "postMoves": [
+    "",
+    "U",
+    "U'",
+    "U2"
+  ],
+  "maxAlgsPerRow": 8,
+  "selectionArrayKey": "3x3ollselection",
+  "timesArrayKey": "3x3ollTimes"
+}

@@ -1,0 +1,18 @@
+{
+  "trainerTitle": "5\u00d75 LCE Trainer",
+  "preRotations": [
+    ""
+  ],
+  "postRotations": [
+    ""
+  ],
+  "preMoves": [
+    ""
+  ],
+  "postMoves": [
+    ""
+  ],
+  "maxAlgsPerRow": 10,
+  "selectionArrayKey": "5x5lceselection",
+  "timesArrayKey": "5x5lceTimes"
+}

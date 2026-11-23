@@ -1,0 +1,22 @@
+{
+  "trainerTitle": "FTO L6X Trainer",
+  "preRotations": [
+    ""
+  ],
+  "postRotations": [
+    ""
+  ],
+  "preMoves": [
+    "",
+    "U",
+    "U'"
+  ],
+  "postMoves": [
+    "",
+    "U",
+    "U'"
+  ],
+  "maxAlgsPerRow": 5,
+  "selectionArrayKey": "ftoL6XSelection",
+  "timesArrayKey": "ftoL6XTimesArray"
+}

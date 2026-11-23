@@ -1,0 +1,22 @@
+{
+  "trainerTitle": "FTO L3T Trainer",
+  "preRotations": [
+    ""
+  ],
+  "postRotations": [
+    ""
+  ],
+  "preMoves": [
+    "",
+    "U",
+    "U'"
+  ],
+  "postMoves": [
+    "",
+    "U",
+    "U'"
+  ],
+  "maxAlgsPerRow": 9,
+  "selectionArrayKey": "octaminxL3TSelection",
+  "timesArrayKey": "octaminxL3TTimesArray"
+}

@@ -1,0 +1,26 @@
+{
+  "trainerTitle": "Megaminx WV Trainer",
+  "preRotations": [
+    ""
+  ],
+  "postRotations": [
+    ""
+  ],
+  "preMoves": [
+    "",
+    "U",
+    "U'",
+    "U2",
+    "U2'"
+  ],
+  "postMoves": [
+    "",
+    "U",
+    "U'",
+    "U2",
+    "U2'"
+  ],
+  "maxAlgsPerRow": 8,
+  "selectionArrayKey": "megawvSelection",
+  "timesArrayKey": "megawvTimesArray"
+}

@@ -27,8 +27,42 @@ pub struct TrainerCase {
     pub name: String,
     pub setup: Option<String>,
     pub image_svg: Option<String>,
-    pub algs: Vec<String>,
+    pub algs: Vec<TrainerAlg>,
     pub scrambles: Vec<String>,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TrainerAlg {
+    pub alg_id: String,
+    pub alg: String,
+    pub position: i32,
+}
+
+#[derive(Clone, Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct TrainerMetadata {
+    trainer_title: Option<String>,
+    selection_array_key: Option<String>,
+    times_array_key: Option<String>,
+    #[serde(default)]
+    pre_rotations: Vec<String>,
+    #[serde(default)]
+    post_rotations: Vec<String>,
+    #[serde(default)]
+    pre_moves: Vec<String>,
+    #[serde(default)]
+    post_moves: Vec<String>,
+    #[serde(default = "default_max_algs_per_row")]
+    max_algs_per_row: i32,
+}
+
+fn default_max_algs_per_row() -> i32 {
+    8
+}
+
+fn read_trainer_metadata(root: &Path, trainer_id: &str) -> Option<TrainerMetadata> {
+    read_json(root.join(trainer_id).join("metadata.json")).ok()
 }
 
 async fn update_max_algs_per_row(
@@ -39,9 +73,9 @@ async fn update_max_algs_per_row(
     for entries in index.values() {
         let entries: Vec<IndexEntry> = serde_json::from_value(entries.clone())?;
         for entry in entries {
-            let source = fs::read_to_string(root.join(&entry.location).join("algsinfo.js"))
-                .unwrap_or_default();
-            let max_algs_per_row = js_integer(&source, "maxAlgsPerRow").unwrap_or(8);
+            let max_algs_per_row = read_trainer_metadata(root, &entry.location)
+                .map(|metadata| metadata.max_algs_per_row)
+                .unwrap_or(8);
             db.execute(Statement::from_sql_and_values(
                 DatabaseBackend::Postgres,
                 "UPDATE trainers SET max_algs_per_row=$1 WHERE trainer_id=$2",
@@ -109,65 +143,18 @@ fn read_json<T: serde::de::DeserializeOwned>(path: impl AsRef<Path>) -> Result<T
     Ok(serde_json::from_slice(&fs::read(path)?)?)
 }
 
-fn js_string_array(source: &str, name: &str) -> Vec<String> {
-    let Some(start) = ["const", "var"]
-        .into_iter()
-        .filter_map(|kind| {
-            let marker = format!("{kind} {name} = ");
-            source.find(&marker).map(|index| index + marker.len())
-        })
-        .next()
-    else {
-        return Vec::new();
-    };
-    let tail = &source[start..];
-    let Some(end) = tail.find(';') else {
-        return Vec::new();
-    };
-    tail[..end]
-        .trim()
-        .trim_start_matches('[')
-        .trim_end_matches(']')
-        .split(',')
-        .filter_map(|item| Some(clean_js_string(item.trim())))
-        .collect()
-}
-
-fn js_string(source: &str, name: &str) -> Option<String> {
-    let start = ["const", "var"].into_iter().find_map(|kind| {
-        let marker = format!("{kind} {name} = ");
-        source.find(&marker).map(|index| index + marker.len())
-    })?;
-    Some(clean_js_string(source[start..].split(';').next()?.trim()))
-}
-
-fn js_integer(source: &str, name: &str) -> Option<i32> {
-    let start = ["const", "var"].into_iter().find_map(|kind| {
-        let marker = format!("{kind} {name} = ");
-        source.find(&marker).map(|index| index + marker.len())
-    })?;
-    let value = source[start..].split(';').next()?.trim().parse().ok()?;
-    (value > 0).then_some(value)
-}
-
-fn clean_js_string(value: &str) -> String {
-    let value = value.trim();
-    if value.len() >= 2
-        && ((value.starts_with('"') && value.ends_with('"'))
-            || (value.starts_with('\'') && value.ends_with('\'')))
-    {
-        return value[1..value.len() - 1].to_owned();
-    }
-    value.to_owned()
-}
-
 fn storage_keys(trainer_id: &str) -> (String, String) {
-    let root = std::env::var("CATALOG_ROOT").unwrap_or_else(|_| ".".to_owned());
-    let source = fs::read_to_string(Path::new(&root).join(trainer_id).join("algsinfo.js"))
-        .unwrap_or_default();
+    let root = std::env::var("CATALOG_ROOT").unwrap_or_else(|_| "static".to_owned());
+    let metadata = read_trainer_metadata(Path::new(&root), trainer_id);
     (
-        js_string(&source, "selectionArrayKey").unwrap_or_else(|| format!("{trainer_id}Selection")),
-        js_string(&source, "timesArrayKey").unwrap_or_else(|| format!("{trainer_id}Times")),
+        metadata
+            .as_ref()
+            .and_then(|value| value.selection_array_key.clone())
+            .unwrap_or_else(|| format!("{trainer_id}Selection")),
+        metadata
+            .as_ref()
+            .and_then(|value| value.times_array_key.clone())
+            .unwrap_or_else(|| format!("{trainer_id}Times")),
     )
 }
 
@@ -220,16 +207,31 @@ async fn seed_trainer(
     order: i32,
 ) -> Result<(), CatalogError> {
     let directory = root.join(&entry.location);
-    let title = fs::read_to_string(directory.join("algsinfo.js"))
-        .ok()
-        .and_then(|source| js_string(&source, "trainerTitle"))
+    let metadata = read_trainer_metadata(root, &entry.location);
+    let title = metadata
+        .as_ref()
+        .and_then(|value| value.trainer_title.clone())
         .unwrap_or_else(|| format!("{puzzle} {} Trainer", entry.name));
-    let source = fs::read_to_string(directory.join("algsinfo.js")).unwrap_or_default();
-    let max_algs_per_row = js_integer(&source, "maxAlgsPerRow").unwrap_or(8);
-    let pre_rotations = js_string_array(&source, "preRotations");
-    let post_rotations = js_string_array(&source, "postRotations");
-    let pre_moves = js_string_array(&source, "preMoves");
-    let post_moves = js_string_array(&source, "postMoves");
+    let max_algs_per_row = metadata
+        .as_ref()
+        .map(|value| value.max_algs_per_row)
+        .unwrap_or(8);
+    let pre_rotations = metadata
+        .as_ref()
+        .map(|value| value.pre_rotations.clone())
+        .unwrap_or_default();
+    let post_rotations = metadata
+        .as_ref()
+        .map(|value| value.post_rotations.clone())
+        .unwrap_or_default();
+    let pre_moves = metadata
+        .as_ref()
+        .map(|value| value.pre_moves.clone())
+        .unwrap_or_default();
+    let post_moves = metadata
+        .as_ref()
+        .map(|value| value.post_moves.clone())
+        .unwrap_or_default();
     let icon_path = format!("/catalog/{}/icon.png", entry.location);
 
     execute(
@@ -292,8 +294,9 @@ async fn seed_trainer(
         for (alg_position, alg) in info.a.into_iter().enumerate() {
             execute(
                 db,
-                "INSERT INTO algs (trainer_id,case_id,alg,position) VALUES ($1,$2,$3,$4)",
+                "INSERT INTO algs (alg_id,trainer_id,case_id,alg,position) VALUES ($1,$2,$3,$4,$5)",
                 vec![
+                    format!("builtin:{}:{}:{}", entry.location, case_id, alg_position).into(),
                     entry.location.clone().into(),
                     case_id.clone().into(),
                     alg.into(),
@@ -475,6 +478,11 @@ pub async fn load(
     db: &DatabaseConnection,
     trainer_id: &str,
 ) -> Result<Option<TrainerBundle>, CatalogError> {
+    let transaction = db.begin().await?;
+    transaction
+        .execute_unprepared("SET LOCAL statement_timeout = '5s'")
+        .await?;
+    let db = &transaction;
     let Some(trainer) = db
         .query_one(Statement::from_sql_and_values(
             DatabaseBackend::Postgres,
@@ -487,18 +495,29 @@ pub async fn load(
         return Ok(None);
     };
     let selected_algsets: serde_json::Value = trainer.try_get("", "selected_algsets")?;
-    let root = std::env::var("CATALOG_ROOT").unwrap_or_else(|_| ".".to_owned());
-    let trainer_source = fs::read_to_string(Path::new(&root).join(trainer_id).join("algsinfo.js"))
+    let root = std::env::var("CATALOG_ROOT").unwrap_or_else(|_| "static".to_owned());
+    let metadata = read_trainer_metadata(Path::new(&root), trainer_id);
+    let pre_rotations = metadata
+        .as_ref()
+        .map(|value| value.pre_rotations.clone())
         .unwrap_or_default();
-    let pre_rotations = js_string_array(&trainer_source, "preRotations");
     let post_rotations = normalize_option_alias_text(
-        js_string_array(&trainer_source, "postRotations"),
+        metadata
+            .as_ref()
+            .map(|value| value.post_rotations.clone())
+            .unwrap_or_default(),
         &pre_rotations,
         "preRotations",
     );
-    let pre_moves = js_string_array(&trainer_source, "preMoves");
+    let pre_moves = metadata
+        .as_ref()
+        .map(|value| value.pre_moves.clone())
+        .unwrap_or_default();
     let post_moves = normalize_option_alias_text(
-        js_string_array(&trainer_source, "postMoves"),
+        metadata
+            .as_ref()
+            .map(|value| value.post_moves.clone())
+            .unwrap_or_default(),
         &pre_moves,
         "preMoves",
     );
@@ -510,42 +529,60 @@ pub async fn load(
     let case_rows = db
         .query_all(Statement::from_sql_and_values(
             DatabaseBackend::Postgres,
-            "SELECT case_id,name,case_setup,image_svg FROM cases WHERE trainer_id=$1",
+            "SELECT case_id,name,case_setup,image_svg FROM cases
+             WHERE trainer_id=$1 ORDER BY case_id",
             vec![trainer_id.into()],
         ))
         .await?;
-    let mut cases = Vec::new();
-    for row in case_rows {
+    let alg_rows = db
+        .query_all(Statement::from_sql_and_values(
+            DatabaseBackend::Postgres,
+            "SELECT case_id,alg_id,alg,position FROM algs
+             WHERE trainer_id=$1 ORDER BY case_id, position",
+            vec![trainer_id.into()],
+        ))
+        .await?;
+    let scramble_rows = db
+        .query_all(Statement::from_sql_and_values(
+            DatabaseBackend::Postgres,
+            "SELECT case_id,scramble FROM scrambles
+             WHERE trainer_id=$1 ORDER BY case_id, position",
+            vec![trainer_id.into()],
+        ))
+        .await?;
+
+    let mut algs_by_case: BTreeMap<String, Vec<TrainerAlg>> = BTreeMap::new();
+    for row in alg_rows {
         let case_id: String = row.try_get("", "case_id")?;
-        let alg_rows = db
-            .query_all(Statement::from_sql_and_values(
-                DatabaseBackend::Postgres,
-                "SELECT alg FROM algs WHERE trainer_id=$1 AND case_id=$2 ORDER BY position",
-                vec![trainer_id.into(), case_id.clone().into()],
-            ))
-            .await?;
-        let scramble_rows = db
-            .query_all(Statement::from_sql_and_values(
-                DatabaseBackend::Postgres,
-                "SELECT scramble FROM scrambles WHERE trainer_id=$1 AND case_id=$2 ORDER BY position",
-                vec![trainer_id.into(), case_id.clone().into()],
-            ))
-            .await?;
-        cases.push(TrainerCase {
-            case_id,
-            name: row.try_get("", "name")?,
-            setup: row.try_get("", "case_setup")?,
-            image_svg: row.try_get("", "image_svg")?,
-            algs: alg_rows
-                .into_iter()
-                .filter_map(|row| row.try_get("", "alg").ok())
-                .collect(),
-            scrambles: scramble_rows
-                .into_iter()
-                .filter_map(|row| row.try_get("", "scramble").ok())
-                .collect(),
+        algs_by_case.entry(case_id).or_default().push(TrainerAlg {
+            alg_id: row.try_get("", "alg_id")?,
+            alg: row.try_get("", "alg")?,
+            position: row.try_get("", "position")?,
         });
     }
+    let mut scrambles_by_case: BTreeMap<String, Vec<String>> = BTreeMap::new();
+    for row in scramble_rows {
+        let case_id: String = row.try_get("", "case_id")?;
+        scrambles_by_case
+            .entry(case_id)
+            .or_default()
+            .push(row.try_get("", "scramble")?);
+    }
+
+    let cases = case_rows
+        .into_iter()
+        .map(|row| -> Result<TrainerCase, DbErr> {
+            let case_id: String = row.try_get("", "case_id")?;
+            Ok(TrainerCase {
+                name: row.try_get("", "name")?,
+                setup: row.try_get("", "case_setup")?,
+                image_svg: row.try_get("", "image_svg")?,
+                algs: algs_by_case.get(&case_id).cloned().unwrap_or_default(),
+                scrambles: scrambles_by_case.get(&case_id).cloned().unwrap_or_default(),
+                case_id,
+            })
+        })
+        .collect::<Result<Vec<_>, _>>()?;
 
     let group_rows = db
         .query_all(Statement::from_sql_and_values(
@@ -592,7 +629,7 @@ pub async fn load(
         })
         .collect();
 
-    Ok(Some(TrainerBundle {
+    let bundle = TrainerBundle {
         selection_key: storage_keys(trainer_id).0,
         times_key: storage_keys(trainer_id).1,
         trainer_id: trainer.try_get("", "trainer_id")?,
@@ -608,7 +645,9 @@ pub async fn load(
         post_moves,
         max_algs_per_row: trainer.try_get("", "max_algs_per_row")?,
         u_move_cycles,
-    }))
+    };
+    transaction.commit().await?;
+    Ok(Some(bundle))
 }
 
 fn normalize_option_alias_text(
@@ -625,21 +664,18 @@ fn normalize_option_alias_text(
 
 #[cfg(test)]
 mod tests {
-    use super::js_integer;
+    use super::{read_json, TrainerMetadata};
+    use std::path::Path;
 
     #[test]
-    fn reads_positive_max_algs_per_row_metadata() {
+    fn reads_json_trainer_metadata() {
+        let path =
+            Path::new(env!("CARGO_MANIFEST_DIR")).join("../static/2x2-EG-Trainer/metadata.json");
+        let metadata: TrainerMetadata = read_json(path).expect("metadata");
+        assert_eq!(metadata.max_algs_per_row, 6);
         assert_eq!(
-            js_integer("var maxAlgsPerRow = 6;", "maxAlgsPerRow"),
-            Some(6)
-        );
-        assert_eq!(
-            js_integer("const maxAlgsPerRow = 0;", "maxAlgsPerRow"),
-            None
-        );
-        assert_eq!(
-            js_integer("var maxAlgsPerRow = many;", "maxAlgsPerRow"),
-            None
+            metadata.selection_array_key.as_deref(),
+            Some("2x2egSelection")
         );
     }
 }

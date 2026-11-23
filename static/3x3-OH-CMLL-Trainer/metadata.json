@@ -1,0 +1,24 @@
+{
+  "trainerTitle": "OH CMLL Trainer",
+  "preRotations": [
+    ""
+  ],
+  "postRotations": [
+    ""
+  ],
+  "preMoves": [
+    "",
+    "U",
+    "U'",
+    "U2"
+  ],
+  "postMoves": [
+    "",
+    "U",
+    "U'",
+    "U2"
+  ],
+  "maxAlgsPerRow": 6,
+  "selectionArrayKey": "3x3ohcmllselection",
+  "timesArrayKey": "3x3ohcmllTimes"
+}

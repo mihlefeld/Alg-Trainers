@@ -1,0 +1,22 @@
+{
+  "trainerTitle": "3x3 CFSP Trainer",
+  "preRotations": [
+    ""
+  ],
+  "postRotations": [
+    ""
+  ],
+  "preMoves": [
+    "U",
+    "U'",
+    "U2"
+  ],
+  "postMoves": [
+    "U",
+    "U'",
+    "U2"
+  ],
+  "maxAlgsPerRow": 8,
+  "selectionArrayKey": "3x3cfspSelection",
+  "timesArrayKey": "3x3cfspTimesArray"
+}

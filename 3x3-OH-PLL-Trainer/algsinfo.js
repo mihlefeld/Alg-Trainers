@@ -1,9 +1,0 @@
-const timesArrayKey = "3x3ohpllTimes";
-const selectionArrayKey = "3x3ohpllselection";
-var trainerTitle = "OH PLL Trainer";
-var preRotations = [''];
-var postRotations = [''];
-var preMoves = ["", "U", "U'", "U2"];
-var postMoves = preMoves;
-var selCases = [];
-var maxAlgsPerRow = 6;

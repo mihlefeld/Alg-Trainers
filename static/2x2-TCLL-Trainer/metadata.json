@@ -1,0 +1,43 @@
+{
+  "trainerTitle": "2\u00d72 TCLL Trainer",
+  "preRotations": [
+    "",
+    "y",
+    "y2",
+    "y'",
+    "x",
+    "x y",
+    "x y2",
+    "x y'",
+    "z'",
+    "z' y",
+    "z' y2",
+    "z' y'",
+    "z",
+    "z y",
+    "z y2",
+    "z y'",
+    "z2 y'",
+    "z2",
+    "x2",
+    "z2 y"
+  ],
+  "postRotations": [
+    ""
+  ],
+  "preMoves": [
+    "",
+    "U",
+    "U'",
+    "U2"
+  ],
+  "postMoves": [
+    "",
+    "U",
+    "U'",
+    "U2"
+  ],
+  "maxAlgsPerRow": 6,
+  "selectionArrayKey": "2x2tcllSelection",
+  "timesArrayKey": "2x2tcllTimes"
+}

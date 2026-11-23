@@ -1,0 +1,24 @@
+{
+  "trainerTitle": "OH OLL Trainer",
+  "preRotations": [
+    ""
+  ],
+  "postRotations": [
+    ""
+  ],
+  "preMoves": [
+    "",
+    "U",
+    "U'",
+    "U2"
+  ],
+  "postMoves": [
+    "",
+    "U",
+    "U'",
+    "U2"
+  ],
+  "maxAlgsPerRow": 8,
+  "selectionArrayKey": "3x3ohollselection",
+  "timesArrayKey": "3x3ohollTimes"
+}

@@ -1,0 +1,22 @@
+{
+  "trainerTitle": "FTO BTLT Trainer",
+  "preRotations": [
+    ""
+  ],
+  "postRotations": [
+    ""
+  ],
+  "preMoves": [
+    "",
+    "U",
+    "U'"
+  ],
+  "postMoves": [
+    "",
+    "U",
+    "U'"
+  ],
+  "maxAlgsPerRow": 8,
+  "selectionArrayKey": "ftoBTLTSelection",
+  "timesArrayKey": "ftoBTLTTimesArray"
+}

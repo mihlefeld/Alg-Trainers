@@ -1,9 +1,0 @@
-const timesArrayKey = "3x3fsoTimesArray.1";
-const selectionArrayKey = "3x3fsoSelection.1";
-var trainerTitle = "3x3 FSO Trainer";
-var preRotations = [""];
-var postRotations = [""];
-var preMoves = ["U", "U'", "U2"];
-var postMoves = preMoves;
-var selCases = [];
-var maxAlgsPerRow = 8;

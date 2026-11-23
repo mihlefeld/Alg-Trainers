@@ -1,0 +1,18 @@
+{
+  "trainerTitle": "3\u00d73 BLD UF Trainer",
+  "preRotations": [
+    ""
+  ],
+  "postRotations": [
+    ""
+  ],
+  "preMoves": [
+    ""
+  ],
+  "postMoves": [
+    ""
+  ],
+  "maxAlgsPerRow": 7,
+  "selectionArrayKey": "3x3bldEdgesSelection",
+  "timesArrayKey": "3x3bldEdgesTimes"
+}

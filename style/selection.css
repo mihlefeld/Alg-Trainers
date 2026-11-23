@@ -231,6 +231,10 @@ div#modeButtons {
     font: inherit;
 }
 
+.algsetSelectors > button.algsetDisabled {
+    opacity: 0.5;
+}
+
 .searchToggle {
     font: inherit;
 }

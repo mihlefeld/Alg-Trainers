@@ -1,9 +1,0 @@
-const timesArrayKey = "octaminxL3TTimesArray";
-const selectionArrayKey = "octaminxL3TSelection";
-var trainerTitle = "FTO L3T Trainer"
-var maxAlgsPerRow = 9;
-var preRotations = [''];
-var postRotations = [''];
-var preMoves = ["", "U", "U'"];
-var postMoves = preMoves;
-var selCases = [];

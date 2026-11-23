@@ -1,0 +1,48 @@
+{
+  "trainerTitle": "Square-1 OBL Trainer",
+  "preRotations": [
+    ""
+  ],
+  "postRotations": [
+    ""
+  ],
+  "preMoves": [
+    "3,0",
+    "6,0",
+    "-3,0",
+    "0,-3",
+    "0,3",
+    "0,6",
+    "3,3",
+    "3,-3",
+    "3,6",
+    "6,3",
+    "6,-3",
+    "6,6",
+    "-3,3",
+    "-3,-3",
+    "-3,6",
+    "0,0"
+  ],
+  "postMoves": [
+    "3,0",
+    "6,0",
+    "-3,0",
+    "0,-3",
+    "0,3",
+    "0,6",
+    "3,3",
+    "3,-3",
+    "3,6",
+    "6,3",
+    "6,-3",
+    "6,6",
+    "-3,3",
+    "-3,-3",
+    "-3,6",
+    "0,0"
+  ],
+  "maxAlgsPerRow": 8,
+  "selectionArrayKey": "sq1oblSelection",
+  "timesArrayKey": "sq1oblTimesArray"
+}

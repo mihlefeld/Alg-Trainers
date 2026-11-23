@@ -1,9 +1,0 @@
-const timesArrayKey = "3x3ollTimes";
-const selectionArrayKey = "3x3ollselection";
-var trainerTitle = "3×3 OLL Trainer";
-var preRotations = [''];
-var postRotations = [''];
-var preMoves = ["", "U", "U'", "U2"];
-var postMoves = preMoves;
-var selCases = [];
-var maxAlgsPerRow = 8;

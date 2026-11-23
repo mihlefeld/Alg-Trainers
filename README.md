@@ -18,12 +18,26 @@ Docker dependency layers are split for the native backend and WASM frontend and
 reuse BuildKit cache mounts. Keep `Cargo.lock` committed when changing Rust
 dependencies so the toolchain and resolved crate graph remain reproducible.
 
+## Backend security configuration
+
+The production backend requires explicit `POSTGRES_PASSWORD` and
+`ROCKET_SECRET_KEY` values. Generate a Rocket-compatible high-entropy secret
+with `openssl rand -base64 32` and keep it stable across deployments.
+`COOKIE_SECURE` defaults automatically from the callback URL; set it to `false`
+for local HTTP development and to `true` behind production HTTPS. An explicit
+`true` is ignored for an HTTP callback because browsers do not return `Secure`
+OAuth state cookies over localhost HTTP.
+
+The application applies per-IP API rate limits and a 1 MiB JSON request limit.
+Deployments should additionally configure proxy-level connection, request, and
+IP-aware rate limits.
+
 ## Architecture
 
 - Rocket serves the Yew WASM application and all authenticated APIs.
 - SeaORM migrations create and update the PostgreSQL schema.
 - Trainer cases, groups, algsets, algorithms, scrambles, and SVG diagrams are
-  imported into PostgreSQL from the checked-in catalog on initial startup.
+  imported into PostgreSQL from the checked-in `static/` catalog on initial startup.
 - Browser state remains in IndexedDB under the existing trainer storage keys.
   A debounced, rate-limited sync engine sends dirty settings, selections,
   presets, custom algorithms, and times to `/api/sync`.

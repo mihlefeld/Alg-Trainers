@@ -1,0 +1,22 @@
+{
+  "trainerTitle": "3x3 FSO Trainer",
+  "preRotations": [
+    ""
+  ],
+  "postRotations": [
+    ""
+  ],
+  "preMoves": [
+    "U",
+    "U'",
+    "U2"
+  ],
+  "postMoves": [
+    "U",
+    "U'",
+    "U2"
+  ],
+  "maxAlgsPerRow": 8,
+  "selectionArrayKey": "3x3fsoSelection.1",
+  "timesArrayKey": "3x3fsoTimesArray.1"
+}

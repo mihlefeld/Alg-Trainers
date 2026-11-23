@@ -1,0 +1,20 @@
+{
+  "trainerTitle": "FTO FTLT Trainer",
+  "preRotations": [
+    ""
+  ],
+  "postRotations": [
+    ""
+  ],
+  "preMoves": [
+    ""
+  ],
+  "postMoves": [
+    "",
+    "U",
+    "U'"
+  ],
+  "maxAlgsPerRow": 8,
+  "selectionArrayKey": "ftoftltSelection",
+  "timesArrayKey": "ftoftltTimesArray"
+}

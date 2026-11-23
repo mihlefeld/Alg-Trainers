@@ -5,24 +5,104 @@ use alg_trainers_migration::Migrator;
 use chrono::Utc;
 use rand::{distributions::Alphanumeric, Rng};
 use rocket::{
-    http::{Cookie, CookieJar, Status},
+    http::{Cookie, CookieJar, Header, Status},
+    request::{self, FromRequest, Request},
     response::Redirect,
     serde::json::Json,
-    State,
+    Responder, State,
 };
-use sea_orm::{ConnectionTrait, Database, DatabaseConnection, Statement};
+use sea_orm::{ConnectOptions, ConnectionTrait, Database, DatabaseConnection, Statement};
 use sea_orm_migration::MigratorTrait;
 use serde::{Deserialize, Serialize};
-use std::env;
+use std::{
+    collections::HashMap,
+    env,
+    net::IpAddr,
+    sync::Mutex,
+    time::{Duration, Instant},
+};
+
+const DEFAULT_SECRET_KEY: &str = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
 
 #[derive(Clone)]
 struct AppState {
     db: DatabaseConnection,
+    http: reqwest::Client,
     wca_base: String,
     wca_client_id: String,
     wca_client_secret: String,
     wca_redirect_url: String,
+    cookie_secure: bool,
 }
+
+struct RateLimiter {
+    buckets: Mutex<HashMap<(IpAddr, &'static str), RateBucket>>,
+}
+
+struct RateBucket {
+    started: Instant,
+    requests: u32,
+}
+
+struct ApiRateLimit;
+
+impl RateLimiter {
+    fn allow(&self, request: &Request<'_>) -> bool {
+        let ip = request
+            .client_ip()
+            .unwrap_or_else(|| IpAddr::from([127, 0, 0, 1]));
+        let (bucket_name, limit) = match request.uri().path().as_str() {
+            path if path.starts_with("/api/auth") => ("auth", 30),
+            "/api/sync" => ("sync", 30),
+            path if path.starts_with("/api/trainers/") => ("catalog-detail", 20),
+            _ => ("api", 120),
+        };
+        let now = Instant::now();
+        let mut buckets = self.buckets.lock().expect("rate-limit lock poisoned");
+        if buckets.len() > 10_000 {
+            buckets
+                .retain(|_, bucket| now.duration_since(bucket.started) < Duration::from_secs(60));
+        }
+        let bucket = buckets.entry((ip, bucket_name)).or_insert(RateBucket {
+            started: now,
+            requests: 0,
+        });
+        if now.duration_since(bucket.started) >= Duration::from_secs(60) {
+            bucket.started = now;
+            bucket.requests = 0;
+        }
+        bucket.requests += 1;
+        bucket.requests <= limit
+    }
+}
+
+#[rocket::async_trait]
+impl<'r> FromRequest<'r> for ApiRateLimit {
+    type Error = ();
+
+    async fn from_request(request: &'r Request<'_>) -> request::Outcome<Self, Self::Error> {
+        let Some(limiter) = request.rocket().state::<RateLimiter>() else {
+            return request::Outcome::Error((Status::InternalServerError, ()));
+        };
+        if limiter.allow(request) {
+            request::Outcome::Success(Self)
+        } else {
+            request::Outcome::Error((Status::TooManyRequests, ()))
+        }
+    }
+}
+
+#[derive(Responder)]
+struct CachedTrainers(Json<Vec<serde_json::Value>>, Header<'static>);
+
+#[derive(Responder)]
+struct CachedTrainer(Json<catalog::TrainerBundle>, Header<'static>);
+
+#[derive(Responder)]
+struct PrivateMe(Json<MeResponse>, Header<'static>);
+
+#[derive(Responder)]
+struct PrivateSync(Json<sync::SyncBundle>, Header<'static>);
 
 #[derive(Serialize)]
 struct MeResponse {
@@ -73,8 +153,28 @@ fn random_state() -> String {
         .collect()
 }
 
+fn secure_cookie_required(redirect_url: &str, configured: Option<&str>) -> bool {
+    let uses_https = redirect_url.starts_with("https://");
+    match configured.and_then(|value| value.parse::<bool>().ok()) {
+        Some(true) if uses_https => true,
+        Some(true) => {
+            tracing::warn!(
+                redirect_url,
+                "COOKIE_SECURE=true is incompatible with an HTTP callback; disabling it for this deployment"
+            );
+            false
+        }
+        Some(false) => false,
+        None => uses_https,
+    }
+}
+
 #[rocket::get("/api/me")]
-async fn me(cookies: &CookieJar<'_>, state: &State<AppState>) -> Json<MeResponse> {
+async fn me(
+    cookies: &CookieJar<'_>,
+    state: &State<AppState>,
+    _rate_limit: ApiRateLimit,
+) -> PrivateMe {
     let email = cookie_user(cookies);
     let (email, wca_id) = match email {
         Some(email) => {
@@ -98,19 +198,28 @@ async fn me(cookies: &CookieJar<'_>, state: &State<AppState>) -> Json<MeResponse
         }
         None => (None, None),
     };
-    Json(MeResponse {
-        authenticated: email.is_some(),
-        email,
-        wca_id,
-    })
+    PrivateMe(
+        Json(MeResponse {
+            authenticated: email.is_some(),
+            email,
+            wca_id,
+        }),
+        Header::new("Cache-Control", "no-store"),
+    )
 }
 
 #[rocket::get("/api/auth/wca")]
-fn wca_login(cookies: &CookieJar<'_>, state: &State<AppState>) -> Redirect {
+fn wca_login(
+    cookies: &CookieJar<'_>,
+    state: &State<AppState>,
+    _rate_limit: ApiRateLimit,
+) -> Redirect {
     let state_value = random_state();
     let mut cookie = Cookie::new("wca_oauth_state", state_value.clone());
     cookie.set_http_only(true);
     cookie.set_same_site(rocket::http::SameSite::Lax);
+    cookie.set_secure(state.cookie_secure);
+    cookie.set_max_age(rocket::time::Duration::minutes(10));
     cookies.add_private(cookie);
     let url = format!(
         "{}/oauth/authorize?response_type=code&client_id={}&redirect_uri={}&scope={}&state={}",
@@ -127,6 +236,7 @@ fn wca_login(cookies: &CookieJar<'_>, state: &State<AppState>) -> Redirect {
 async fn wca_callback(
     cookies: &CookieJar<'_>,
     app_state: &State<AppState>,
+    _rate_limit: ApiRateLimit,
     code: Option<String>,
     state: Option<String>,
 ) -> Result<Redirect, Status> {
@@ -140,8 +250,8 @@ async fn wca_callback(
     }
     cookies.remove_private(Cookie::from("wca_oauth_state"));
 
-    let client = reqwest::Client::new();
-    let token: WcaTokenResponse = client
+    let token: WcaTokenResponse = app_state
+        .http
         .post(format!("{}/oauth/token", app_state.wca_base))
         .form(&[
             ("grant_type", "authorization_code"),
@@ -159,7 +269,8 @@ async fn wca_callback(
         .await
         .map_err(|_| Status::BadGateway)?;
 
-    let envelope: WcaMeEnvelope = client
+    let envelope: WcaMeEnvelope = app_state
+        .http
         .get(format!("{}/api/v0/me", app_state.wca_base))
         .bearer_auth(token.access_token)
         .send()
@@ -202,53 +313,85 @@ async fn wca_callback(
     let mut cookie = Cookie::new("alg_trainers_session", email.clone());
     cookie.set_http_only(true);
     cookie.set_same_site(rocket::http::SameSite::Lax);
+    cookie.set_secure(app_state.cookie_secure);
     cookie.set_max_age(rocket::time::Duration::days(30));
     cookies.add_private(cookie);
     Ok(Redirect::to("/"))
 }
 
 #[rocket::post("/api/auth/logout")]
-fn logout(cookies: &CookieJar<'_>) -> Status {
+fn logout(cookies: &CookieJar<'_>, _rate_limit: ApiRateLimit) -> Status {
     cookies.remove_private(Cookie::from("alg_trainers_session"));
     Status::Ok
 }
 
 #[rocket::get("/api/trainers")]
-async fn trainers(state: &State<AppState>) -> Json<Vec<serde_json::Value>> {
-    Json(
-        catalog::list(&state.db)
-            .await
-            .unwrap_or_default()
-            .into_iter()
-            .map(|trainer| serde_json::to_value(trainer).unwrap_or_default())
-            .collect(),
-    )
+async fn trainers(
+    state: &State<AppState>,
+    _rate_limit: ApiRateLimit,
+) -> Result<CachedTrainers, Status> {
+    let trainers = catalog::list(&state.db)
+        .await
+        .map_err(|_| Status::InternalServerError)?
+        .into_iter()
+        .map(serde_json::to_value)
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(|_| Status::InternalServerError)?;
+    Ok(CachedTrainers(
+        Json(trainers),
+        Header::new(
+            "Cache-Control",
+            "public, max-age=3600, stale-while-revalidate=86400",
+        ),
+    ))
 }
 
 #[rocket::get("/api/trainers/<trainer_id>")]
 async fn trainer(
     state: &State<AppState>,
     trainer_id: &str,
-) -> Result<Json<catalog::TrainerBundle>, Status> {
+    _rate_limit: ApiRateLimit,
+) -> Result<CachedTrainer, Status> {
     catalog::load(&state.db, trainer_id)
         .await
         .map_err(|_| Status::InternalServerError)?
-        .map(Json)
+        .map(|trainer| {
+            CachedTrainer(
+                Json(trainer),
+                Header::new(
+                    "Cache-Control",
+                    "public, max-age=3600, stale-while-revalidate=86400",
+                ),
+            )
+        })
         .ok_or(Status::NotFound)
 }
 
-#[rocket::get("/api/sync")]
+#[rocket::get("/api/sync?<before_datetime>&<before_id>")]
 async fn sync_get(
     cookies: &CookieJar<'_>,
     state: &State<AppState>,
-) -> Result<Json<sync::SyncBundle>, Status> {
+    _rate_limit: ApiRateLimit,
+    before_datetime: Option<String>,
+    before_id: Option<String>,
+) -> Result<PrivateSync, Status> {
     let email = cookie_user(cookies).ok_or(Status::Unauthorized)?;
     let user_id = find_user(&state.db, &email)
         .await
         .ok_or(Status::Unauthorized)?;
-    sync::load(&state.db, user_id)
+    let cursor = match (before_datetime, before_id) {
+        (None, None) => None,
+        (Some(datetime), Some(id)) => Some(sync::ResultCursor {
+            datetime: chrono::DateTime::parse_from_rfc3339(&datetime)
+                .map_err(|_| Status::BadRequest)?
+                .with_timezone(&Utc),
+            id: id.parse().map_err(|_| Status::BadRequest)?,
+        }),
+        _ => return Err(Status::BadRequest),
+    };
+    sync::load_page(&state.db, user_id, cursor)
         .await
-        .map(Json)
+        .map(|bundle| PrivateSync(Json(bundle), Header::new("Cache-Control", "no-store")))
         .map_err(|_| Status::InternalServerError)
 }
 
@@ -257,15 +400,25 @@ async fn sync_put(
     cookies: &CookieJar<'_>,
     state: &State<AppState>,
     bundle: Json<sync::SyncBundle>,
-) -> Result<Json<sync::SyncBundle>, Status> {
+    _rate_limit: ApiRateLimit,
+) -> Result<PrivateSync, Status> {
     let email = cookie_user(cookies).ok_or(Status::Unauthorized)?;
     let user_id = find_user(&state.db, &email)
         .await
         .ok_or(Status::Unauthorized)?;
     sync::save(&state.db, user_id, bundle.into_inner())
         .await
-        .map(Json)
-        .map_err(|_| Status::InternalServerError)
+        .map(|bundle| PrivateSync(Json(bundle), Header::new("Cache-Control", "no-store")))
+        .map_err(|error| match error {
+            sync::SaveError::Validation(error) => {
+                tracing::warn!(%error, user_id = %user_id, "rejected invalid sync payload");
+                Status::UnprocessableEntity
+            }
+            sync::SaveError::Database(error) => {
+                tracing::error!(%error, user_id = %user_id, "failed to save sync payload");
+                Status::InternalServerError
+            }
+        })
 }
 
 #[rocket::get("/")]
@@ -283,18 +436,13 @@ async fn catch_all(path: std::path::PathBuf) -> Option<rocket::fs::NamedFile> {
             .is_some_and(|extension| extension == "png")
         {
             if let Ok(file) =
-                rocket::fs::NamedFile::open(std::path::Path::new("catalog").join(stripped)).await
+                rocket::fs::NamedFile::open(std::path::Path::new("static").join(stripped)).await
             {
                 return Some(file);
             }
         }
     }
-    if path.starts_with("style")
-        || matches!(
-            path.file_name().and_then(|name| name.to_str()),
-            Some("icon.png" | "manifest.json" | "serviceworker.js")
-        )
-    {
+    if path.starts_with("style") {
         if let Ok(file) = rocket::fs::NamedFile::open(path.clone()).await {
             return Some(file);
         }
@@ -316,10 +464,25 @@ async fn rocket() -> _ {
     tracing_subscriber::fmt()
         .with_env_filter(tracing_subscriber::EnvFilter::from_default_env())
         .init();
-    let database_url = env::var("DATABASE_URL").unwrap_or_else(|_| {
-        "postgres://alg_trainers:alg_trainers@psql:5432/alg_trainers".to_owned()
-    });
-    let db = Database::connect(&database_url)
+    let secret_key = env::var("ROCKET_SECRET_KEY").expect("ROCKET_SECRET_KEY must be configured");
+    if secret_key == DEFAULT_SECRET_KEY
+        || secret_key.len() < 32
+        || secret_key.contains("change-me")
+        || secret_key.contains("replace-with")
+    {
+        panic!("ROCKET_SECRET_KEY must be replaced with a high-entropy secret");
+    }
+    let database_url =
+        env::var("DATABASE_URL").expect("DATABASE_URL must be configured explicitly");
+    let mut connect_options = ConnectOptions::new(database_url);
+    connect_options
+        .max_connections(20)
+        .min_connections(2)
+        .connect_timeout(Duration::from_secs(5))
+        .acquire_timeout(Duration::from_secs(5))
+        .idle_timeout(Duration::from_secs(300))
+        .max_lifetime(Duration::from_secs(1800));
+    let db = Database::connect(connect_options)
         .await
         .expect("Unable to connect to PostgreSQL");
     Migrator::up(&db, None)
@@ -327,22 +490,37 @@ async fn rocket() -> _ {
         .expect("Database migrations failed");
     let catalog_root = env::var("CATALOG_ROOT")
         .map(std::path::PathBuf::from)
-        .unwrap_or_else(|_| std::path::PathBuf::from("."));
+        .unwrap_or_else(|_| std::path::PathBuf::from("static"));
     catalog::seed(&db, &catalog_root)
         .await
         .expect("Unable to seed trainer catalog");
 
+    let wca_redirect_url = env::var("WCA_REDIRECT_URL")
+        .unwrap_or_else(|_| "http://localhost:8000/api/auth/wca/callback".to_owned());
+    let configured_cookie_secure = env::var("COOKIE_SECURE").ok();
+    let cookie_secure =
+        secure_cookie_required(&wca_redirect_url, configured_cookie_secure.as_deref());
+    let http = reqwest::Client::builder()
+        .connect_timeout(Duration::from_secs(5))
+        .timeout(Duration::from_secs(10))
+        .redirect(reqwest::redirect::Policy::none())
+        .build()
+        .expect("Unable to build HTTP client");
     let state = AppState {
         db,
+        http,
         wca_base: env::var("WCA_BASE_URL")
             .unwrap_or_else(|_| "https://www.worldcubeassociation.org".to_owned()),
         wca_client_id: env::var("WCA_CLIENT_ID").unwrap_or_default(),
         wca_client_secret: env::var("WCA_CLIENT_SECRET").unwrap_or_default(),
-        wca_redirect_url: env::var("WCA_REDIRECT_URL")
-            .unwrap_or_else(|_| "http://localhost:8000/api/auth/wca/callback".to_owned()),
+        wca_redirect_url,
+        cookie_secure,
+    };
+    let rate_limiter = RateLimiter {
+        buckets: Mutex::new(HashMap::new()),
     };
 
-    rocket::build().manage(state).mount(
+    rocket::build().manage(state).manage(rate_limiter).mount(
         "/",
         rocket::routes![
             index,
@@ -357,4 +535,29 @@ async fn rocket() -> _ {
             catch_all
         ],
     )
+}
+
+#[cfg(test)]
+mod tests {
+    use super::secure_cookie_required;
+
+    #[test]
+    fn http_callback_cannot_set_secure_oauth_cookie() {
+        assert!(!secure_cookie_required(
+            "http://localhost:8000/api/auth/wca/callback",
+            Some("true")
+        ));
+        assert!(!secure_cookie_required(
+            "http://localhost:8000/api/auth/wca/callback",
+            None
+        ));
+    }
+
+    #[test]
+    fn https_callback_defaults_to_secure_cookie() {
+        assert!(secure_cookie_required(
+            "https://trainer.example/api/auth/wca/callback",
+            None
+        ));
+    }
 }

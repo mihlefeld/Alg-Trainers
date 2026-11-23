@@ -1,0 +1,30 @@
+{
+  "trainerTitle": "3\u00d73 ZBLS Trainer",
+  "preRotations": [
+    "",
+    "y",
+    "y'",
+    "y2"
+  ],
+  "postRotations": [
+    "",
+    "y",
+    "y'",
+    "y2"
+  ],
+  "preMoves": [
+    "",
+    "U",
+    "U'",
+    "U2"
+  ],
+  "postMoves": [
+    "",
+    "U",
+    "U'",
+    "U2"
+  ],
+  "maxAlgsPerRow": 8,
+  "selectionArrayKey": "3x3zblsselection",
+  "timesArrayKey": "3x3zblsTimes"
+}

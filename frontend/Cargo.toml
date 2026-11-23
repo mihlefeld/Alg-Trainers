@@ -19,4 +19,4 @@ wasm-bindgen = "0.2"
 wasm-bindgen-futures = "0.4"
 serde-wasm-bindgen = "0.6"
 js-sys = "0.3"
-web-sys = { version = "0.3", features = ["Window", "Document", "Element", "HtmlElement", "HtmlInputElement", "HtmlSelectElement", "HtmlTextAreaElement", "CssStyleDeclaration", "KeyboardEvent", "PointerEvent", "EventTarget", "Storage", "File", "FileList", "IdbFactory", "IdbDatabase", "IdbOpenDbRequest", "IdbObjectStore", "IdbTransaction", "IdbRequest", "Event", "MessageEvent", "console"] }
+web-sys = { version = "0.3", features = ["Window", "Document", "Element", "HtmlElement", "HtmlInputElement", "HtmlSelectElement", "HtmlTextAreaElement", "CssStyleDeclaration", "KeyboardEvent", "PointerEvent", "DragEvent", "EventTarget", "Storage", "File", "FileList", "IdbFactory", "IdbDatabase", "IdbOpenDbRequest", "IdbObjectStore", "IdbTransaction", "IdbRequest", "Event", "MessageEvent", "console"] }

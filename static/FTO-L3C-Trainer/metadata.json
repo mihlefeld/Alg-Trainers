@@ -1,0 +1,22 @@
+{
+  "trainerTitle": "FTO L3C Trainer",
+  "preRotations": [
+    ""
+  ],
+  "postRotations": [
+    ""
+  ],
+  "preMoves": [
+    "",
+    "U",
+    "U'"
+  ],
+  "postMoves": [
+    "",
+    "U",
+    "U'"
+  ],
+  "maxAlgsPerRow": 5,
+  "selectionArrayKey": "ftoL3CSelection",
+  "timesArrayKey": "ftoL3CTimesArray"
+}

@@ -3,6 +3,8 @@ pub use sea_orm_migration::prelude::*;
 mod m20261120_000001_create_tables;
 mod m20261120_000002_add_catalog_tables;
 mod m20261123_000001_add_max_algs_per_row;
+mod m20261123_000002_add_alg_ids;
+mod m20261123_000003_harden_indexes_and_ownership;
 
 pub struct Migrator;
 
@@ -13,6 +15,8 @@ impl MigratorTrait for Migrator {
             Box::new(m20261120_000001_create_tables::Migration),
             Box::new(m20261120_000002_add_catalog_tables::Migration),
             Box::new(m20261123_000001_add_max_algs_per_row::Migration),
+            Box::new(m20261123_000002_add_alg_ids::Migration),
+            Box::new(m20261123_000003_harden_indexes_and_ownership::Migration),
         ]
     }
 }

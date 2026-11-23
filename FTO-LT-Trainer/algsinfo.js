@@ -1,9 +1,0 @@
-const timesArrayKey = "ftoltTimesArray";
-const selectionArrayKey = "ftoltSelection";
-var trainerTitle = "FTO LT Trainer";
-var preRotations = [""];
-var postRotations = [""];
-var preMoves = [""];
-var postMoves = ["", "U", "U'"];
-var selCases = [];
-var maxAlgsPerRow = 7;

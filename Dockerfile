@@ -57,11 +57,7 @@ RUN apt-get update && apt-get install -y ca-certificates && rm -rf /var/lib/apt/
 WORKDIR /app
 COPY --from=backend-builder /app/alg-trainers-server /app/alg-trainers-server
 COPY --from=frontend-builder /app/frontend/dist /app/frontend/dist
-COPY index.json /app/index.json
+COPY static /app/static
 COPY style /app/style
-COPY manifest.json /app/manifest.json
-COPY serviceworker.js /app/serviceworker.js
-COPY icon.png /app/icon.png
-COPY . /app/catalog
 EXPOSE 8000
 CMD ["/app/alg-trainers-server"]

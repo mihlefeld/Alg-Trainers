@@ -28,7 +28,12 @@ Reference used: upstream `dev` at `8df81345766fb73cd14aba338d785d68be27514d`.
 - Added basic session statistics (`Times` and distinct `Cases`), with case information available on each recent result.
 - Added grouped per-case statistics, histograms, detailed time lists, and an
   exponential-moving-average trend line.
+- Added account controls and last-successful-sync status to trainer settings.
 - Added hint previous/next navigation and custom-algorithm save/reset/download/upload controls.
+- Reworked hints and algorithm sheets around stable per-algorithm IDs with
+  reorderable secondary-color items, user-alg editing/deletion, and built-in hiding.
+- Styled the compact hint algorithm editor with secondary colors and removed
+  the legacy reset/import/export controls.
 - Restored any-key timer stopping, Escape-to-abort, keyboard hint navigation, and touch cancellation.
 - Restored `?select`, `?train`, and `?recap` direct-link and browser-history behavior, including case selection after asynchronous storage loading.
 - Translated BLD scrambles with the configured corner/edge letter scheme.
@@ -63,6 +68,16 @@ Reference used: upstream `dev` at `8df81345766fb73cd14aba338d785d68be27514d`.
 
 - Rocket, Yew, and the production Docker image build successfully.
 - Backend catalog tests pass, the Yew frontend builds for `wasm32-unknown-unknown`, and all 44 trainer catalogs define `maxAlgsPerRow`.
+- Database ownership is enforced for result conflicts and sync cleanup, with
+  foreign keys and indexes for the frequent user-history and catalog lookups.
+- Sync writes are bounded, validated, statement-limited, and committed atomically
+  in batches; private responses are marked `no-store`.
+- Public API routes are rate-limited, catalog detail loading uses a fixed number
+  of bulk queries, and catalog responses are cacheable.
+- Production startup rejects missing/placeholder secrets, OAuth calls have
+  explicit timeouts, and session cookies are configurable as `Secure`.
+- Algset buttons now distinguish disabled, partial, and fully selected states,
+  including the disabled-to-empty re-enable transition.
 - Presets survive a browser reload and restore the expected selected cases.
 - Browser regression probes verified:
   - legacy localStorage and IndexedDB v1 cube colors migrate correctly;

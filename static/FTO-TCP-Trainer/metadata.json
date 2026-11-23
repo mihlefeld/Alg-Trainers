@@ -1,0 +1,22 @@
+{
+  "trainerTitle": "FTO TCP Trainer",
+  "preRotations": [
+    ""
+  ],
+  "postRotations": [
+    ""
+  ],
+  "preMoves": [
+    "",
+    "U",
+    "U'"
+  ],
+  "postMoves": [
+    "",
+    "U",
+    "U'"
+  ],
+  "maxAlgsPerRow": 6,
+  "selectionArrayKey": "ftoTCPSelection",
+  "timesArrayKey": "ftoTCPTimesArray"
+}

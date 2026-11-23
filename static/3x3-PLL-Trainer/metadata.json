@@ -1,0 +1,24 @@
+{
+  "trainerTitle": "3\u00d73 PLL Trainer",
+  "preRotations": [
+    ""
+  ],
+  "postRotations": [
+    ""
+  ],
+  "preMoves": [
+    "",
+    "U",
+    "U'",
+    "U2"
+  ],
+  "postMoves": [
+    "",
+    "U",
+    "U'",
+    "U2"
+  ],
+  "maxAlgsPerRow": 6,
+  "selectionArrayKey": "3x3pllselection",
+  "timesArrayKey": "3x3pllTimes"
+}

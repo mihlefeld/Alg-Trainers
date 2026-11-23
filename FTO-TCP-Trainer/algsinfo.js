@@ -1,9 +1,0 @@
-const timesArrayKey = "ftoTCPTimesArray";
-const selectionArrayKey = "ftoTCPSelection";
-var trainerTitle = "FTO TCP Trainer"
-var maxAlgsPerRow = 6;
-var preRotations = [''];
-var postRotations = [''];
-var preMoves = ["", "U", "U'"];
-var postMoves = preMoves;
-var selCases = [];

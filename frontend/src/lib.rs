@@ -8,7 +8,7 @@ use serde::{Deserialize, Serialize};
 use std::{cell::RefCell, collections::BTreeMap, rc::Rc};
 use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::{spawn_local, JsFuture};
-use web_sys::{Element, KeyboardEvent, MouseEvent};
+use web_sys::{DragEvent, Element, KeyboardEvent, MouseEvent};
 use yew::prelude::*;
 use yew_router::prelude::*;
 
@@ -147,6 +147,11 @@ export function downloadText(filename, text) {
 export async function readFileText(file) {
   return await file.text();
 }
+export function randomAlgId() {
+  if (crypto.randomUUID) return `user:${crypto.randomUUID()}`;
+  const random = crypto.getRandomValues(new Uint32Array(4));
+  return `user:${Array.from(random, value => value.toString(16).padStart(8, "0")).join("")}`;
+}
 export async function importStorageText(text) {
   const parsed = JSON.parse(text);
   const values = parsed.data && typeof parsed.data === "object" ? parsed.data : parsed;
@@ -190,6 +195,7 @@ extern "C" {
     fn downloadText(filename: &str, text: &str);
     #[wasm_bindgen(catch)]
     fn readFileText(file: &web_sys::File) -> Result<js_sys::Promise, JsValue>;
+    fn randomAlgId() -> String;
     #[wasm_bindgen(catch)]
     fn importStorageText(text: &str) -> Result<js_sys::Promise, JsValue>;
 }
@@ -270,8 +276,36 @@ struct TrainerCase {
     name: String,
     setup: Option<String>,
     image_svg: Option<String>,
-    algs: Vec<String>,
+    algs: Vec<TrainerAlg>,
     scrambles: Vec<String>,
+}
+
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct TrainerAlg {
+    alg_id: String,
+    alg: String,
+    position: i32,
+}
+
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct UserAlgState {
+    alg_id: String,
+    alg: String,
+    position: i32,
+    #[serde(default)]
+    hidden: bool,
+    #[serde(default)]
+    deleted: bool,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+struct DisplayAlg {
+    alg_id: String,
+    alg: String,
+    position: i32,
+    user: bool,
 }
 
 #[derive(Clone, Debug, Deserialize, PartialEq)]
@@ -332,6 +366,8 @@ struct SyncBundle {
     selections: Vec<SelectionSync>,
     user_algs: Vec<UserAlgSync>,
     results: Vec<ResultSync>,
+    #[serde(default)]
+    next_results: Option<ResultCursor>,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -351,7 +387,11 @@ struct SelectionSync {
 struct UserAlgSync {
     trainer_id: String,
     case_id: String,
+    alg_id: String,
     alg: String,
+    position: i32,
+    hidden: bool,
+    deleted: bool,
     updated_at: String,
 }
 
@@ -364,6 +404,146 @@ struct ResultSync {
     case_id: String,
     updated_at: String,
     deleted: bool,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+struct ResultCursor {
+    datetime: String,
+    id: String,
+}
+
+fn parse_custom_algs(value: &serde_json::Value, case_id: &str) -> Vec<UserAlgState> {
+    value
+        .get("items")
+        .and_then(serde_json::Value::as_array)
+        .and_then(|items| serde_json::from_value(serde_json::Value::Array(items.clone())).ok())
+        .or_else(|| {
+            value
+                .get("a")
+                .and_then(serde_json::Value::as_array)
+                .map(|algs| {
+                    algs.iter()
+                        .filter_map(serde_json::Value::as_str)
+                        .enumerate()
+                        .map(|(position, alg)| UserAlgState {
+                            alg_id: format!("legacy:{case_id}:{position}"),
+                            alg: alg.to_owned(),
+                            position: position as i32,
+                            hidden: false,
+                            deleted: false,
+                        })
+                        .collect()
+                })
+        })
+        .or_else(|| {
+            value
+                .get("alg")
+                .and_then(serde_json::Value::as_str)
+                .map(|alg| {
+                    vec![UserAlgState {
+                        alg_id: format!("legacy:{case_id}:0"),
+                        alg: alg.to_owned(),
+                        position: 0,
+                        hidden: false,
+                        deleted: false,
+                    }]
+                })
+        })
+        .unwrap_or_default()
+}
+
+fn custom_algs_payload(
+    custom_algs: &BTreeMap<String, Vec<UserAlgState>>,
+) -> serde_json::Map<String, serde_json::Value> {
+    custom_algs
+        .iter()
+        .map(|(case_id, items)| (case_id.clone(), serde_json::json!({ "items": items })))
+        .collect()
+}
+
+fn display_algs(
+    case: &TrainerCase,
+    custom_algs: &BTreeMap<String, Vec<UserAlgState>>,
+) -> Vec<DisplayAlg> {
+    let overrides = custom_algs.get(&case.case_id).cloned().unwrap_or_default();
+    let mut result = case
+        .algs
+        .iter()
+        .filter_map(|alg| {
+            let override_item = overrides.iter().find(|item| item.alg_id == alg.alg_id);
+            if override_item.is_some_and(|item| item.hidden || item.deleted) {
+                return None;
+            }
+            Some(DisplayAlg {
+                alg_id: alg.alg_id.clone(),
+                alg: override_item
+                    .map(|item| item.alg.clone())
+                    .unwrap_or_else(|| alg.alg.clone()),
+                position: override_item
+                    .map(|item| item.position)
+                    .unwrap_or(alg.position),
+                user: false,
+            })
+        })
+        .collect::<Vec<_>>();
+    let builtin_ids = case
+        .algs
+        .iter()
+        .map(|alg| alg.alg_id.as_str())
+        .collect::<std::collections::BTreeSet<_>>();
+    result.extend(
+        overrides
+            .iter()
+            .filter(|item| {
+                !item.hidden && !item.deleted && !builtin_ids.contains(item.alg_id.as_str())
+            })
+            .map(|item| DisplayAlg {
+                alg_id: item.alg_id.clone(),
+                alg: item.alg.clone(),
+                position: item.position,
+                user: true,
+            }),
+    );
+    result.sort_by_key(|item| item.position);
+    result
+}
+
+fn upgrade_legacy_custom_algs(case: &TrainerCase, items: Vec<UserAlgState>) -> Vec<UserAlgState> {
+    if !items.iter().any(|item| item.alg_id.starts_with("legacy:")) {
+        return items;
+    }
+    let mut upgraded = Vec::new();
+    for alg in &case.algs {
+        if !items.iter().any(|item| item.alg_id == alg.alg_id) {
+            upgraded.push(UserAlgState {
+                alg_id: alg.alg_id.clone(),
+                alg: alg.alg.clone(),
+                position: alg.position,
+                hidden: true,
+                deleted: false,
+            });
+        }
+    }
+    upgraded.extend(items);
+    upgraded
+}
+
+fn first_display_alg(
+    case: &TrainerCase,
+    custom_algs: &BTreeMap<String, Vec<UserAlgState>>,
+) -> String {
+    display_algs(case, custom_algs)
+        .first()
+        .map(|item| item.alg.clone())
+        .unwrap_or_default()
+}
+
+fn save_custom_algs(selection_key: &str, custom_algs: &BTreeMap<String, Vec<UserAlgState>>) {
+    let key = format!("{selection_key}customAlgs");
+    let payload = serde_json::Value::Object(custom_algs_payload(custom_algs)).to_string();
+    spawn_local(async move {
+        put_stored(key, payload).await;
+    });
 }
 
 #[function_component(App)]
@@ -391,6 +571,7 @@ fn switch(route: Route) -> Html {
 fn alg_sheet_page() -> Html {
     let bundle = use_state(|| None::<TrainerBundle>);
     let query = use_state(String::new);
+    let custom_algs = use_state(BTreeMap::<String, Vec<UserAlgState>>::new);
     let settings = use_state(|| {
         let mut settings = serde_json::json!({});
         cube_schemes::migrate(&mut settings);
@@ -428,6 +609,45 @@ fn alg_sheet_page() -> Html {
             || ()
         });
     }
+    {
+        let custom_algs = custom_algs.clone();
+        let loaded = bundle.clone();
+        let dependency = bundle
+            .as_ref()
+            .map(|value| value.selection_key.clone())
+            .unwrap_or_default();
+        use_effect_with(dependency, move |_| {
+            if let Some(bundle) = loaded.as_ref() {
+                let key = format!("{}customAlgs", bundle.selection_key);
+                let cases = bundle.cases.clone();
+                spawn_local(async move {
+                    let Some(value) = get_stored(&key).await else {
+                        return;
+                    };
+                    let Ok(parsed) =
+                        serde_json::from_str::<BTreeMap<String, serde_json::Value>>(&value)
+                    else {
+                        return;
+                    };
+                    custom_algs.set(
+                        parsed
+                            .into_iter()
+                            .map(|(case_id, value)| {
+                                let mut items = parse_custom_algs(&value, &case_id);
+                                if let Some(case) =
+                                    cases.iter().find(|case| case.case_id == case_id)
+                                {
+                                    items = upgrade_legacy_custom_algs(case, items);
+                                }
+                                (case_id, items)
+                            })
+                            .collect(),
+                    );
+                });
+            }
+            || ()
+        });
+    }
     let Some(bundle) = bundle.as_ref() else {
         return html! { <main class="colFlex pad"><h1>{"Loading algorithm sheet..."}</h1></main> };
     };
@@ -456,6 +676,7 @@ fn alg_sheet_page() -> Html {
                 {for bundle.algsets.iter().map(|algset| {
                     let needle = needle.clone();
                     let cases = cases.clone();
+                    let custom_algs = custom_algs.clone();
                     html! {
                         <>
                             <div class="borderedContainer itemUnsel pad groupNameDiv fullSpan"><b>{&algset.name}</b></div>
@@ -480,8 +701,8 @@ fn alg_sheet_page() -> Html {
                                                     }
                                                 </div>
                                                 <div class="colFlex algsheetAlgs">
-                                                    {for case.algs.iter().map(|alg| html! {
-                                                        <div class="borderedContainer pad">{alg}</div>
+                                                    {for display_algs(case, &custom_algs).into_iter().map(|alg| html! {
+                                                        <div class="borderedContainer pad">{alg.alg}</div>
                                                     })}
                                                 </div>
                                             </section>
@@ -654,6 +875,159 @@ enum Dialog {
     Stats,
 }
 
+#[derive(Clone, Copy, Debug, PartialEq)]
+enum AlgsetClickAction {
+    Enable,
+    Disable,
+    SelectAll,
+    SelectNone,
+}
+
+fn algset_click_action(enabled: bool, selected_count: usize, total: usize) -> AlgsetClickAction {
+    if !enabled {
+        AlgsetClickAction::Enable
+    } else if selected_count == 0 {
+        AlgsetClickAction::Disable
+    } else if selected_count < total {
+        AlgsetClickAction::SelectAll
+    } else {
+        AlgsetClickAction::SelectNone
+    }
+}
+
+fn last_sync_label() -> String {
+    LAST_SYNC_COMPLETED
+        .with(|last| *last.borrow())
+        .map(|timestamp| {
+            Date::new(&JsValue::from_f64(timestamp))
+                .to_locale_string("en-GB", &JsValue::UNDEFINED)
+                .as_string()
+                .unwrap_or_else(|| "Unknown".to_owned())
+        })
+        .unwrap_or_else(|| "Not yet".to_owned())
+}
+
+#[function_component(AccountSettings)]
+fn account_settings() -> Html {
+    let account = use_state(MeResponse::default);
+    let syncing = use_state(|| false);
+    let sync_time = use_state(last_sync_label);
+    let error = use_state(|| None::<String>);
+
+    {
+        let account = account.clone();
+        let sync_time = sync_time.clone();
+        let error = error.clone();
+        use_effect_with((), move |_| {
+            let account_request = account.clone();
+            let request_error = error.clone();
+            spawn_local(async move {
+                match Request::get("/api/me").send().await {
+                    Ok(response) if response.ok() => match response.json::<MeResponse>().await {
+                        Ok(value) => account_request.set(value),
+                        Err(_) => request_error.set(Some("Unable to load account.".to_owned())),
+                    },
+                    _ => request_error.set(Some("Unable to load account.".to_owned())),
+                }
+            });
+            let sync_time_listener = sync_time.clone();
+            let listener = Closure::<dyn FnMut(web_sys::Event)>::new(move |_| {
+                sync_time_listener.set(last_sync_label());
+            });
+            let window = web_sys::window();
+            if let Some(window) = window.as_ref() {
+                let _ = window.add_event_listener_with_callback(
+                    "alg-trainers-sync",
+                    listener.as_ref().unchecked_ref(),
+                );
+            }
+            move || {
+                if let Some(window) = window {
+                    let _ = window.remove_event_listener_with_callback(
+                        "alg-trainers-sync",
+                        listener.as_ref().unchecked_ref(),
+                    );
+                }
+            }
+        });
+    }
+
+    let force_sync = {
+        let syncing = syncing.clone();
+        let sync_time = sync_time.clone();
+        let error = error.clone();
+        Callback::from(move |_| {
+            let syncing = syncing.clone();
+            let sync_time = sync_time.clone();
+            let error = error.clone();
+            syncing.set(true);
+            error.set(None);
+            spawn_local(async move {
+                let before = last_sync_label();
+                sync_now(true).await;
+                let after = last_sync_label();
+                if before == after {
+                    error.set(Some("Sync did not complete. Please try again.".to_owned()));
+                }
+                sync_time.set(after);
+                syncing.set(false);
+            });
+        })
+    };
+    let logout = {
+        let account = account.clone();
+        let error = error.clone();
+        Callback::from(move |_| {
+            let account = account.clone();
+            let error = error.clone();
+            spawn_local(async move {
+                match Request::post("/api/auth/logout").send().await {
+                    Ok(response) if response.ok() => account.set(MeResponse::default()),
+                    _ => error.set(Some("Unable to sign out.".to_owned())),
+                }
+            });
+        })
+    };
+
+    html! {
+        <details class="settingsDetails accountDetails" name="trainer-settings">
+            <summary class="settingsSummary">{"Account"}</summary>
+            <div class="colFlex accountSection">
+                if account.authenticated {
+                    <div class="settingsEntry accountIdentity">
+                        <b>{account.wca_id.as_deref().unwrap_or("WCA user")}</b>
+                        <span>{account.email.as_deref().unwrap_or("")}</span>
+                    </div>
+                    <div class="settingsEntry accountSync">
+                        <div class="colFlex">
+                            <b>{"Last sync"}</b>
+                            <span>{(*sync_time).clone()}</span>
+                        </div>
+                        <button class="abutton" disabled={*syncing} onclick={force_sync}>
+                            {if *syncing { "Syncing..." } else { "Sync now" }}
+                        </button>
+                    </div>
+                    <div class="settingsEntry">
+                        <div></div>
+                        <button class="abutton" onclick={logout}>{"Sign out"}</button>
+                    </div>
+                } else {
+                    <div class="settingsEntry accountLogin">
+                        <div class="colFlex">
+                            <b>{"Not signed in"}</b>
+                            <span>{"Sign in to sync settings and results."}</span>
+                        </div>
+                        <a class="abutton" href="/api/auth/wca">{"Sign in with WCA"}</a>
+                    </div>
+                }
+                if let Some(message) = error.as_ref() {
+                    <div class="accountError" role="alert">{message}</div>
+                }
+            </div>
+        </details>
+    }
+}
+
 #[function_component(LoadedTrainer)]
 fn loaded_trainer(props: &LoadedTrainerProps) -> Html {
     let bundle = &props.bundle;
@@ -693,8 +1067,10 @@ fn loaded_trainer(props: &LoadedTrainerProps) -> Html {
     let hint_open = use_state(|| false);
     let hint_case = use_state(|| None::<TrainerCase>);
     let stats_case_id = use_state(String::new);
-    let custom_algs = use_state(BTreeMap::<String, Vec<String>>::new);
+    let custom_algs = use_state(BTreeMap::<String, Vec<UserAlgState>>::new);
     let edited_alg = use_state(String::new);
+    let alg_editor = use_state(|| None::<(Option<String>, String)>);
+    let dragged_alg = use_state(String::new);
     let timer_ready = use_state(|| false);
     let timer_stopped = use_state(|| false);
     let hold_timeout = use_mut_ref(|| None::<Timeout>);
@@ -795,23 +1171,14 @@ fn loaded_trainer(props: &LoadedTrainerProps) -> Html {
                     {
                         let parsed = parsed
                             .into_iter()
-                            .filter_map(|(case_id, value)| {
-                                let algs = value
-                                    .get("a")
-                                    .and_then(serde_json::Value::as_array)
-                                    .map(|algs| {
-                                        algs.iter()
-                                            .filter_map(serde_json::Value::as_str)
-                                            .map(str::to_owned)
-                                            .collect()
-                                    })
-                                    .or_else(|| {
-                                        value
-                                            .get("alg")
-                                            .and_then(serde_json::Value::as_str)
-                                            .map(|alg| vec![alg.to_owned()])
-                                    })?;
-                                Some((case_id, algs))
+                            .map(|(case_id, value)| {
+                                let mut items = parse_custom_algs(&value, &case_id);
+                                if let Some(case) =
+                                    bundle.cases.iter().find(|case| case.case_id == case_id)
+                                {
+                                    items = upgrade_legacy_custom_algs(case, items);
+                                }
+                                (case_id, items)
                             })
                             .collect();
                         custom_algs.set(parsed);
@@ -1228,14 +1595,7 @@ fn loaded_trainer(props: &LoadedTrainerProps) -> Html {
                             {
                                 if index > 0 {
                                     let case = cases[index - 1].clone();
-                                    edited_alg.set(
-                                        custom_algs
-                                            .get(&case.case_id)
-                                            .or_else(|| Some(&case.algs))
-                                            .and_then(|algs| algs.first())
-                                            .cloned()
-                                            .unwrap_or_default(),
-                                    );
+                                    edited_alg.set(first_display_alg(&case, &custom_algs));
                                     hint_case.set(Some(case));
                                 }
                             }
@@ -1249,14 +1609,7 @@ fn loaded_trainer(props: &LoadedTrainerProps) -> Html {
                                 .position(|case| case.case_id == current.case_id)
                             {
                                 if let Some(case) = cases.get(index + 1).cloned() {
-                                    edited_alg.set(
-                                        custom_algs
-                                            .get(&case.case_id)
-                                            .or_else(|| Some(&case.algs))
-                                            .and_then(|algs| algs.first())
-                                            .cloned()
-                                            .unwrap_or_default(),
-                                    );
+                                    edited_alg.set(first_display_alg(&case, &custom_algs));
                                     hint_case.set(Some(case));
                                 }
                             }
@@ -1290,12 +1643,7 @@ fn loaded_trainer(props: &LoadedTrainerProps) -> Html {
                             active_case.as_ref()
                         };
                         if let Some(case) = case {
-                            let alg = custom_algs
-                                .get(&case.case_id)
-                                .or_else(|| Some(&case.algs))
-                                .and_then(|algs| algs.first())
-                                .cloned()
-                                .unwrap_or_default();
+                            let alg = first_display_alg(&case, &custom_algs);
                             edited_alg.set(alg);
                             hint_case.set(Some(case.clone()));
                             hint_open.set(true);
@@ -1523,12 +1871,7 @@ fn loaded_trainer(props: &LoadedTrainerProps) -> Html {
         let active_case = active_case.clone();
         Callback::from(move |_| {
             if let Some(case) = active_case.as_ref() {
-                let alg = custom_algs
-                    .get(&case.case_id)
-                    .or_else(|| Some(&case.algs))
-                    .and_then(|algs| algs.first())
-                    .cloned()
-                    .unwrap_or_default();
+                let alg = first_display_alg(&case, &custom_algs);
                 edited_alg.set(alg);
                 hint_case.set(Some(case.clone()));
                 hint_open.set(true);
@@ -1541,12 +1884,7 @@ fn loaded_trainer(props: &LoadedTrainerProps) -> Html {
         let edited_alg = edited_alg.clone();
         let custom_algs = custom_algs.clone();
         Callback::from(move |case: TrainerCase| {
-            let alg = custom_algs
-                .get(&case.case_id)
-                .or_else(|| Some(&case.algs))
-                .and_then(|algs| algs.first())
-                .cloned()
-                .unwrap_or_default();
+            let alg = first_display_alg(&case, &custom_algs);
             edited_alg.set(alg);
             hint_case.set(Some(case));
             hint_open.set(true);
@@ -1560,12 +1898,7 @@ fn loaded_trainer(props: &LoadedTrainerProps) -> Html {
         let last_case = last_case.clone();
         Callback::from(move |_| {
             if let Some(case) = last_case.as_ref() {
-                let alg = custom_algs
-                    .get(&case.case_id)
-                    .or_else(|| Some(&case.algs))
-                    .and_then(|algs| algs.first())
-                    .cloned()
-                    .unwrap_or_default();
+                let alg = first_display_alg(case, &custom_algs);
                 edited_alg.set(alg);
                 hint_case.set(Some(case.clone()));
                 hint_open.set(true);
@@ -1591,12 +1924,7 @@ fn loaded_trainer(props: &LoadedTrainerProps) -> Html {
                 if let Some(index) = cases.iter().position(|item| item.case_id == case.case_id) {
                     if index > 0 {
                         let previous = cases[index - 1].clone();
-                        let alg = custom_algs
-                            .get(&previous.case_id)
-                            .or_else(|| Some(&previous.algs))
-                            .and_then(|algs| algs.first())
-                            .cloned()
-                            .unwrap_or_default();
+                        let alg = first_display_alg(&previous, &custom_algs);
                         edited_alg.set(alg);
                         hint_case.set(Some(previous));
                         hint_open.set(true);
@@ -1616,12 +1944,7 @@ fn loaded_trainer(props: &LoadedTrainerProps) -> Html {
                 if let Some(index) = cases.iter().position(|item| item.case_id == case.case_id) {
                     if index + 1 < cases.len() {
                         let next = cases[index + 1].clone();
-                        let alg = custom_algs
-                            .get(&next.case_id)
-                            .or_else(|| Some(&next.algs))
-                            .and_then(|algs| algs.first())
-                            .cloned()
-                            .unwrap_or_default();
+                        let alg = first_display_alg(&next, &custom_algs);
                         edited_alg.set(alg);
                         hint_case.set(Some(next));
                         hint_open.set(true);
@@ -1630,135 +1953,134 @@ fn loaded_trainer(props: &LoadedTrainerProps) -> Html {
             }
         })
     };
-    let reset_alg = {
+    let save_editor = {
         let custom_algs = custom_algs.clone();
         let hint_case = hint_case.clone();
-        let edited_alg = edited_alg.clone();
+        let alg_editor = alg_editor.clone();
         let selection_key = selection_storage_key.clone();
         Callback::from(move |_| {
             let Some(case) = hint_case.as_ref() else {
                 return;
             };
-            let mut next = (*custom_algs).clone();
-            next.remove(&case.case_id);
-            edited_alg.set(case.algs.first().cloned().unwrap_or_default());
-            custom_algs.set(next.clone());
-            let payload = next
-                .into_iter()
-                .map(|(case_id, algs)| (case_id, serde_json::json!({ "a": algs })))
-                .collect::<serde_json::Map<_, _>>();
-            let key = format!("{selection_key}customAlgs");
-            spawn_local(async move {
-                put_stored(key, serde_json::Value::Object(payload).to_string()).await;
-            });
-        })
-    };
-    let download_custom_algs = {
-        let custom_algs = custom_algs.clone();
-        let trainer_id = bundle.trainer_id.clone();
-        Callback::from(move |_| {
-            let payload = (*custom_algs)
-                .iter()
-                .map(|(case_id, algs)| (case_id.clone(), serde_json::json!({ "a": algs })))
-                .collect::<serde_json::Map<_, _>>();
-            downloadText(
-                &format!("{trainer_id}-custom-algs.json"),
-                &serde_json::Value::Object(payload).to_string(),
-            );
-        })
-    };
-    let upload_custom_algs = {
-        let custom_algs = custom_algs.clone();
-        let hint_case = hint_case.clone();
-        let edited_alg = edited_alg.clone();
-        let selection_key = selection_storage_key.clone();
-        Callback::from(move |event: Event| {
-            let input = event.target_unchecked_into::<web_sys::HtmlInputElement>();
-            let Some(file) = input.files().and_then(|files| files.get(0)) else {
+            let Some((alg_id, value)) = alg_editor.as_ref() else {
                 return;
             };
-            let custom_algs = custom_algs.clone();
-            let hint_case = hint_case.clone();
-            let edited_alg = edited_alg.clone();
-            let storage_key = format!("{selection_key}customAlgs");
-            spawn_local(async move {
-                let Ok(promise) = readFileText(&file) else {
-                    return;
-                };
-                let Ok(text) = JsFuture::from(promise).await else {
-                    return;
-                };
-                let Some(text) = text.as_string() else {
-                    return;
-                };
-                let Ok(parsed) = serde_json::from_str::<BTreeMap<String, serde_json::Value>>(&text)
-                else {
-                    return;
-                };
-                let imported = parsed
-                    .into_iter()
-                    .filter_map(|(case_id, value)| {
-                        let algs = value
-                            .get("a")
-                            .and_then(serde_json::Value::as_array)
-                            .map(|algs| {
-                                algs.iter()
-                                    .filter_map(serde_json::Value::as_str)
-                                    .map(str::to_owned)
-                                    .collect()
-                            })
-                            .or_else(|| {
-                                value
-                                    .get("alg")
-                                    .and_then(serde_json::Value::as_str)
-                                    .map(|alg| vec![alg.to_owned()])
-                            })?;
-                        Some((case_id, algs))
-                    })
-                    .collect::<BTreeMap<_, _>>();
-                custom_algs.set(imported.clone());
-                let payload = imported
-                    .clone()
-                    .into_iter()
-                    .map(|(case_id, algs)| (case_id, serde_json::json!({ "a": algs })))
-                    .collect::<serde_json::Map<_, _>>();
-                put_stored(storage_key, serde_json::Value::Object(payload).to_string()).await;
-                if let Some(case) = hint_case.as_ref() {
-                    if let Some(algs) = imported.get(&case.case_id) {
-                        edited_alg.set(algs.first().cloned().unwrap_or_default());
-                    }
+            let value = value.trim().to_owned();
+            if value.is_empty() {
+                return;
+            }
+            let mut next = (*custom_algs).clone();
+            if let Some(alg_id) = alg_id {
+                let current = next.entry(case.case_id.clone()).or_default();
+                if let Some(item) = current.iter_mut().find(|item| &item.alg_id == alg_id) {
+                    item.alg = value;
+                    item.deleted = false;
                 }
-            });
+            } else {
+                let position = display_algs(case, &next)
+                    .iter()
+                    .map(|item| item.position)
+                    .max()
+                    .unwrap_or(-1)
+                    + 1;
+                next.entry(case.case_id.clone())
+                    .or_default()
+                    .push(UserAlgState {
+                        alg_id: randomAlgId(),
+                        alg: value,
+                        position,
+                        hidden: false,
+                        deleted: false,
+                    });
+            }
+            custom_algs.set(next.clone());
+            save_custom_algs(&selection_key, &next);
+            alg_editor.set(None);
         })
     };
-    let save_alg = {
+    let hide_alg = {
         let custom_algs = custom_algs.clone();
         let hint_case = hint_case.clone();
-        let edited_alg = edited_alg.clone();
         let selection_key = selection_storage_key.clone();
-        Callback::from(move |_| {
+        Callback::from(move |item: DisplayAlg| {
             let Some(case) = hint_case.as_ref() else {
                 return;
             };
             let mut next = (*custom_algs).clone();
-            next.insert(
-                case.case_id.clone(),
-                edited_alg
-                    .split('\n')
-                    .map(str::trim)
-                    .filter(|line| !line.is_empty())
-                    .map(str::to_owned)
-                    .collect(),
-            );
+            let current = next.entry(case.case_id.clone()).or_default();
+            if let Some(existing) = current.iter_mut().find(|alg| alg.alg_id == item.alg_id) {
+                existing.hidden = true;
+            } else {
+                current.push(UserAlgState {
+                    alg_id: item.alg_id,
+                    alg: item.alg,
+                    position: item.position,
+                    hidden: true,
+                    deleted: false,
+                });
+            }
             custom_algs.set(next.clone());
-            let payload = next
-                .into_iter()
-                .map(|(case_id, algs)| (case_id, serde_json::json!({ "a": algs })))
-                .collect::<serde_json::Map<_, _>>();
-            let key = format!("{selection_key}customAlgs");
-            spawn_local(async move {
-                put_stored(key, serde_json::Value::Object(payload).to_string()).await;
-            });
+            save_custom_algs(&selection_key, &next);
+        })
+    };
+    let delete_alg = {
+        let custom_algs = custom_algs.clone();
+        let hint_case = hint_case.clone();
+        let selection_key = selection_storage_key.clone();
+        Callback::from(move |alg_id: String| {
+            let Some(case) = hint_case.as_ref() else {
+                return;
+            };
+            let mut next = (*custom_algs).clone();
+            if let Some(item) = next
+                .entry(case.case_id.clone())
+                .or_default()
+                .iter_mut()
+                .find(|item| item.alg_id == alg_id)
+            {
+                item.deleted = true;
+            }
+            custom_algs.set(next.clone());
+            save_custom_algs(&selection_key, &next);
+        })
+    };
+    let reorder_alg = {
+        let custom_algs = custom_algs.clone();
+        let hint_case = hint_case.clone();
+        let selection_key = selection_storage_key.clone();
+        Callback::from(move |(from, to): (String, String)| {
+            let Some(case) = hint_case.as_ref() else {
+                return;
+            };
+            let mut items = display_algs(case, &custom_algs);
+            let Some(from_index) = items.iter().position(|item| item.alg_id == from) else {
+                return;
+            };
+            let Some(to_index) = items.iter().position(|item| item.alg_id == to) else {
+                return;
+            };
+            let moved = items.remove(from_index);
+            items.insert(to_index, moved);
+            let mut next = (*custom_algs).clone();
+            let overrides = next.entry(case.case_id.clone()).or_default();
+            for (position, item) in items.into_iter().enumerate() {
+                if let Some(existing) = overrides
+                    .iter_mut()
+                    .find(|existing| existing.alg_id == item.alg_id)
+                {
+                    existing.position = position as i32;
+                } else {
+                    overrides.push(UserAlgState {
+                        alg_id: item.alg_id,
+                        alg: item.alg,
+                        position: position as i32,
+                        hidden: false,
+                        deleted: false,
+                    });
+                }
+            }
+            custom_algs.set(next.clone());
+            save_custom_algs(&selection_key, &next);
         })
     };
     let select_all = {
@@ -1810,17 +2132,29 @@ fn loaded_trainer(props: &LoadedTrainerProps) -> Html {
         let selection_key = selection_storage_key.clone();
         Callback::from(move |(name, group_case_ids): (String, Vec<String>)| {
             let mut algsets = (*selected_algsets).clone();
-            let enabled = !algsets.get(&name).copied().unwrap_or(true);
-            algsets.insert(name, enabled);
             let mut cases = (*selected).clone();
-            if enabled {
-                for id in group_case_ids {
-                    if !cases.contains(&id) {
-                        cases.push(id);
+            let enabled = algsets.get(&name).copied().unwrap_or(true);
+            let selected_count = group_case_ids
+                .iter()
+                .filter(|id| cases.contains(id))
+                .count();
+            match algset_click_action(enabled, selected_count, group_case_ids.len()) {
+                AlgsetClickAction::Enable => {
+                    algsets.insert(name, true);
+                }
+                AlgsetClickAction::Disable => {
+                    algsets.insert(name, false);
+                }
+                AlgsetClickAction::SelectAll => {
+                    for id in group_case_ids {
+                        if !cases.contains(&id) {
+                            cases.push(id);
+                        }
                     }
                 }
-            } else {
-                cases.retain(|id| !group_case_ids.contains(id));
+                AlgsetClickAction::SelectNone => {
+                    cases.retain(|id| !group_case_ids.contains(id));
+                }
             }
             selected.set(cases.clone());
             selected_algsets.set(algsets.clone());
@@ -2335,7 +2669,9 @@ fn loaded_trainer(props: &LoadedTrainerProps) -> Html {
         .iter()
         .filter(|id| !visible_case_ids.contains(id))
         .count();
-    let visible_case_id_set = visible_case_ids.iter().collect::<std::collections::BTreeSet<_>>();
+    let visible_case_id_set = visible_case_ids
+        .iter()
+        .collect::<std::collections::BTreeSet<_>>();
     let widest_group_cases = bundle
         .groups
         .iter()
@@ -2484,13 +2820,24 @@ fn loaded_trainer(props: &LoadedTrainerProps) -> Html {
                                         .filter(|group| algset.groups.contains(&group.name))
                                         .flat_map(|group| group.cases.clone())
                                         .filter(|id| cases_by_id.contains_key(id))
+                                        .collect::<std::collections::BTreeSet<_>>()
+                                        .into_iter()
                                         .collect::<Vec<_>>();
                                     let enabled = selected_algsets.get(&algset.name).copied().unwrap_or(algset.selected);
                                     let selected_count = case_ids.iter().filter(|id| selected.contains(id)).count();
-                                    let label = format!("{} ({}/{})", algset.name, selected_count, case_ids.len());
+                                    let count = if enabled { selected_count.to_string() } else { "-".to_owned() };
+                                    let fully_selected = enabled
+                                        && !case_ids.is_empty()
+                                        && selected_count == case_ids.len();
+                                    let label = format!("{} ({}/{})", algset.name, count, case_ids.len());
                                     let name = algset.name.clone();
                                     html! {
-                                        <button class={classes!("borderedContainer", "pad", if enabled { "itemSel" } else { "itemUnsel" })}
+                                        <button class={classes!(
+                                            "borderedContainer",
+                                            "pad",
+                                            if fully_selected { "itemSel" } else { "itemUnsel" },
+                                            (!enabled).then_some("algsetDisabled")
+                                        )}
                                             onclick={Callback::from(move |_| toggle_algset.emit((name.clone(), case_ids.clone())))}>{label}</button>
                                     }
                                 }) }
@@ -2873,21 +3220,102 @@ fn loaded_trainer(props: &LoadedTrainerProps) -> Html {
                                 }
                             </div>
                             <div class="borderedContainer grow rowFlex center pad">{case.setup.as_deref().unwrap_or("")}</div>
-                            <div class="borderedContainer grow colFlex pad">
-                                <textarea rows="5" value={(*edited_alg).clone()}
-                                    oninput={Callback::from({
-                                        let edited_alg = edited_alg.clone();
-                                        move |event: InputEvent| edited_alg.set(event.target_unchecked_into::<web_sys::HtmlTextAreaElement>().value())
-                                    })} />
-                                <div class="rowFlex" style="flex-wrap:wrap;">
-                                    <button class="material-symbols-outlined abutton grow" title="Save custom algorithm" onclick={save_alg}>{"save"}</button>
-                                    <button class="material-symbols-outlined abutton grow" title="Reset custom algorithm" onclick={reset_alg}>{"refresh"}</button>
-                                    <button class="material-symbols-outlined abutton grow" title="Download custom algorithms" onclick={download_custom_algs}>{"download"}</button>
-                                    <label class="material-symbols-outlined abutton grow" title="Upload custom algorithms">
-                                        {"upload"}
-                                        <input type="file" accept="application/json,.json" style="display:none;" onchange={upload_custom_algs} />
-                                    </label>
-                                </div>
+                            <div class="borderedContainer grow colFlex algList">
+                                {for display_algs(case, &custom_algs).into_iter().map(|item| {
+                                    let editing = alg_editor.as_ref().is_some_and(|(id, _)| id.as_deref() == Some(item.alg_id.as_str()));
+                                    let dragged_alg_start = dragged_alg.clone();
+                                    let dragged_alg_drop = dragged_alg.clone();
+                                    let reorder_alg = reorder_alg.clone();
+                                    let hide_alg = hide_alg.clone();
+                                    let delete_alg = delete_alg.clone();
+                                    let alg_editor = alg_editor.clone();
+                                    let drag_id = item.alg_id.clone();
+                                    let drop_id = item.alg_id.clone();
+                                    html! {
+                                        <div class="algItem borderedContainer"
+                                            ondragover={Callback::from(|event: DragEvent| event.prevent_default())}
+                                            ondrop={{
+                                                let reorder_alg = reorder_alg.clone();
+                                                Callback::from(move |event: DragEvent| {
+                                                    event.prevent_default();
+                                                    if !dragged_alg_drop.is_empty() && dragged_alg_drop.as_str() != drop_id.as_str() {
+                                                        reorder_alg.emit((dragged_alg_drop.to_string(), drop_id.clone()));
+                                                    }
+                                                })
+                                            }}>
+                                            <button class="material-symbols-outlined algHandle" draggable="true"
+                                                title="Drag to reorder" aria-label="Drag to reorder"
+                                                ondragstart={Callback::from(move |_| dragged_alg_start.set(drag_id.clone()))}>
+                                                {"drag_indicator"}
+                                            </button>
+                                            if editing {
+                                                <textarea class="algEditorInput" rows="2"
+                                                    value={alg_editor.as_ref().map(|(_, value)| value.clone()).unwrap_or_default()}
+                                                    oninput={Callback::from({
+                                                        let alg_editor = alg_editor.clone();
+                                                        move |event: InputEvent| {
+                                                            let value = event.target_unchecked_into::<web_sys::HtmlTextAreaElement>().value();
+                                                            if let Some((id, _)) = alg_editor.as_ref() {
+                                                                alg_editor.set(Some((id.clone(), value)));
+                                                            }
+                                                        }
+                                                    })} />
+                                                <button class="material-symbols-outlined algAction" title="Save algorithm"
+                                                    onclick={save_editor.clone()}>{"check"}</button>
+                                                <button class="material-symbols-outlined algAction" title="Cancel edit"
+                                                    onclick={Callback::from({
+                                                        let alg_editor = alg_editor.clone();
+                                                        move |_| alg_editor.set(None)
+                                                    })}>{"close"}</button>
+                                            } else {
+                                                <span class="algText">{&item.alg}</span>
+                                                if item.user {
+                                                    <button class="material-symbols-outlined algAction" title="Edit algorithm"
+                                                        onclick={Callback::from({
+                                                            let alg_editor = alg_editor.clone();
+                                                            let id = item.alg_id.clone();
+                                                            let value = item.alg.clone();
+                                                            move |_| alg_editor.set(Some((Some(id.clone()), value.clone())))
+                                                        })}>{"edit"}</button>
+                                                    <button class="material-symbols-outlined algAction" title="Delete algorithm"
+                                                        onclick={Callback::from({
+                                                            let id = item.alg_id.clone();
+                                                            move |_| delete_alg.emit(id.clone())
+                                                        })}>{"close"}</button>
+                                                } else {
+                                                    <button class="material-symbols-outlined algAction" title="Hide algorithm"
+                                                        onclick={Callback::from(move |_| hide_alg.emit(item.clone()))}>{"visibility_off"}</button>
+                                                }
+                                            }
+                                        </div>
+                                    }
+                                })}
+                                if let Some((None, value)) = alg_editor.as_ref() {
+                                    <div class="algItem algNewItem borderedContainer">
+                                        <textarea class="algEditorInput" rows="2" placeholder="Enter a new algorithm"
+                                            value={value.clone()}
+                                            oninput={Callback::from({
+                                                let alg_editor = alg_editor.clone();
+                                                move |event: InputEvent| alg_editor.set(Some((
+                                                    None,
+                                                    event.target_unchecked_into::<web_sys::HtmlTextAreaElement>().value(),
+                                                )))
+                                            })} />
+                                        <button class="material-symbols-outlined algAction" title="Add algorithm"
+                                            onclick={save_editor.clone()}>{"check"}</button>
+                                        <button class="material-symbols-outlined algAction" title="Cancel"
+                                            onclick={Callback::from({
+                                                let alg_editor = alg_editor.clone();
+                                                move |_| alg_editor.set(None)
+                                            })}>{"close"}</button>
+                                    </div>
+                                } else {
+                                    <button class="material-symbols-outlined abutton algAddButton" title="Add algorithm"
+                                        onclick={Callback::from({
+                                            let alg_editor = alg_editor.clone();
+                                            move |_| alg_editor.set(Some((None, String::new())))
+                                        })}>{"add"}</button>
+                                }
                             </div>
                         }
                     </div>
@@ -3002,6 +3430,7 @@ fn loaded_trainer(props: &LoadedTrainerProps) -> Html {
                                 })}
                             </div>
                         </details>
+                        <AccountSettings />
                         <details class="settingsDetails" name="trainer-settings">
                             <summary class="settingsSummary">{"Scramble options"}</summary>
                             <div class="colFlex">
@@ -3464,7 +3893,7 @@ fn case_matches_text(case: &TrainerCase, bundle: &TrainerBundle, needle: &str) -
         case.name.as_str(),
         case.setup.as_deref().unwrap_or(""),
     ];
-    terms.extend(case.algs.iter().map(String::as_str));
+    terms.extend(case.algs.iter().map(|item| item.alg.as_str()));
     terms.extend(
         bundle
             .groups
@@ -4020,6 +4449,7 @@ thread_local! {
     static SYNC_INTERVAL: RefCell<Option<Interval>> = const { RefCell::new(None) };
     static SYNC_DEBOUNCE: RefCell<Option<Timeout>> = const { RefCell::new(None) };
     static LAST_SYNC: RefCell<f64> = RefCell::new(0.0);
+    static LAST_SYNC_COMPLETED: RefCell<Option<f64>> = const { RefCell::new(None) };
 }
 
 fn start_sync_engine() {
@@ -4030,13 +4460,13 @@ fn start_sync_engine() {
         *started.borrow_mut() = true;
         let sync_interval = Interval::new(60_000, || {
             spawn_local(async move {
-                sync_now().await;
+                sync_now(false).await;
             })
         });
         SYNC_INTERVAL.with(|timer| *timer.borrow_mut() = Some(sync_interval));
         Timeout::new(0, || {
             spawn_local(async move {
-                sync_now().await;
+                sync_now(false).await;
             })
         })
         .forget();
@@ -4048,7 +4478,7 @@ fn start_sync_engine() {
                     }
                     *timer.borrow_mut() = Some(Timeout::new(2_000, || {
                         spawn_local(async move {
-                            sync_now().await;
+                            sync_now(false).await;
                         });
                     }));
                 });
@@ -4062,9 +4492,18 @@ fn start_sync_engine() {
     });
 }
 
-async fn sync_now() {
+fn record_sync_completed() {
+    LAST_SYNC_COMPLETED.with(|last| *last.borrow_mut() = Some(Date::now()));
+    if let Some(window) = web_sys::window() {
+        if let Ok(event) = web_sys::Event::new("alg-trainers-sync") {
+            let _ = window.dispatch_event(&event);
+        }
+    }
+}
+
+async fn sync_now(force: bool) {
     let now = Date::now();
-    let too_soon = LAST_SYNC.with(|last| now - *last.borrow() < 10_000.0);
+    let too_soon = !force && LAST_SYNC.with(|last| now - *last.borrow() < 10_000.0);
     if too_soon {
         return;
     }
@@ -4088,7 +4527,9 @@ async fn sync_now() {
         return;
     };
     if dirty.is_empty() {
-        pull_remote().await;
+        if pull_remote().await {
+            record_sync_completed();
+        }
         return;
     }
     let trainers = match Request::get("/api/trainers").send().await {
@@ -4160,29 +4601,18 @@ async fn sync_now() {
         {
             if let Ok(algs) = serde_json::from_str::<BTreeMap<String, serde_json::Value>>(value) {
                 for (case_id, value) in algs {
-                    let alg = value
-                        .get("a")
-                        .and_then(serde_json::Value::as_array)
-                        .map(|algs| {
-                            algs.iter()
-                                .filter_map(serde_json::Value::as_str)
-                                .collect::<Vec<_>>()
-                                .join("\n")
-                        })
-                        .or_else(|| {
-                            value
-                                .get("alg")
-                                .and_then(serde_json::Value::as_str)
-                                .map(str::to_owned)
-                        })
-                        .or_else(|| value.as_str().map(str::to_owned))
-                        .unwrap_or_default();
-                    bundle.user_algs.push(UserAlgSync {
-                        trainer_id: trainer.trainer_id.clone(),
-                        case_id,
-                        alg,
-                        updated_at: updated_at.clone(),
-                    });
+                    for alg in parse_custom_algs(&value, &case_id) {
+                        bundle.user_algs.push(UserAlgSync {
+                            trainer_id: trainer.trainer_id.clone(),
+                            case_id: case_id.clone(),
+                            alg_id: alg.alg_id,
+                            alg: alg.alg,
+                            position: alg.position,
+                            hidden: alg.hidden,
+                            deleted: alg.deleted,
+                            updated_at: updated_at.clone(),
+                        });
+                    }
                 }
             }
         } else if let Some(trainer) = trainers.iter().find(|trainer| trainer.times_key == *key) {
@@ -4218,10 +4648,11 @@ async fn sync_now() {
         if let Ok(promise) = storageClearDirty(keys) {
             let _ = JsFuture::from(promise).await;
         }
+        record_sync_completed();
     }
 }
 
-async fn pull_remote() {
+async fn pull_remote() -> bool {
     let dirty = match storageAll("dirty") {
         Ok(promise) => match JsFuture::from(promise).await {
             Ok(value) => {
@@ -4239,11 +4670,29 @@ async fn pull_remote() {
         Err(_) => Vec::new(),
     };
     let Ok(response) = Request::get("/api/sync").send().await else {
-        return;
+        return false;
     };
-    let Ok(bundle) = response.json::<SyncBundle>().await else {
-        return;
+    let Ok(mut bundle) = response.json::<SyncBundle>().await else {
+        return false;
     };
+    for _ in 0..100 {
+        let Some(cursor) = bundle.next_results.take() else {
+            break;
+        };
+        let url = format!(
+            "/api/sync?before_datetime={}&before_id={}",
+            js_sys::encode_uri_component(&cursor.datetime),
+            js_sys::encode_uri_component(&cursor.id)
+        );
+        let Ok(response) = Request::get(&url).send().await else {
+            return false;
+        };
+        let Ok(page) = response.json::<SyncBundle>().await else {
+            return false;
+        };
+        bundle.results.extend(page.results);
+        bundle.next_results = page.next_results;
+    }
     let mut imported = Vec::new();
     if let Some(settings) = bundle.settings {
         let key = "ALLGSettings".to_owned();
@@ -4284,8 +4733,29 @@ async fn pull_remote() {
             }
         }
     }
-    let mut remote_algs = BTreeMap::<String, serde_json::Map<String, serde_json::Value>>::new();
+    let mut remote_algs = BTreeMap::<String, BTreeMap<String, Vec<UserAlgState>>>::new();
     for alg in bundle.user_algs {
+        let values = if alg.alg_id.starts_with("legacy:") && alg.alg.contains('\n') {
+            alg.alg
+                .lines()
+                .enumerate()
+                .map(|(position, value)| UserAlgState {
+                    alg_id: format!("{}:{position}", alg.alg_id),
+                    alg: value.to_owned(),
+                    position: position as i32,
+                    hidden: alg.hidden,
+                    deleted: alg.deleted,
+                })
+                .collect()
+        } else {
+            vec![UserAlgState {
+                alg_id: alg.alg_id,
+                alg: alg.alg,
+                position: alg.position,
+                hidden: alg.hidden,
+                deleted: alg.deleted,
+            }]
+        };
         remote_algs
             .entry(format!(
                 "{}customAlgs",
@@ -4296,16 +4766,15 @@ async fn pull_remote() {
                     .unwrap_or(&alg.trainer_id)
             ))
             .or_default()
-            .insert(
-                alg.case_id,
-                serde_json::json!({ "a": alg.alg.lines().collect::<Vec<_>>() }),
-            );
+            .entry(alg.case_id)
+            .or_default()
+            .extend(values);
     }
     for (key, algs) in remote_algs {
         if !dirty.contains_key(&key) {
             put_stored(
                 key.clone(),
-                serde_json::to_string(&algs).unwrap_or_else(|_| "{}".to_owned()),
+                serde_json::Value::Object(custom_algs_payload(&algs)).to_string(),
             )
             .await;
             imported.push(key);
@@ -4361,6 +4830,7 @@ async fn pull_remote() {
             let _ = JsFuture::from(promise).await;
         }
     }
+    true
 }
 
 #[wasm_bindgen(start)]
@@ -4383,5 +4853,120 @@ mod cube_image_tests {
         let encoded = image.strip_prefix("data:image/svg+xml;base64,").unwrap();
         let decoded = String::from_utf8(STANDARD.decode(encoded).unwrap()).unwrap();
         assert_eq!(decoded, "<svg fill='#4E79A7' stroke='#123456'/>");
+    }
+
+    #[cfg(test)]
+    mod algset_selection_tests {
+        use super::{algset_click_action, AlgsetClickAction};
+
+        #[test]
+        fn disabled_algset_is_enabled_without_selecting_cases() {
+            assert_eq!(algset_click_action(false, 0, 4), AlgsetClickAction::Enable);
+        }
+
+        #[test]
+        fn empty_algset_is_disabled() {
+            assert_eq!(algset_click_action(true, 0, 4), AlgsetClickAction::Disable);
+        }
+
+        #[test]
+        fn partial_algset_selects_all_cases() {
+            assert_eq!(
+                algset_click_action(true, 2, 4),
+                AlgsetClickAction::SelectAll
+            );
+        }
+
+        #[test]
+        fn complete_algset_clears_cases() {
+            assert_eq!(
+                algset_click_action(true, 4, 4),
+                AlgsetClickAction::SelectNone
+            );
+        }
+    }
+
+    fn test_case() -> TrainerCase {
+        TrainerCase {
+            case_id: "case".to_owned(),
+            name: "Case".to_owned(),
+            setup: None,
+            image_svg: None,
+            algs: vec![
+                TrainerAlg {
+                    alg_id: "builtin:1".to_owned(),
+                    alg: "R U".to_owned(),
+                    position: 0,
+                },
+                TrainerAlg {
+                    alg_id: "builtin:2".to_owned(),
+                    alg: "R' U'".to_owned(),
+                    position: 1,
+                },
+            ],
+            scrambles: Vec::new(),
+        }
+    }
+
+    #[test]
+    fn user_alg_state_controls_visibility_order_and_additions() {
+        let case = test_case();
+        let custom = BTreeMap::from([(
+            "case".to_owned(),
+            vec![
+                UserAlgState {
+                    alg_id: "builtin:1".to_owned(),
+                    alg: "R U".to_owned(),
+                    position: 2,
+                    hidden: true,
+                    deleted: false,
+                },
+                UserAlgState {
+                    alg_id: "user:1".to_owned(),
+                    alg: "F R".to_owned(),
+                    position: 0,
+                    hidden: false,
+                    deleted: false,
+                },
+                UserAlgState {
+                    alg_id: "builtin:2".to_owned(),
+                    alg: "R' U'".to_owned(),
+                    position: 1,
+                    hidden: false,
+                    deleted: false,
+                },
+            ],
+        )]);
+
+        let displayed = display_algs(&case, &custom);
+        assert_eq!(
+            displayed
+                .iter()
+                .map(|item| item.alg.as_str())
+                .collect::<Vec<_>>(),
+            vec!["F R", "R' U'"]
+        );
+        assert!(displayed[0].user);
+        assert!(!displayed[1].user);
+    }
+
+    #[test]
+    fn legacy_custom_algs_hide_catalog_defaults() {
+        let case = test_case();
+        let migrated = upgrade_legacy_custom_algs(
+            &case,
+            vec![UserAlgState {
+                alg_id: "legacy:case:0".to_owned(),
+                alg: "U R".to_owned(),
+                position: 0,
+                hidden: false,
+                deleted: false,
+            }],
+        );
+        let displayed = display_algs(&case, &BTreeMap::from([("case".to_owned(), migrated)]));
+
+        assert_eq!(displayed.len(), 1);
+        assert_eq!(displayed[0].alg, "U R");
+        assert!(displayed[0].user);
     }
 }

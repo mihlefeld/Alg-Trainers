@@ -5,7 +5,7 @@ services:
     environment:
       POSTGRES_DB: alg_trainers
       POSTGRES_USER: alg_trainers
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-alg_trainers}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set}
     volumes:
       - psql-data:/var/lib/postgresql/data
     healthcheck:
@@ -25,14 +25,15 @@ services:
     environment:
       ROCKET_ADDRESS: 0.0.0.0
       ROCKET_PORT: 8000
-      ROCKET_SECRET_KEY: ${ROCKET_SECRET_KEY:-0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef}
-      DATABASE_URL: postgres://alg_trainers:${POSTGRES_PASSWORD:-alg_trainers}@psql:5432/alg_trainers
+      ROCKET_SECRET_KEY: ${ROCKET_SECRET_KEY:?ROCKET_SECRET_KEY must be set}
+      DATABASE_URL: postgres://alg_trainers:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set}@psql:5432/alg_trainers
       WCA_BASE_URL: ${WCA_BASE_URL:-https://www.worldcubeassociation.org}
       WCA_CLIENT_ID: ${WCA_CLIENT_ID:-}
       WCA_CLIENT_SECRET: ${WCA_CLIENT_SECRET:-}
       WCA_REDIRECT_URL: ${WCA_REDIRECT_URL:-http://localhost:8000/api/auth/wca/callback}
-      CATALOG_ROOT: /app/catalog
+      CATALOG_ROOT: /app/static
       FORCE_CATALOG_SEED: ${FORCE_CATALOG_SEED:-}
+      COOKIE_SECURE: ${COOKIE_SECURE:-}
     ports:
       - "${ALG_TRAINERS_PORT:-8000}:8000"
 

@@ -99,6 +99,41 @@ dialog#settings span {
     line-height: normal;
 }
 
+.accountSection {
+    gap: 0.2em;
+}
+
+dialog#settings .accountSection span {
+    width: auto;
+    height: auto;
+    font-size: 0.85em;
+    overflow-wrap: anywhere;
+}
+
+.accountIdentity,
+.accountLogin,
+.accountSync {
+    align-items: center;
+}
+
+.accountIdentity,
+.accountLogin .colFlex,
+.accountSync .colFlex {
+    min-width: 0;
+}
+
+.accountIdentity {
+    flex-direction: column;
+    align-items: flex-start;
+}
+
+.accountError {
+    padding: 0.3em;
+    color: var(--accentText);
+    background: var(--accent);
+    border-radius: var(--borderRadius);
+}
+
 .plusMinus {
     display: flex;
     flex-direction: row;

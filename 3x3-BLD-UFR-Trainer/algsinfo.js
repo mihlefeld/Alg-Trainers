@@ -1,9 +1,0 @@
-const timesArrayKey = "3x3bldCornersTimes";
-const selectionArrayKey = "3x3bldCornersSelection";
-var trainerTitle = "3×3 BLD UFR Trainer";
-var preRotations = [''];
-var postRotations = [''];
-var preMoves = [""];
-var postMoves = preMoves;
-var selCases = [];
-var maxAlgsPerRow = 6;

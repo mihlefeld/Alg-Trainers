@@ -1,0 +1,20 @@
+{
+  "trainerTitle": "FTO LBT Trainer",
+  "preRotations": [
+    ""
+  ],
+  "postRotations": [
+    ""
+  ],
+  "preMoves": [
+    "U",
+    "U'"
+  ],
+  "postMoves": [
+    "U",
+    "U'"
+  ],
+  "maxAlgsPerRow": 8,
+  "selectionArrayKey": "ftolbtSelection.1",
+  "timesArrayKey": "ftolbtTimesArray.1"
+}

@@ -1,9 +1,0 @@
-const timesArrayKey = "3x3cmllTimes";
-const selectionArrayKey = "3x3cmllselection";
-var trainerTitle = "3×3 CMLL Trainer";
-var preRotations = [''];
-var postRotations = [''];
-var preMoves = ["", "U", "U'", "U2"];
-var postMoves = preMoves;
-var selCases = [];
-var maxAlgsPerRow = 6;
