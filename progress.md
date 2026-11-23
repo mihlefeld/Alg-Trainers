@@ -38,6 +38,10 @@ Reference used: upstream `dev` at `8df81345766fb73cd14aba338d785d68be27514d`.
 
 ### Styling and usability
 
+- Added named cube-color schemes, built-in color-blind presets, and global,
+  puzzle, and trainer assignments with legacy color migration.
+- Applied the active scheme to trainer and algorithm-sheet diagrams and added
+  contrasting color previews to theme and cube-color inputs.
 - Reduced the desktop trainer selection panel to a compact centered layout close to the reference.
 - Restored the compact preset toolbar and improved mobile wrapping.
 - Added a responsive grouped grid for algorithm sheets.
@@ -52,6 +56,9 @@ Reference used: upstream `dev` at `8df81345766fb73cd14aba338d785d68be27514d`.
 - Rocket, Yew, and the production Docker image build successfully.
 - Presets survive a browser reload and restore the expected selected cases.
 - Browser regression probes verified:
+  - legacy localStorage and IndexedDB v1 cube colors migrate correctly;
+  - scheme assignments survive reload and update trainer and algorithm-sheet
+    diagrams, and color inputs meet 4.5:1 contrast for tested opaque colors;
   - recap count remains `Recap 1 Cases` after the first of two solves;
   - `B`, `R`, and `Shift+H` update the expected state;
   - BLD outputs translated letter pairs;
@@ -63,9 +70,7 @@ Reference used: upstream `dev` at `8df81345766fb73cd14aba338d785d68be27514d`.
 
 ### Settings and custom data
 
-- Custom cube-color schemes, including global/puzzle/trainer assignments and scheme management, are not implemented.
 - Backup import/export is consolidated into one trainer-data backup; the reference's separate custom-algorithm and letter-pair export workflows are not fully represented.
-- Cube-color inputs are still raw text values rather than scheme selectors.
 
 ### Visual polish
 

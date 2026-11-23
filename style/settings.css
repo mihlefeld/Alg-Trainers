@@ -130,8 +130,12 @@ dialog#settings select {
     font: inherit;
 }
 
-dialog#settings input:disabled, dialog#settings button:disabled {
+dialog#settings button:disabled {
     opacity: 0.65;
+    cursor: default;
+}
+
+dialog#settings input:disabled {
     cursor: default;
 }
 
@@ -156,4 +160,8 @@ dialog#settings input:disabled, dialog#settings button:disabled {
 dialog#settings .cubeTrainerEntry span {
     width: auto;
     height: auto;
+}
+
+dialog#settings .cubeSchemeEntry span, dialog#settings .colorSetting span {
+    width: auto;
 }

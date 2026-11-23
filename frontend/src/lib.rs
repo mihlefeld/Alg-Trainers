@@ -1,3 +1,6 @@
+mod cube_schemes;
+mod cube_settings;
+
 use gloo_net::http::Request;
 use gloo_timers::callback::{Interval, Timeout};
 use js_sys::{Date, Math};
@@ -14,18 +17,56 @@ function openStorage() {
   return new Promise((resolve, reject) => {
     const request = indexedDB.open("alg-trainers", 2);
     request.onupgradeneeded = () => {
-      request.result.createObjectStore("data");
-      request.result.createObjectStore("metadata");
+      if (!request.result.objectStoreNames.contains("data")) {
+        request.result.createObjectStore("data");
+      }
+      if (!request.result.objectStoreNames.contains("metadata")) {
+        request.result.createObjectStore("metadata");
+      }
       if (!request.result.objectStoreNames.contains("dirty")) {
         request.result.createObjectStore("dirty");
       }
     };
-    request.onsuccess = () => resolve(request.result);
+    request.onsuccess = () => {
+      request.result.onversionchange = () => request.result.close();
+      resolve(request.result);
+    };
     request.onerror = () => reject(request.error);
+    request.onblocked = () => reject(new Error("Browser storage upgrade blocked by another tab."));
   });
 }
 export async function storageGet(key) {
   const db = await openStorage();
+  if (key === "ALLGSettings") {
+    return await new Promise((resolve, reject) => {
+      const tx = db.transaction(["data", "metadata", "dirty"], "readwrite");
+      const data = tx.objectStore("data");
+      const metadata = tx.objectStore("metadata");
+      const stored = data.get(key);
+      const legacyMarker = metadata.get("localStorageMigrated");
+      const settingsMarker = metadata.get("yewSettingsMigrated");
+      let result = null;
+      settingsMarker.onsuccess = () => {
+        try {
+          result = stored.result ?? null;
+          if (!settingsMarker.result && !legacyMarker.result && result === null) {
+            result = localStorage.getItem(key);
+            if (result !== null) {
+              data.put(result, key);
+              tx.objectStore("dirty").put(Date.now(), key);
+            }
+          }
+          metadata.put(true, "yewSettingsMigrated");
+        } catch (error) {
+          tx.abort();
+          reject(error);
+        }
+      };
+      tx.oncomplete = () => resolve(result);
+      tx.onerror = () => reject(tx.error);
+      tx.onabort = () => reject(tx.error || new Error("Unable to migrate settings"));
+    });
+  }
   return await new Promise((resolve, reject) => {
     const request = db.transaction("data", "readonly").objectStore("data").get(key);
     request.onsuccess = () => resolve(request.result ?? null);
@@ -64,6 +105,36 @@ export async function storageClearDirty(keys) {
 }
 export function prefersLightTheme() {
   return window.matchMedia && window.matchMedia("(prefers-color-scheme: light)").matches;
+}
+export function colorInputStyle(value, background) {
+  if (!CSS.supports("color", value) || !CSS.supports("color", background)) {
+    throw new Error("Please enter a valid CSS color.");
+  }
+  const probe = document.createElement("span");
+  probe.style.color = value;
+  document.body.appendChild(probe);
+  const resolved = getComputedStyle(probe).color;
+  probe.style.color = background;
+  const base = getComputedStyle(probe).color;
+  probe.remove();
+  const canvas = document.createElement("canvas");
+  canvas.width = canvas.height = 1;
+  const context = canvas.getContext("2d", { willReadFrequently: true });
+  if (!context) throw new Error("Unable to calculate color contrast.");
+  context.fillStyle = "white";
+  context.fillRect(0, 0, 1, 1);
+  context.fillStyle = base;
+  context.fillRect(0, 0, 1, 1);
+  context.fillStyle = resolved;
+  context.fillRect(0, 0, 1, 1);
+  const rgb = context.getImageData(0, 0, 1, 1).data;
+  const linear = channel => {
+    const c = channel / 255;
+    return c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
+  };
+  const luminance = 0.2126 * linear(rgb[0]) + 0.7152 * linear(rgb[1]) + 0.0722 * linear(rgb[2]);
+  const text = (luminance + 0.05) / 0.05 >= 1.05 / (luminance + 0.05) ? "black" : "white";
+  return `background-color:${value};color:${text}`;
 }
 export function downloadText(filename, text) {
   const url = URL.createObjectURL(new Blob([text], { type: "application/json" }));
@@ -114,6 +185,8 @@ extern "C" {
     fn storageClearDirty(keys: js_sys::Array) -> Result<js_sys::Promise, JsValue>;
     #[wasm_bindgen(catch)]
     fn prefersLightTheme() -> Result<bool, JsValue>;
+    #[wasm_bindgen(catch)]
+    fn colorInputStyle(value: &str, background: &str) -> Result<String, JsValue>;
     fn downloadText(filename: &str, text: &str);
     #[wasm_bindgen(catch)]
     fn readFileText(file: &web_sys::File) -> Result<js_sys::Promise, JsValue>;
@@ -122,13 +195,37 @@ extern "C" {
 }
 
 async fn get_stored(key: &str) -> Option<String> {
-    let promise = storageGet(key).ok()?;
-    JsFuture::from(promise).await.ok()?.as_string()
+    let result = match storageGet(key) {
+        Ok(promise) => JsFuture::from(promise).await,
+        Err(error) => Err(error),
+    };
+    match result {
+        Ok(value) => value.as_string(),
+        Err(error) => {
+            web_sys::console::error_1(&error);
+            if key == "ALLGSettings" {
+                if let Some(window) = web_sys::window() {
+                    let _ =
+                        window.alert_with_message("Unable to load settings from browser storage.");
+                }
+            }
+            None
+        }
+    }
 }
 
 async fn put_stored(key: String, value: String) {
-    if let Ok(promise) = storagePut(&key, &value) {
-        let _ = JsFuture::from(promise).await;
+    let result = match storagePut(&key, &value) {
+        Ok(promise) => JsFuture::from(promise).await.map(|_| ()),
+        Err(error) => Err(error),
+    };
+    if let Err(error) = result {
+        web_sys::console::error_1(&error);
+        if key == "ALLGSettings" {
+            if let Some(window) = web_sys::window() {
+                let _ = window.alert_with_message("Unable to save settings to browser storage.");
+            }
+        }
     }
 }
 
@@ -292,6 +389,24 @@ fn switch(route: Route) -> Html {
 fn alg_sheet_page() -> Html {
     let bundle = use_state(|| None::<TrainerBundle>);
     let query = use_state(String::new);
+    let settings = use_state(|| {
+        let mut settings = serde_json::json!({});
+        cube_schemes::migrate(&mut settings);
+        settings
+    });
+    {
+        let settings = settings.clone();
+        use_effect_with((), move |_| {
+            spawn_local(async move {
+                if let Some(value) = get_stored("ALLGSettings").await {
+                    if let Ok(parsed) = serde_json::from_str::<serde_json::Value>(&value) {
+                        settings.set(parsed);
+                    }
+                }
+            });
+            || ()
+        });
+    }
     {
         let bundle = bundle.clone();
         use_effect_with((), move |_| {
@@ -315,6 +430,7 @@ fn alg_sheet_page() -> Html {
         return html! { <main class="colFlex pad"><h1>{"Loading algorithm sheet..."}</h1></main> };
     };
     let needle = query.trim().to_lowercase();
+    let cube_colors = cube_schemes::active_colors(&settings, &bundle.trainer_id, &bundle.puzzle);
     let cases = bundle
         .cases
         .iter()
@@ -358,7 +474,7 @@ fn alg_sheet_page() -> Html {
                                                     <b class="caseName">{&case.name}</b>
                                                     <span class="caseSetup">{case.setup.as_deref().unwrap_or("")}</span>
                                                     if let Some(svg) = case.image_svg.as_ref() {
-                                                        <img class="caseImage" src={case_image_data(svg, &serde_json::Value::Null)} />
+                                                        <img class="caseImage" src={case_image_data(svg, &cube_colors)} />
                                                     }
                                                 </div>
                                                 <div class="colFlex algsheetAlgs">
@@ -561,7 +677,12 @@ fn loaded_trainer(props: &LoadedTrainerProps) -> Html {
     let search_cells = use_state(BTreeMap::<usize, String>::new);
     let search_color = use_state(|| search_color_names()[0].to_owned());
     let search_all_angles = use_state(|| true);
-    let settings = use_state(|| serde_json::json!({}));
+    let settings = use_state(|| {
+        let mut settings = serde_json::json!({});
+        cube_schemes::migrate(&mut settings);
+        settings
+    });
+    let settings_ready = use_state(|| false);
     let presets = use_state(BTreeMap::<String, SelectionPreset>::new);
     let preset_name = use_state(String::new);
     let current_scramble = use_state(String::new);
@@ -585,6 +706,7 @@ fn loaded_trainer(props: &LoadedTrainerProps) -> Html {
         let selected_algsets = selected_algsets.clone();
         let results = results.clone();
         let settings = settings.clone();
+        let settings_ready = settings_ready.clone();
         let presets = presets.clone();
         let custom_algs = custom_algs.clone();
         let trainer_id = trainer_id.clone();
@@ -645,9 +767,18 @@ fn loaded_trainer(props: &LoadedTrainerProps) -> Html {
                 if let Some(value) = get_stored("ALLGSettings").await {
                     if let Ok(parsed) = serde_json::from_str(&value) {
                         loaded_settings = parsed;
+                        if cube_schemes::migrate(&mut loaded_settings) {
+                            put_stored("ALLGSettings".to_owned(), loaded_settings.to_string())
+                                .await;
+                        }
                         settings.set(loaded_settings.clone());
                     }
                 }
+                if loaded_settings.get("cubeColorSchemes").is_none() {
+                    cube_schemes::migrate(&mut loaded_settings);
+                    settings.set(loaded_settings.clone());
+                }
+                settings_ready.set(true);
                 if let Some(value) = get_stored(&format!("{selection_key}Presets")).await {
                     if let Ok(parsed) =
                         serde_json::from_str::<BTreeMap<String, SelectionPreset>>(&value)
@@ -2080,18 +2211,9 @@ fn loaded_trainer(props: &LoadedTrainerProps) -> Html {
             });
         })
     };
-    let change_cube_color = {
+    let change_cube_settings = {
         let settings = settings.clone();
-        Callback::from(move |(key, value): (String, String)| {
-            let mut next = (*settings).clone();
-            if next
-                .get("cubecolors")
-                .and_then(serde_json::Value::as_object)
-                .is_none()
-            {
-                next["cubecolors"] = serde_json::to_value(default_cube_colors()).unwrap();
-            }
-            next["cubecolors"][&key] = value.into();
+        Callback::from(move |next: serde_json::Value| {
             settings.set(next.clone());
             spawn_local(async move {
                 put_stored("ALLGSettings".to_owned(), next.to_string()).await;
@@ -2184,6 +2306,7 @@ fn loaded_trainer(props: &LoadedTrainerProps) -> Html {
         .filter(|id| !visible_case_ids.contains(id))
         .count();
     let probabilities = case_probabilities(&selected, &results, &settings);
+    let cube_colors = cube_schemes::active_colors(&settings, &bundle.trainer_id, &bundle.puzzle);
 
     html! {
         <main id="trainer-main" tabindex="0" style="display:flex; flex-direction:column; align-items:center; width:100%;" onkeydown={key_down} onkeyup={key_up}>
@@ -2343,7 +2466,7 @@ fn loaded_trainer(props: &LoadedTrainerProps) -> Html {
                         </div>
                         if *search_open {
                             <div class="searchPanel borderedContainer pad colFlex">
-                                if let Some(template) = search_template_svg(bundle, &search_cells, &settings) {
+                                if let Some(template) = search_template_svg(bundle, &search_cells, &cube_colors) {
                                     <div class="searchDiagram borderedContainer itemUnsel pad" onclick={{
                                         let search_cells = search_cells.clone();
                                         let search_color = search_color.clone();
@@ -2389,7 +2512,7 @@ fn loaded_trainer(props: &LoadedTrainerProps) -> Html {
                                     {for search_color_names().into_iter().map(|name| {
                                         let selected_color = search_color.clone();
                                         let active = *selected_color == name;
-                                        let color = cube_color(&settings, name);
+                                        let color = cube_color(&cube_colors, name);
                                         html! {
                                             <button class={classes!("searchSwatch", active.then_some("active"))}
                                                 title={name} aria-label={format!("Use {name} search color")}
@@ -2465,7 +2588,7 @@ fn loaded_trainer(props: &LoadedTrainerProps) -> Html {
                                             let hint_case_mobile = case.clone();
                                             let hint_timeout = Rc::new(RefCell::new(None::<Timeout>));
                                             let image = case.image_svg.as_ref()
-                                                                .map(|svg| case_image_data(svg, &settings))
+                                                                .map(|svg| case_image_data(svg, &cube_colors))
                                                 .unwrap_or_default();
                                             let include_name = bundle.title.contains("PLL")
                                                 || bundle.title.contains("BLD")
@@ -2676,7 +2799,7 @@ fn loaded_trainer(props: &LoadedTrainerProps) -> Html {
                             </div>
                             <div class="borderedContainer colFlex center" style="background-color:var(--secondary);">
                                 if let Some(svg) = case.image_svg.as_ref() {
-                                    <img style="width:16em;" src={case_image_data(svg, &settings)} />
+                                    <img style="width:16em;" src={case_image_data(svg, &cube_colors)} />
                                 }
                             </div>
                             <div class="borderedContainer grow rowFlex center pad">{case.setup.as_deref().unwrap_or("")}</div>
@@ -2881,15 +3004,25 @@ fn loaded_trainer(props: &LoadedTrainerProps) -> Html {
                                     ("--accent", "Accent"),
                                 ].into_iter().map(|(key, label)| {
                                     let value = setting_color(&settings, key);
+                                    let style = color_input_style(&value, &setting_color(&settings, "--background"));
                                     let change_color = change_color.clone();
                                     html! {
                                         <div class="settingsEntry colorSetting">
                                             <div>{label}</div>
-                                            <input type="text" value={value}
+                                            <input type="text" value={value.clone()} style={style}
                                                 aria-label={format!("{} color", label)}
                                                 onchange={{
                                                     Callback::from(move |event: Event| {
-                                                        change_color.emit((key.to_owned(), event.target_unchecked_into::<web_sys::HtmlInputElement>().value()));
+                                                        let input = event.target_unchecked_into::<web_sys::HtmlInputElement>();
+                                                        let new_value = input.value();
+                                                        if colorInputStyle(&new_value, "#fff").is_err() {
+                                                            if let Some(window) = web_sys::window() {
+                                                                let _ = window.alert_with_message("Please enter a valid CSS color.");
+                                                            }
+                                                            input.set_value(&value);
+                                                            return;
+                                                        }
+                                                        change_color.emit((key.to_owned(), new_value));
                                                     })
                                                 }} />
                                         </div>
@@ -2899,29 +3032,11 @@ fn loaded_trainer(props: &LoadedTrainerProps) -> Html {
                         </details>
                         <details class="settingsDetails">
                             <summary class="settingsSummary">{"Cube colors"}</summary>
-                            <div class="colFlex">
-                                <div class="trainerScrambleHelp">{"These colors update every case diagram immediately."}</div>
-                                {for default_cube_colors().into_iter().map(|(name, fallback)| {
-                                    let value = settings
-                                        .get("cubecolors")
-                                        .and_then(|colors| colors.get(name))
-                                        .and_then(serde_json::Value::as_str)
-                                        .unwrap_or(fallback)
-                                        .to_owned();
-                                    let change_cube_color = change_cube_color.clone();
-                                    html! {
-                                        <div class="settingsEntry colorSetting">
-                                            <div>{name}</div>
-                                            <input type="text" value={value}
-                                                onchange={{
-                                                    Callback::from(move |event: Event| {
-                                                        change_cube_color.emit((name.to_owned(), event.target_unchecked_into::<web_sys::HtmlInputElement>().value()));
-                                                    })
-                                                }} />
-                                        </div>
-                                    }
-                                })}
-                            </div>
+                            if *settings_ready {
+                                <cube_settings::CubeSettings settings={(*settings).clone()} on_change={change_cube_settings} />
+                            } else {
+                                <div>{"Loading settings..."}</div>
+                            }
                         </details>
                         <details class="settingsDetails">
                             <summary class="settingsSummary">{"Blind trainer behavior"}</summary>
@@ -3219,16 +3334,35 @@ fn default_cube_colors() -> BTreeMap<&'static str, &'static str> {
     ])
 }
 
-fn case_image_data(svg: &str, settings: &serde_json::Value) -> String {
-    let mut rendered = svg.to_owned();
-    for (name, original) in default_cube_colors() {
-        let replacement = settings
-            .get("cubecolors")
-            .and_then(|colors| colors.get(name))
-            .and_then(serde_json::Value::as_str)
-            .unwrap_or(original);
-        rendered = rendered.replace(original, replacement);
+fn color_input_style(value: &str, background: &str) -> String {
+    match colorInputStyle(value, background) {
+        Ok(style) => style,
+        Err(error) => {
+            web_sys::console::warn_1(&error);
+            "background-color:var(--background);color:var(--text)".to_owned()
+        }
     }
+}
+
+fn case_image_data(svg: &str, colors: &BTreeMap<String, String>) -> String {
+    let originals = default_cube_colors();
+    let mut rendered = String::with_capacity(svg.len());
+    let mut rest = svg;
+    while let Some(index) = rest.find('#') {
+        rendered.push_str(&rest[..index]);
+        rest = &rest[index..];
+        if let Some((name, original)) = originals
+            .iter()
+            .find(|(_, original)| rest.starts_with(**original))
+        {
+            rendered.push_str(colors.get(*name).map(String::as_str).unwrap_or(original));
+            rest = &rest[original.len()..];
+        } else {
+            rendered.push('#');
+            rest = &rest[1..];
+        }
+    }
+    rendered.push_str(rest);
     format!("data:image/svg+xml;base64,{}", STANDARD.encode(rendered))
 }
 
@@ -3405,11 +3539,10 @@ fn search_color_names() -> [&'static str; 12] {
     ]
 }
 
-fn cube_color(settings: &serde_json::Value, name: &str) -> String {
-    settings
-        .get("cubecolors")
-        .and_then(|colors| colors.get(name))
-        .and_then(serde_json::Value::as_str)
+fn cube_color(colors: &BTreeMap<String, String>, name: &str) -> String {
+    colors
+        .get(name)
+        .map(String::as_str)
         .or_else(|| default_cube_colors().get(name).copied())
         .unwrap_or("#222222")
         .to_owned()
@@ -3418,7 +3551,7 @@ fn cube_color(settings: &serde_json::Value, name: &str) -> String {
 fn search_template_svg(
     bundle: &TrainerBundle,
     cells: &BTreeMap<usize, String>,
-    settings: &serde_json::Value,
+    colors: &BTreeMap<String, String>,
 ) -> Option<String> {
     let svg = bundle
         .cases
@@ -3435,7 +3568,7 @@ fn search_template_svg(
         let tag = &remaining[..=end];
         let fill = cells
             .get(&index)
-            .map(|name| cube_color(settings, name))
+            .map(|name| cube_color(colors, name))
             .unwrap_or_else(|| "#222222".to_owned());
         let mut replacement = tag
             .strip_prefix("<polygon")
@@ -4165,3 +4298,20 @@ pub fn start() {
     yew::Renderer::<App>::new().render();
 }
 use base64::{engine::general_purpose::STANDARD, Engine};
+
+#[cfg(test)]
+mod cube_image_tests {
+    use super::*;
+
+    #[test]
+    fn recoloring_does_not_replace_new_colors_twice() {
+        let colors = BTreeMap::from([
+            ("red".to_owned(), "#4E79A7".to_owned()),
+            ("blue".to_owned(), "#123456".to_owned()),
+        ]);
+        let image = case_image_data("<svg fill='#E15759' stroke='#4E79A7'/>", &colors);
+        let encoded = image.strip_prefix("data:image/svg+xml;base64,").unwrap();
+        let decoded = String::from_utf8(STANDARD.decode(encoded).unwrap()).unwrap();
+        assert_eq!(decoded, "<svg fill='#4E79A7' stroke='#123456'/>");
+    }
+}

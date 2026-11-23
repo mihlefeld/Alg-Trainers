@@ -29,6 +29,15 @@ dependencies so the toolchain and resolved crate graph remain reproducible.
   presets, custom algorithms, and times to `/api/sync`.
 - The runtime image does not expose the previous JavaScript trainer routes.
 
+## Cube colors
+
+Trainer settings provide built-in default and color-blind palettes. Copy a
+palette to create an editable named scheme, then assign it globally or override
+it for a puzzle or individual trainer. Trainer assignments take precedence over
+puzzle assignments, which take precedence over the global scheme. Deleting a
+custom scheme clears its assignments. Schemes are included in settings sync
+and trainer backups; previous custom cube colors are retained during migration.
+
 ## WCA OAuth environment variables
 
 - `WCA_BASE_URL`
