@@ -197,13 +197,20 @@ dialog#settings input:disabled {
 
 .cubePuzzleSummary {
     cursor: pointer;
-    padding: 0.3em;
+    margin: -0.3em;
+    padding: 0.6em;
+}
+
+.cubeTrainerGroup[open] > .cubePuzzleSummary {
+    margin-bottom: 0;
 }
 
 dialog#settings .cubePuzzleSummary span {
     width: auto;
     height: auto;
+    margin-left: 0.4em;
     font-size: 0.8em;
+    overflow-wrap: anywhere;
 }
 
 .cubePuzzleEntry {

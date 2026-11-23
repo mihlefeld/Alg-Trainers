@@ -877,7 +877,6 @@ enum Dialog {
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 enum AlgsetClickAction {
-    Enable,
     Disable,
     SelectAll,
     SelectNone,
@@ -885,7 +884,7 @@ enum AlgsetClickAction {
 
 fn algset_click_action(enabled: bool, selected_count: usize, total: usize) -> AlgsetClickAction {
     if !enabled {
-        AlgsetClickAction::Enable
+        AlgsetClickAction::SelectAll
     } else if selected_count == 0 {
         AlgsetClickAction::Disable
     } else if selected_count < total {
@@ -2139,13 +2138,11 @@ fn loaded_trainer(props: &LoadedTrainerProps) -> Html {
                 .filter(|id| cases.contains(id))
                 .count();
             match algset_click_action(enabled, selected_count, group_case_ids.len()) {
-                AlgsetClickAction::Enable => {
-                    algsets.insert(name, true);
-                }
                 AlgsetClickAction::Disable => {
                     algsets.insert(name, false);
                 }
                 AlgsetClickAction::SelectAll => {
+                    algsets.insert(name, true);
                     for id in group_case_ids {
                         if !cases.contains(&id) {
                             cases.push(id);
@@ -4860,8 +4857,11 @@ mod cube_image_tests {
         use super::{algset_click_action, AlgsetClickAction};
 
         #[test]
-        fn disabled_algset_is_enabled_without_selecting_cases() {
-            assert_eq!(algset_click_action(false, 0, 4), AlgsetClickAction::Enable);
+        fn disabled_algset_is_enabled_and_selects_all_cases() {
+            assert_eq!(
+                algset_click_action(false, 0, 4),
+                AlgsetClickAction::SelectAll
+            );
         }
 
         #[test]
