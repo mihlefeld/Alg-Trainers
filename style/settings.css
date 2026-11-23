@@ -48,7 +48,7 @@ summary.settingsSummary:hover {
     display: flex;
     flex-direction: row;
     justify-content: space-between;
-    gap: 1em;
+    gap: 0.2em;
     background-color: var(--background);
     border-radius: var(--borderRadius);
     padding: 0.3em;
@@ -77,9 +77,10 @@ summary.settingsSummary:hover {
     font: inherit;
 }
 
-dialog#settings button, #settingsUploadCustomAlgsLabel, #uploadLSLabel, #uploadLPLabel {
+dialog#settings .plusMinus button:not(.compactButton),
+#settingsUploadCustomAlgsLabel, #uploadLSLabel, #uploadLPLabel {
     width: 3em;
-    height: 100%;
+    height: auto;
     font-size: 1em;
     padding: 0;
     margin: 0;
@@ -101,7 +102,7 @@ dialog#settings span {
 .plusMinus {
     display: flex;
     flex-direction: row;
-    gap: 0.2em;;
+    gap: 0.2em;
 }
 
 .cubeSchemeEntry, .cubeTrainerEntry {
@@ -144,13 +145,30 @@ dialog#settings input:disabled {
     overflow-y: auto;
     display: flex;
     flex-direction: column;
-    gap: 0.8em;
+    gap: 0.2em;
 }
 
 .cubeTrainerGroup {
+    border: 1px solid var(--secondary);
+    border-radius: var(--borderRadius);
+    padding: 0.3em;
+}
+
+.cubeTrainerGroup[open] {
     display: flex;
     flex-direction: column;
-    gap: 0.3em;
+    gap: 0.2em;
+}
+
+.cubePuzzleSummary {
+    cursor: pointer;
+    padding: 0.3em;
+}
+
+dialog#settings .cubePuzzleSummary span {
+    width: auto;
+    height: auto;
+    font-size: 0.8em;
 }
 
 .cubePuzzleEntry {

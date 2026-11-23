@@ -11,6 +11,16 @@ img#boxImg {
     width: 2em;
 }
 
+.hintCaseHeader {
+    width: 100%;
+    box-sizing: border-box;
+}
+
+.hintCaseHeader > b {
+    flex: 1;
+    text-align: center;
+}
+
 textarea:disabled {
     background-color: var(--background);
     color: var(--text);

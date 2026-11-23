@@ -15,6 +15,7 @@ pub struct TrainerSummary {
     pub method: String,
     pub name: String,
     pub order: i32,
+    pub max_algs_per_row: i32,
     pub selection_key: String,
     pub times_key: String,
 }
@@ -28,6 +29,28 @@ pub struct TrainerCase {
     pub image_svg: Option<String>,
     pub algs: Vec<String>,
     pub scrambles: Vec<String>,
+}
+
+async fn update_max_algs_per_row(
+    db: &DatabaseConnection,
+    root: &Path,
+    index: &serde_json::Map<String, serde_json::Value>,
+) -> Result<(), CatalogError> {
+    for entries in index.values() {
+        let entries: Vec<IndexEntry> = serde_json::from_value(entries.clone())?;
+        for entry in entries {
+            let source = fs::read_to_string(root.join(&entry.location).join("algsinfo.js"))
+                .unwrap_or_default();
+            let max_algs_per_row = js_integer(&source, "maxAlgsPerRow").unwrap_or(8);
+            db.execute(Statement::from_sql_and_values(
+                DatabaseBackend::Postgres,
+                "UPDATE trainers SET max_algs_per_row=$1 WHERE trainer_id=$2",
+                vec![max_algs_per_row.into(), entry.location.into()],
+            ))
+            .await?;
+        }
+    }
+    Ok(())
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -59,6 +82,7 @@ pub struct TrainerBundle {
     pub post_rotations: Vec<String>,
     pub pre_moves: Vec<String>,
     pub post_moves: Vec<String>,
+    pub max_algs_per_row: i32,
     #[serde(default)]
     pub u_move_cycles: Vec<Vec<usize>>,
     pub selection_key: String,
@@ -117,6 +141,15 @@ fn js_string(source: &str, name: &str) -> Option<String> {
     Some(clean_js_string(source[start..].split(';').next()?.trim()))
 }
 
+fn js_integer(source: &str, name: &str) -> Option<i32> {
+    let start = ["const", "var"].into_iter().find_map(|kind| {
+        let marker = format!("{kind} {name} = ");
+        source.find(&marker).map(|index| index + marker.len())
+    })?;
+    let value = source[start..].split(';').next()?.trim().parse().ok()?;
+    (value > 0).then_some(value)
+}
+
 fn clean_js_string(value: &str) -> String {
     let value = value.trim();
     if value.len() >= 2
@@ -159,6 +192,7 @@ pub async fn seed(db: &DatabaseConnection, root: &Path) -> Result<(), CatalogErr
             .and_then(|row| row.try_get::<i64>("", "count").ok())
             .unwrap_or_default();
         if existing >= expected {
+            update_max_algs_per_row(db, root, &index).await?;
             return Ok(());
         }
     }
@@ -191,6 +225,7 @@ async fn seed_trainer(
         .and_then(|source| js_string(&source, "trainerTitle"))
         .unwrap_or_else(|| format!("{puzzle} {} Trainer", entry.name));
     let source = fs::read_to_string(directory.join("algsinfo.js")).unwrap_or_default();
+    let max_algs_per_row = js_integer(&source, "maxAlgsPerRow").unwrap_or(8);
     let pre_rotations = js_string_array(&source, "preRotations");
     let post_rotations = js_string_array(&source, "postRotations");
     let pre_moves = js_string_array(&source, "preMoves");
@@ -199,12 +234,13 @@ async fn seed_trainer(
 
     execute(
         db,
-        "INSERT INTO trainers (trainer_id, puzzle, method, name, \"order\", icon_path, title, pre_rotations, post_rotations, pre_moves, post_moves, selected_algsets)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
+        "INSERT INTO trainers (trainer_id, puzzle, method, name, \"order\", icon_path, title, pre_rotations, post_rotations, pre_moves, post_moves, selected_algsets, max_algs_per_row)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
          ON CONFLICT (trainer_id) DO UPDATE SET puzzle=EXCLUDED.puzzle, method=EXCLUDED.method,
          name=EXCLUDED.name, \"order\"=EXCLUDED.\"order\", icon_path=EXCLUDED.icon_path, title=EXCLUDED.title,
          pre_rotations=EXCLUDED.pre_rotations, post_rotations=EXCLUDED.post_rotations,
-         pre_moves=EXCLUDED.pre_moves, post_moves=EXCLUDED.post_moves, selected_algsets=EXCLUDED.selected_algsets",
+         pre_moves=EXCLUDED.pre_moves, post_moves=EXCLUDED.post_moves, selected_algsets=EXCLUDED.selected_algsets,
+         max_algs_per_row=EXCLUDED.max_algs_per_row",
         vec![
             entry.location.clone().into(),
             puzzle.into(),
@@ -218,6 +254,7 @@ async fn seed_trainer(
             serde_json::to_value(pre_moves)?.into(),
             serde_json::to_value(post_moves)?.into(),
             read_json::<serde_json::Value>(directory.join("selected_algsets.json"))?.into(),
+            max_algs_per_row.into(),
         ],
     )
     .await?;
@@ -412,7 +449,7 @@ pub async fn list(db: &DatabaseConnection) -> Result<Vec<TrainerSummary>, DbErr>
     let rows = db
         .query_all(Statement::from_string(
             DatabaseBackend::Postgres,
-            "SELECT trainer_id,puzzle,method,name,\"order\" FROM trainers ORDER BY \"order\"",
+            "SELECT trainer_id,puzzle,method,name,\"order\",max_algs_per_row FROM trainers ORDER BY \"order\"",
         ))
         .await?;
     Ok(rows
@@ -426,6 +463,7 @@ pub async fn list(db: &DatabaseConnection) -> Result<Vec<TrainerSummary>, DbErr>
                 method: row.try_get("", "method").ok()?,
                 name: row.try_get("", "name").ok()?,
                 order: row.try_get("", "order").ok()?,
+                max_algs_per_row: row.try_get("", "max_algs_per_row").ok()?,
                 selection_key,
                 times_key,
             })
@@ -440,7 +478,7 @@ pub async fn load(
     let Some(trainer) = db
         .query_one(Statement::from_sql_and_values(
             DatabaseBackend::Postgres,
-            "SELECT trainer_id,title,puzzle,method,pre_rotations,post_rotations,pre_moves,post_moves,selected_algsets
+            "SELECT trainer_id,title,puzzle,method,pre_rotations,post_rotations,pre_moves,post_moves,selected_algsets,max_algs_per_row
              FROM trainers WHERE trainer_id=$1",
             vec![trainer_id.into()],
         ))
@@ -568,6 +606,7 @@ pub async fn load(
         post_rotations,
         pre_moves,
         post_moves,
+        max_algs_per_row: trainer.try_get("", "max_algs_per_row")?,
         u_move_cycles,
     }))
 }
@@ -581,5 +620,26 @@ fn normalize_option_alias_text(
         fallback.to_vec()
     } else {
         values
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::js_integer;
+
+    #[test]
+    fn reads_positive_max_algs_per_row_metadata() {
+        assert_eq!(
+            js_integer("var maxAlgsPerRow = 6;", "maxAlgsPerRow"),
+            Some(6)
+        );
+        assert_eq!(
+            js_integer("const maxAlgsPerRow = 0;", "maxAlgsPerRow"),
+            None
+        );
+        assert_eq!(
+            js_integer("var maxAlgsPerRow = many;", "maxAlgsPerRow"),
+            None
+        );
     }
 }

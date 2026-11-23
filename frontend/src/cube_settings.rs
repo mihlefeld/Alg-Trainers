@@ -35,6 +35,30 @@ fn options(settings: &Value, fallback: Option<&str>, selected: &str) -> Vec<Html
     result
 }
 
+fn scheme_label(settings: &Value, id: &str) -> String {
+    if id.is_empty() {
+        return "Use global scheme".to_owned();
+    }
+    cube_schemes::PRESETS
+        .iter()
+        .find(|(preset_id, _)| *preset_id == id)
+        .map(|(_, name)| (*name).to_owned())
+        .or_else(|| {
+            settings
+                .get("cubeColorSchemes")
+                .and_then(Value::as_array)
+                .and_then(|schemes| {
+                    schemes
+                        .iter()
+                        .find(|scheme| scheme.get("id").and_then(Value::as_str) == Some(id))
+                })
+                .and_then(|scheme| scheme.get("name"))
+                .and_then(Value::as_str)
+                .map(str::to_owned)
+        })
+        .unwrap_or_else(|| "Unknown scheme".to_owned())
+}
+
 fn notify(message: &str) {
     if let Some(window) = web_sys::window() {
         let _ = window.alert_with_message(message);
@@ -153,103 +177,109 @@ pub fn cube_settings(props: &Props) -> Html {
                     })
                 }}>{for options(settings, None, &global)}</select>
             </label>
-            <label class="settingsEntry cubeSchemeEntry">
-                <span>{"Manage scheme"}</span>
-                <select aria-label="Manage cube scheme" value={selected_id.clone()} onchange={{
-                    let editing = editing.clone();
-                    Callback::from(move |event: Event| editing.set(event.target_unchecked_into::<HtmlSelectElement>().value()))
-                }}>{for options(settings, None, &selected_id)}</select>
-            </label>
-            <label class="settingsEntry cubeSchemeEntry">
-                <span>{"Name"}</span>
-                <input type="text" aria-label="Scheme name" value={name.clone()} disabled={!is_custom} onchange={{
-                    let next = settings.clone();
-                    let id = selected_id.clone();
-                    let name = name.clone();
-                    let on_change = props.on_change.clone();
-                    Callback::from(move |event: Event| {
-                        let mut next = next.clone();
-                        let input = event.target_unchecked_into::<HtmlInputElement>();
-                        let value = input.value();
-                        if value.trim().is_empty() {
-                            notify("Please enter a scheme name.");
-                            input.set_value(&name);
-                            return;
-                        }
-                        if let Some(scheme) = next["cubeColorSchemes"].as_array_mut()
-                            .and_then(|schemes| schemes.iter_mut().find(|s| s["id"].as_str() == Some(&id))) {
-                            scheme["name"] = json!(value.trim());
+            <details class="cubeTrainerGroup" name="puzzle-scheme-sections">
+                <summary class="cubePuzzleSummary">
+                    <b>{"Manage scheme"}</b>
+                    <span>{name.clone()}</span>
+                </summary>
+                <label class="settingsEntry cubeSchemeEntry">
+                    <span>{"Manage scheme"}</span>
+                    <select aria-label="Manage cube scheme" value={selected_id.clone()} onchange={{
+                        let editing = editing.clone();
+                        Callback::from(move |event: Event| editing.set(event.target_unchecked_into::<HtmlSelectElement>().value()))
+                    }}>{for options(settings, None, &selected_id)}</select>
+                </label>
+                <label class="settingsEntry cubeSchemeEntry">
+                    <span>{"Name"}</span>
+                    <input type="text" aria-label="Scheme name" value={name.clone()} disabled={!is_custom} onchange={{
+                        let next = settings.clone();
+                        let id = selected_id.clone();
+                        let name = name.clone();
+                        let on_change = props.on_change.clone();
+                        Callback::from(move |event: Event| {
+                            let mut next = next.clone();
+                            let input = event.target_unchecked_into::<HtmlInputElement>();
+                            let value = input.value();
+                            if value.trim().is_empty() {
+                                notify("Please enter a scheme name.");
+                                input.set_value(&name);
+                                return;
+                            }
+                            if let Some(scheme) = next["cubeColorSchemes"].as_array_mut()
+                                .and_then(|schemes| schemes.iter_mut().find(|s| s["id"].as_str() == Some(&id))) {
+                                scheme["name"] = json!(value.trim());
+                                on_change.emit(next.clone());
+                            }
+                        })
+                    }} />
+                </label>
+                <div class="cubeSchemeActions">
+                    <button class="abutton" onclick={{
+                        let next = settings.clone();
+                        let colors = colors.clone();
+                        let editing = editing.clone();
+                        let on_change = props.on_change.clone();
+                        Callback::from(move |_| {
+                            let mut next = next.clone();
+                            let Some(schemes) = next["cubeColorSchemes"].as_array_mut() else { return };
+                            let id = loop {
+                                let id = format!("custom-{}-{}", js_sys::Date::now() as u64, (js_sys::Math::random() * 1_000_000_000.0) as u64);
+                                if !schemes.iter().any(|scheme| scheme["id"].as_str() == Some(&id)) { break id; }
+                            };
+                            schemes.push(json!({"id": id, "name": format!("Custom scheme {}", schemes.len() + 1), "colors": colors}));
+                            editing.set(id);
                             on_change.emit(next.clone());
-                        }
-                    })
-                }} />
-            </label>
-            <div class="cubeSchemeActions">
-                <button class="abutton" onclick={{
-                    let next = settings.clone();
-                    let colors = colors.clone();
-                    let editing = editing.clone();
-                    let on_change = props.on_change.clone();
-                    Callback::from(move |_| {
-                        let mut next = next.clone();
-                        let Some(schemes) = next["cubeColorSchemes"].as_array_mut() else { return };
-                        let id = loop {
-                            let id = format!("custom-{}-{}", js_sys::Date::now() as u64, (js_sys::Math::random() * 1_000_000_000.0) as u64);
-                            if !schemes.iter().any(|scheme| scheme["id"].as_str() == Some(&id)) { break id; }
-                        };
-                        schemes.push(json!({"id": id, "name": format!("Custom scheme {}", schemes.len() + 1), "colors": colors}));
-                        editing.set(id);
-                        on_change.emit(next.clone());
-                    })
-                }}>{"Add copy"}</button>
-                <button class="abutton" disabled={!is_custom} onclick={{
-                    let next = settings.clone();
-                    let id = selected_id.clone();
-                    let name = name.clone();
-                    let editing = editing.clone();
-                    let on_change = props.on_change.clone();
-                    Callback::from(move |_| {
-                        let mut next = next.clone();
-                        let confirmed = web_sys::window().and_then(|w| w.confirm_with_message(&format!("Delete \"{name}\"? Overrides using it will fall back to their inherited scheme.")).ok()).unwrap_or(false);
-                        if confirmed {
-                            cube_schemes::delete_scheme(&mut next, &id);
-                            editing.set("default".to_owned());
-                            on_change.emit(next.clone());
-                        }
-                    })
-                }}>{"Delete"}</button>
-            </div>
-            {for crate::default_cube_colors().keys().map(|key| {
-                let key = *key;
-                let value = colors.get(key).cloned().unwrap_or_default();
-                let style = color_input_style(&value, &background);
-                html! {
-                    <label class="settingsEntry colorSetting">
-                        <span>{key}</span>
-                        <input type="text" aria-label={format!("{key} cube color")} value={value.clone()} style={style} disabled={!is_custom} onchange={{
-                            let next = settings.clone();
-                            let id = selected_id.clone();
-                            let background = background.clone();
-                            let on_change = props.on_change.clone();
-                            Callback::from(move |event: Event| {
-                                let mut next = next.clone();
-                                let input = event.target_unchecked_into::<HtmlInputElement>();
-                                let new_value = input.value();
-                                if crate::colorInputStyle(&new_value, &background).is_err() {
-                                    notify("Please enter a valid CSS color.");
-                                    input.set_value(&value);
-                                    return;
-                                }
-                                if let Some(scheme) = next["cubeColorSchemes"].as_array_mut()
-                                    .and_then(|schemes| schemes.iter_mut().find(|s| s["id"].as_str() == Some(&id))) {
-                                    scheme["colors"][key] = json!(new_value);
-                                    on_change.emit(next.clone());
-                                }
-                            })
-                        }} />
-                    </label>
-                }
-            })}
+                        })
+                    }}>{"Add copy"}</button>
+                    <button class="abutton" disabled={!is_custom} onclick={{
+                        let next = settings.clone();
+                        let id = selected_id.clone();
+                        let name = name.clone();
+                        let editing = editing.clone();
+                        let on_change = props.on_change.clone();
+                        Callback::from(move |_| {
+                            let mut next = next.clone();
+                            let confirmed = web_sys::window().and_then(|w| w.confirm_with_message(&format!("Delete \"{name}\"? Overrides using it will fall back to their inherited scheme.")).ok()).unwrap_or(false);
+                            if confirmed {
+                                cube_schemes::delete_scheme(&mut next, &id);
+                                editing.set("default".to_owned());
+                                on_change.emit(next.clone());
+                            }
+                        })
+                    }}>{"Delete"}</button>
+                </div>
+                {for crate::default_cube_colors().keys().map(|key| {
+                    let key = *key;
+                    let value = colors.get(key).cloned().unwrap_or_default();
+                    let style = color_input_style(&value, &background);
+                    html! {
+                        <label class="settingsEntry colorSetting">
+                            <span>{key}</span>
+                            <input type="text" aria-label={format!("{key} cube color")} value={value.clone()} style={style} disabled={!is_custom} onchange={{
+                                let next = settings.clone();
+                                let id = selected_id.clone();
+                                let background = background.clone();
+                                let on_change = props.on_change.clone();
+                                Callback::from(move |event: Event| {
+                                    let mut next = next.clone();
+                                    let input = event.target_unchecked_into::<HtmlInputElement>();
+                                    let new_value = input.value();
+                                    if crate::colorInputStyle(&new_value, &background).is_err() {
+                                        notify("Please enter a valid CSS color.");
+                                        input.set_value(&value);
+                                        return;
+                                    }
+                                    if let Some(scheme) = next["cubeColorSchemes"].as_array_mut()
+                                        .and_then(|schemes| schemes.iter_mut().find(|s| s["id"].as_str() == Some(&id))) {
+                                        scheme["colors"][key] = json!(new_value);
+                                        on_change.emit(next.clone());
+                                    }
+                                })
+                            }} />
+                        </label>
+                    }
+                })}
+            </details>
             <div class="cubeTrainerList">
                 if let Some(Err(error)) = catalog.as_ref() {
                     <div role="alert">{error}</div>
@@ -265,12 +295,16 @@ pub fn cube_settings(props: &Props) -> Html {
                         .and_then(|v| v.get("scheme")).and_then(Value::as_str).unwrap_or("").to_owned();
                     let next = settings.clone();
                     let puzzle_key = puzzle.clone();
+                    let puzzle_scheme_label = scheme_label(settings, &puzzle_value);
                     let trainer_ids = trainers.iter().map(|t| t.trainer_id.clone()).collect::<Vec<_>>();
                     let on_change = props.on_change.clone();
                     html! {
-                        <div class="cubeTrainerGroup">
-                            <label class="settingsEntry cubeTrainerEntry cubePuzzleEntry">
+                        <details class="cubeTrainerGroup" name="puzzle-scheme-sections">
+                            <summary class="cubePuzzleSummary">
                                 <b>{puzzle.clone()}</b>
+                                <span>{puzzle_scheme_label}</span>
+                            </summary>
+                            <label class="settingsEntry cubeTrainerEntry cubePuzzleEntry">
                                 <select aria-label={format!("{puzzle} puzzle scheme")} value={puzzle_value.clone()} onchange={Callback::from(move |event: Event| {
                                     let mut next = next.clone();
                                     let value = event.target_unchecked_into::<HtmlSelectElement>().value();
@@ -304,7 +338,7 @@ pub fn cube_settings(props: &Props) -> Html {
                                     </label>
                                 }
                             })}
-                        </div>
+                        </details>
                     }
                 })}
             </div>

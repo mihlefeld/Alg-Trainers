@@ -50,10 +50,19 @@ Reference used: upstream `dev` at `8df81345766fb73cd14aba338d785d68be27514d`.
 - Improved touch targets and practice-page spacing.
 - Restored centered, backdrop-click-dismissible dialogs and Material Symbols rendering.
 - Restored the floating start-practice control.
+- Fixed background-click dismissal for every dialog and hint window.
+- Corrected selection colors, search toggle states, group spacing, and first-use algset headings.
+- Matched selection width to each trainer's `maxAlgsPerRow` metadata, stored it in the trainers table, and exposed it through the catalog API.
+- Restored white hotkey keycaps, consistent button sizing, and bookmark/close/delete/undo icon rendering.
+- Limited stopped-timer red feedback to the 0.1-second debounce and positioned hint navigation arrows around the case name.
+- Matched home-card width and spacing to the upstream layout and restored the algorithm-sheet grid's 18em card sizing.
+- Kept practice controls and the footer visible by sizing the timer area to the dynamic viewport and letting its statistics scroll; added footer icon spacing.
+- Grouped settings disclosures into exclusive accordions, added bordered per-puzzle scheme disclosures, and standardized flex gaps and case-group header widths.
 
 ## Verified
 
 - Rocket, Yew, and the production Docker image build successfully.
+- Backend catalog tests pass, the Yew frontend builds for `wasm32-unknown-unknown`, and all 44 trainer catalogs define `maxAlgsPerRow`.
 - Presets survive a browser reload and restore the expected selected cases.
 - Browser regression probes verified:
   - legacy localStorage and IndexedDB v1 cube colors migrate correctly;
@@ -71,9 +80,3 @@ Reference used: upstream `dev` at `8df81345766fb73cd14aba338d785d68be27514d`.
 ### Settings and custom data
 
 - Backup import/export is consolidated into one trainer-data backup; the reference's separate custom-algorithm and letter-pair export workflows are not fully represented.
-
-### Visual polish
-
-- Home cards remain slightly more compact than the upstream reference.
-- The practice footer and icon spacing still need final alignment across unusual viewport heights.
-- Algorithm-sheet card proportions and typography are close but not pixel-identical to the reference.

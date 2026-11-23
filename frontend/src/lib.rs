@@ -258,6 +258,7 @@ struct TrainerSummary {
     method: String,
     name: String,
     order: i32,
+    max_algs_per_row: i32,
     selection_key: String,
     times_key: String,
 }
@@ -301,6 +302,7 @@ struct TrainerBundle {
     post_rotations: Vec<String>,
     pre_moves: Vec<String>,
     post_moves: Vec<String>,
+    max_algs_per_row: i32,
     #[serde(default)]
     u_move_cycles: Vec<Vec<usize>>,
     selection_key: String,
@@ -697,6 +699,7 @@ fn loaded_trainer(props: &LoadedTrainerProps) -> Html {
     let timer_stopped = use_state(|| false);
     let hold_timeout = use_mut_ref(|| None::<Timeout>);
     let interval = use_mut_ref(|| None::<Interval>);
+    let stopped_timeout = use_mut_ref(|| None::<Timeout>);
     let trainer_id = bundle.trainer_id.clone();
     let selection_storage_key = bundle.selection_key.clone();
     let times_storage_key = bundle.times_key.clone();
@@ -1096,6 +1099,7 @@ fn loaded_trainer(props: &LoadedTrainerProps) -> Html {
         let last_scramble = last_scramble.clone();
         let current_scramble = current_scramble.clone();
         let timer_stopped = timer_stopped.clone();
+        let stopped_timeout = stopped_timeout.clone();
         Callback::from(move |_| {
             if !*timer_running {
                 return;
@@ -1105,6 +1109,12 @@ fn loaded_trainer(props: &LoadedTrainerProps) -> Html {
             timer_running.set(false);
             timer_ready.set(false);
             timer_stopped.set(true);
+            if let Some(timeout) = stopped_timeout.borrow_mut().take() {
+                timeout.cancel();
+            }
+            let timer_stopped = timer_stopped.clone();
+            *stopped_timeout.borrow_mut() =
+                Some(Timeout::new(100, move || timer_stopped.set(false)));
             if let Some(timer) = interval.borrow_mut().take() {
                 timer.cancel();
             }
@@ -1139,11 +1149,15 @@ fn loaded_trainer(props: &LoadedTrainerProps) -> Html {
         let interval = interval.clone();
         let hold_timeout = hold_timeout.clone();
         let elapsed_ms = elapsed_ms.clone();
+        let stopped_timeout = stopped_timeout.clone();
         Callback::from(move |_| {
             timer_running.set(false);
             timer_ready.set(false);
             timer_stopped.set(false);
             elapsed_ms.set(0);
+            if let Some(timeout) = stopped_timeout.borrow_mut().take() {
+                timeout.cancel();
+            }
             if let Some(timer) = interval.borrow_mut().take() {
                 timer.cancel();
             }
@@ -1383,6 +1397,7 @@ fn loaded_trainer(props: &LoadedTrainerProps) -> Html {
         let elapsed_ms = elapsed_ms.clone();
         let interval = interval.clone();
         let timer_stopped = timer_stopped.clone();
+        let stopped_timeout = stopped_timeout.clone();
         Callback::from(move |event: KeyboardEvent| {
             if event.code() != "Space" {
                 return;
@@ -1398,6 +1413,9 @@ fn loaded_trainer(props: &LoadedTrainerProps) -> Html {
             }
             timer_ready.set(false);
             timer_stopped.set(false);
+            if let Some(timeout) = stopped_timeout.borrow_mut().take() {
+                timeout.cancel();
+            }
             let start = Date::now();
             *started_at.borrow_mut() = start;
             timer_running.set(true);
@@ -1416,6 +1434,7 @@ fn loaded_trainer(props: &LoadedTrainerProps) -> Html {
         let hold_timeout = hold_timeout.clone();
         let settings = settings.clone();
         let timer_stopped = timer_stopped.clone();
+        let stopped_timeout = stopped_timeout.clone();
         Callback::from(move |event: web_sys::PointerEvent| {
             if event.pointer_type() != "touch" && event.pointer_type() != "pen" {
                 return;
@@ -1427,6 +1446,9 @@ fn loaded_trainer(props: &LoadedTrainerProps) -> Html {
             }
             if hold_timeout.borrow().is_none() && !*timer_ready {
                 timer_stopped.set(false);
+                if let Some(timeout) = stopped_timeout.borrow_mut().take() {
+                    timeout.cancel();
+                }
                 let timer_ready = timer_ready.clone();
                 let delay = if settings
                     .get("enableHoldDelay")
@@ -1450,6 +1472,7 @@ fn loaded_trainer(props: &LoadedTrainerProps) -> Html {
         let elapsed_ms = elapsed_ms.clone();
         let interval = interval.clone();
         let timer_stopped = timer_stopped.clone();
+        let stopped_timeout = stopped_timeout.clone();
         Callback::from(move |event: web_sys::PointerEvent| {
             if event.pointer_type() != "touch" && event.pointer_type() != "pen" {
                 return;
@@ -1467,6 +1490,9 @@ fn loaded_trainer(props: &LoadedTrainerProps) -> Html {
             }
             timer_ready.set(false);
             timer_stopped.set(false);
+            if let Some(timeout) = stopped_timeout.borrow_mut().take() {
+                timeout.cancel();
+            }
             let start = Date::now();
             *started_at.borrow_mut() = start;
             timer_running.set(true);
@@ -1956,9 +1982,11 @@ fn loaded_trainer(props: &LoadedTrainerProps) -> Html {
     let close_dialog_background = {
         let dialog = dialog.clone();
         Callback::from(move |event: web_sys::MouseEvent| {
-            let target = event.target().map(JsValue::from);
-            let current = event.current_target().map(JsValue::from);
-            if target == current {
+            if event
+                .target()
+                .and_then(|target| target.dyn_into::<Element>().ok())
+                .is_some_and(|target| target.tag_name() == "DIALOG")
+            {
                 dialog.set(Dialog::None);
             }
         })
@@ -1966,9 +1994,11 @@ fn loaded_trainer(props: &LoadedTrainerProps) -> Html {
     let close_hint_background = {
         let hint_open = hint_open.clone();
         Callback::from(move |event: web_sys::MouseEvent| {
-            let target = event.target().map(JsValue::from);
-            let current = event.current_target().map(JsValue::from);
-            if target == current {
+            if event
+                .target()
+                .and_then(|target| target.dyn_into::<Element>().ok())
+                .is_some_and(|target| target.tag_name() == "DIALOG")
+            {
                 hint_open.set(false);
             }
         })
@@ -2305,13 +2335,38 @@ fn loaded_trainer(props: &LoadedTrainerProps) -> Html {
         .iter()
         .filter(|id| !visible_case_ids.contains(id))
         .count();
+    let visible_case_id_set = visible_case_ids.iter().collect::<std::collections::BTreeSet<_>>();
+    let widest_group_cases = bundle
+        .groups
+        .iter()
+        .filter(|group| {
+            bundle.algsets.iter().any(|algset| {
+                algset.groups.contains(&group.name)
+                    && selected_algsets
+                        .get(&algset.name)
+                        .copied()
+                        .unwrap_or(algset.selected)
+            })
+        })
+        .map(|group| {
+            group
+                .cases
+                .iter()
+                .filter(|id| visible_case_id_set.contains(id))
+                .count()
+        })
+        .max()
+        .unwrap_or(0);
+    let selection_columns = widest_group_cases
+        .max(1)
+        .min(bundle.max_algs_per_row.max(1) as usize);
     let probabilities = case_probabilities(&selected, &results, &settings);
     let cube_colors = cube_schemes::active_colors(&settings, &bundle.trainer_id, &bundle.puzzle);
 
     html! {
         <main id="trainer-main" tabindex="0" style="display:flex; flex-direction:column; align-items:center; width:100%;" onkeydown={key_down} onkeyup={key_up}>
             if *mode == Mode::Select {
-                <div id="selectionLayout" class="colFlex scroller" style="margin: 0.5em; max-width: 70em; width: fit-content; display:flex;">
+                <div id="selectionLayout" class="colFlex scroller" style={format!("--selection-columns:{selection_columns}; margin: 0.5em; max-width: 70em; width: fit-content; display:flex;")}>
                     <div class="colFlex">
                         <div class="rowFlex center" style="justify-content: space-between;">
                             <h1 id="trainerTitle">{&bundle.title}<span>{" | "}</span><a href="/">{"Back"}</a></h1>
@@ -2420,7 +2475,7 @@ fn loaded_trainer(props: &LoadedTrainerProps) -> Html {
                     </div>
                     <div id="cases_selection" class="colFlex" style="width: 100%;">
                         if bundle.algsets.len() > 1 {
-                            <div class="rowFlex algsetSelectors" style="flex-wrap:wrap;gap:0.3em;margin-bottom:0.3em;">
+                            <div class="rowFlex algsetSelectors" style="flex-wrap:wrap;">
                                 { for bundle.algsets.iter().map(|algset| {
                                     let selected_algsets = selected_algsets.clone();
                                     let toggle_algset = toggle_algset.clone();
@@ -2441,7 +2496,7 @@ fn loaded_trainer(props: &LoadedTrainerProps) -> Html {
                                 }) }
                             </div>
                         }
-                        <div class="rowFlex" style="align-items:stretch; gap:0.3em;">
+                        <div class="rowFlex" style="align-items:stretch;">
                             <div id="allSelector"
                                  class={classes!("borderedContainer", "pad", if !visible_case_ids.is_empty() && visible_case_ids.iter().all(|id| selected.contains(id)) { "itemSel" } else { "itemUnsel" })}
                                  style="flex-grow:1; text-align:center;" onclick={{
@@ -2454,7 +2509,9 @@ fn loaded_trainer(props: &LoadedTrainerProps) -> Html {
                                     <span class="hiddenCaseCount">{format!("Hidden: {hidden_cases} ({hidden_selected} selected)")}</span>
                                 }
                             </div>
-                            <button class={classes!("borderedContainer", "pad", if search_active { "itemSel" } else { "itemUnsel" })}
+                            <button class={classes!("borderedContainer", "pad", "searchToggle",
+                                    (*search_open).then_some("searchToggleOpen"),
+                                    search_active.then_some("searchToggleActive"))}
                                  style="display:flex; flex-direction:column; justify-content:center; padding-left:1em; padding-right:1em;"
                                  title="Search" aria-label="Search cases"
                                  onclick={{
@@ -2545,7 +2602,9 @@ fn loaded_trainer(props: &LoadedTrainerProps) -> Html {
                                 </div>
                             </div>
                         }
-                        { for bundle.groups.iter().map(|group| {
+                        { {
+                            let mut displayed_algsets = std::collections::BTreeSet::new();
+                            bundle.groups.iter().map(|group| {
                             let selected = selected.clone();
                             let cases_by_id = cases_by_id.clone();
                             let toggle_case = toggle_case.clone();
@@ -2569,16 +2628,25 @@ fn loaded_trainer(props: &LoadedTrainerProps) -> Html {
                             }
                             let visible_toggle_cases = visible_cases.clone();
                             let group_selected = group.cases.iter().all(|id| selected.contains(id));
+                            let algset_headers = bundle.algsets.iter()
+                                .filter(|algset| algset.groups.contains(&group.name)
+                                    && selected_algsets.get(&algset.name).copied().unwrap_or(algset.selected))
+                                .filter_map(|algset| displayed_algsets.insert(algset.name.clone()).then(|| algset.name.clone()))
+                                .collect::<Vec<_>>();
                             html! {
-                                <section>
-                                    <div class={classes!("borderedContainer", "pad", "groupNameDiv", if group_selected { "itemSel" } else { "itemUnsel" })}
-                                         style="text-align:center;" onclick={Callback::from(move |_| {
-                                             if !search_active { toggle_group.emit(group_cases.clone()) }
-                                             else { toggle_group.emit(visible_toggle_cases.clone()) }
-                                         })}>
-                                        <b>{&group.name}</b>
-                                    </div>
-                                    <div class="rowFlex" style="flex-wrap: wrap;">
+                                <>
+                                    {for algset_headers.iter().map(|name| html! {
+                                        <div class="borderedContainer pad algsetNameHeader"><b>{name}</b></div>
+                                    })}
+                                    <section class={classes!("caseGroup", (visible_cases.len() == widest_group_cases).then_some("widestCaseGroup"))}>
+                                        <div class={classes!("borderedContainer", "pad", "groupNameDiv", if group_selected { "itemSel" } else { "itemUnsel" })}
+                                             style="text-align:center;" onclick={Callback::from(move |_| {
+                                                 if !search_active { toggle_group.emit(group_cases.clone()) }
+                                                 else { toggle_group.emit(visible_toggle_cases.clone()) }
+                                             })}>
+                                            <b>{&group.name}</b>
+                                        </div>
+                                        <div class="rowFlex" style="flex-wrap: wrap;">
                                         { for visible_cases.iter().filter_map(|id| cases_by_id.get(id)).map(|case| {
                                             let is_selected = selected.contains(&case.case_id);
                                             let case_id = case.case_id.clone();
@@ -2652,14 +2720,16 @@ fn loaded_trainer(props: &LoadedTrainerProps) -> Html {
                                                 </div>
                                             }
                                         }) }
-                                    </div>
-                                </section>
+                                        </div>
+                                    </section>
+                                </>
                             }
-                        }) }
+                            }).collect::<Vec<_>>()
+                        } }
                     </div>
                 </div>
             } else {
-                <div id="practiceLayout" class="colFlex" style="display:flex;height:100vh;">
+                <div id="practiceLayout" class="colFlex" style="display:flex;">
                     <div id="casesBox" class="borderedContainer pad rowFlex center">
                         <button class="material-symbols-outlined abutton mbutton" onclick={Callback::from(move |_| {
                             set_body_background("var(--background)");
@@ -2693,7 +2763,7 @@ fn loaded_trainer(props: &LoadedTrainerProps) -> Html {
                         </span>
                         <button class="material-symbols-outlined abutton" title="Settings" aria-label="Settings" onclick={open_settings}>{"settings"}</button>
                     </div>
-                    <div class="borderedContainer pad center rowFlex" style="justify-content:space-between;">
+                    <div class="borderedContainer pad center rowFlex practiceScramble" style="justify-content:space-between;">
                         <div id="scramble" onclick={open_hint.clone()}
                              style={format!("font-size:{}em;", settings.get("scrambleSize").and_then(serde_json::Value::as_f64).unwrap_or(2.0))}>
                             {if current_scramble.is_empty() { "Select at least one case".to_owned() } else { (*current_scramble).clone() }}
@@ -2713,7 +2783,7 @@ fn loaded_trainer(props: &LoadedTrainerProps) -> Html {
                                 {if *timer_running || *elapsed_ms > 0 { format_time(*elapsed_ms) } else { "ready".to_owned() }}
                             </span>
                         </div>
-                        <div id="stats" class="borderedContainer colFlex pad" style="gap:0.3em;">
+                        <div id="stats" class="borderedContainer colFlex pad">
                             <div class="timeEntry rowFlex" style="justify-content:space-between;">
                                 <div class="colFlex">
                                     <span>{format!("Times {}", results.len())}</span>
@@ -2729,7 +2799,7 @@ fn loaded_trainer(props: &LoadedTrainerProps) -> Html {
                                     })
                                 }}>{"delete"}</button>
                             </div>
-                            <div id="times" class="colFlex" style="gap:0.3em;">
+                            <div id="times" class="colFlex">
                                 { for cases_by_id.values().filter_map(|case| {
                                     let case_results = results.iter()
                                         .filter(|result| result.case == case.case_id)
@@ -2758,7 +2828,7 @@ fn loaded_trainer(props: &LoadedTrainerProps) -> Html {
                             </div>
                         </div>
                     </div>
-                    <div class="borderedContainer pad rowFlex center" style="justify-content:space-between;flex-direction:row-reverse;">
+                    <div class="borderedContainer pad rowFlex center practiceFooter" style="justify-content:space-between;flex-direction:row-reverse;">
                         <div id="last_scramble" class="rowFlex" style="width:100%;">
                             <span class="lastScrambleText">
                                 {"Last scramble: "}
@@ -2792,9 +2862,9 @@ fn loaded_trainer(props: &LoadedTrainerProps) -> Html {
                             move |_| hint_open.set(false)
                         })}>{"close"}</button>
                         if let Some(case) = hint_case.as_ref() {
-                            <div class="borderedContainer rowFlex pad center" style="justify-content:center;">
-                                <b>{&case.name}</b>
+                            <div class="borderedContainer rowFlex pad center hintCaseHeader" style="justify-content:space-between;">
                                 <button class="material-symbols-outlined abutton prevNext" onclick={previous_hint.clone()} title="Previous case">{"arrow_back"}</button>
+                                <b>{&case.name}</b>
                                 <button class="material-symbols-outlined abutton prevNext" onclick={next_hint.clone()} title="Next case">{"arrow_forward"}</button>
                             </div>
                             <div class="borderedContainer colFlex center" style="background-color:var(--secondary);">
@@ -2878,7 +2948,7 @@ fn loaded_trainer(props: &LoadedTrainerProps) -> Html {
                                         <b>{format!("Mean: {:.2}s", mean)}</b>
                                         <b>{format!("Range: {:.2}-{:.2}s", if times.is_empty() { 0.0 } else { min }, if times.is_empty() { 0.0 } else { max })}</b>
                                     </div>
-                                    <div id="timeHistogram" class="rowFlex" style="height:8em;align-items:end;gap:0.15em;padding:0.5em;">
+                                    <div id="timeHistogram" class="rowFlex" style="height:8em;align-items:end;padding:0.5em;">
                                         { for counts.iter().map(|count| html! {
                                             <div style={format!("flex:1;height:{}%;background:var(--primaryBG);min-width:0.5em;", *count as f64 * 100.0 / max_count as f64)} title={count.to_string()}></div>
                                         }) }
@@ -2902,7 +2972,7 @@ fn loaded_trainer(props: &LoadedTrainerProps) -> Html {
                 <dialog id="settings" class="colFlex borderedContainer" open=true onclick={close_dialog_background.clone()}>
                     <div class="dialogDiv colFlex borderedContainer">
                         <button class="material-symbols-outlined abutton closeButton" onclick={close_dialog.clone()} aria-label="Close">{"close"}</button>
-                        <details class="settingsDetails" open=true>
+                        <details class="settingsDetails" name="trainer-settings" open=true>
                             <summary class="settingsSummary">{"Behavior"}</summary>
                             <div class="colFlex">
                                 {for [
@@ -2932,7 +3002,7 @@ fn loaded_trainer(props: &LoadedTrainerProps) -> Html {
                                 })}
                             </div>
                         </details>
-                        <details class="settingsDetails">
+                        <details class="settingsDetails" name="trainer-settings">
                             <summary class="settingsSummary">{"Scramble options"}</summary>
                             <div class="colFlex">
                                 <div class="trainerScrambleHelp">{"Enter one option per line. Leave blank to use the trainer defaults."}</div>
@@ -2964,7 +3034,7 @@ fn loaded_trainer(props: &LoadedTrainerProps) -> Html {
                                 })}
                             </div>
                         </details>
-                        <details class="settingsDetails">
+                        <details class="settingsDetails" name="trainer-settings">
                             <summary class="settingsSummary">{"Styling"}</summary>
                             <div class="colFlex">
                                 {for [
@@ -3030,7 +3100,7 @@ fn loaded_trainer(props: &LoadedTrainerProps) -> Html {
                                 })}
                             </div>
                         </details>
-                        <details class="settingsDetails">
+                        <details class="settingsDetails" name="trainer-settings">
                             <summary class="settingsSummary">{"Cube colors"}</summary>
                             if *settings_ready {
                                 <cube_settings::CubeSettings settings={(*settings).clone()} on_change={change_cube_settings} />
@@ -3038,7 +3108,7 @@ fn loaded_trainer(props: &LoadedTrainerProps) -> Html {
                                 <div>{"Loading settings..."}</div>
                             }
                         </details>
-                        <details class="settingsDetails">
+                        <details class="settingsDetails" name="trainer-settings">
                             <summary class="settingsSummary">{"Blind trainer behavior"}</summary>
                             <div class="colFlex">
                                 {for [
@@ -3087,7 +3157,7 @@ fn loaded_trainer(props: &LoadedTrainerProps) -> Html {
                                 </div>
                             </div>
                         </details>
-                        <details class="settingsDetails">
+                        <details class="settingsDetails" name="trainer-settings">
                             <summary class="settingsSummary">{"Import / Export"}</summary>
                             <div class="colFlex">
                                 <div class="settingsEntry">

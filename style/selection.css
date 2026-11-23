@@ -6,7 +6,7 @@ div.itemSel {
     color: var(--accentText);
     display: flex;
     flex-direction: column;
-    gap: 0;
+    gap: 0.2em;
     align-items: center;
     -webkit-user-select: none; /* Safari */        
     -moz-user-select: none; /* Firefox */
@@ -38,7 +38,7 @@ div.itemUnsel {
     color: var(--secondaryText);
     display: flex;
     flex-direction: column;
-    gap: 0;
+    gap: 0.2em;
     align-items: center;
     -webkit-user-select: none; /* Safari */        
     -moz-user-select: none; /* Firefox */
@@ -84,16 +84,26 @@ span.caseSpan {
 }
 
 #selectionLayout {
-    width: min(calc(100vw - 1em), 26em) !important;
+    --case-width: calc(5em + 2 * var(--borderWidth));
+    --case-gap: 0.2em;
+    width: min(calc(100vw - 1em), max(26em, calc(var(--selection-columns) * (var(--case-width) + var(--case-gap)) - var(--case-gap)))) !important;
     max-width: 100%;
     box-sizing: border-box;
 }
 
-#selectionLayout > div:first-child {
-    width: 100%;
+@supports (width: round(down, 10px, 1px)) {
+    #selectionLayout {
+        /* Use the same pixel-aligned dimensions for row sizing and flex layout. */
+        --case-width: round(up, calc(5em + 2 * var(--borderWidth)), 1px);
+        --case-gap: round(nearest, 0.2em, 1px);
+        width: min(
+            max(26em, calc(var(--selection-columns) * (var(--case-width) + var(--case-gap)) - var(--case-gap))),
+            calc(round(down, calc(min(100vw - 1em, 70em) + var(--case-gap)), calc(var(--case-width) + var(--case-gap))) - var(--case-gap))
+        ) !important;
+    }
 }
 
-#selectionLayout section > .rowFlex {
+#selectionLayout > div:first-child {
     width: 100%;
 }
 
@@ -102,7 +112,14 @@ button.inlineButton {
     border: 0;
     padding: 0;
     background: transparent;
+}
+
+button.caseNameStats {
     font: inherit;
+}
+
+button.material-symbols-outlined.inlineButton {
+    font-family: "Material Symbols Outlined";
 }
 
 .lastScrambleText {
@@ -112,7 +129,7 @@ button.inlineButton {
 
 div#modeButtons {
     position: static;
-    gap: 0.3em;
+    gap: 0.2em;
     /* font-size: 1.3em; */
     transition: all 0.3s;
 }
@@ -139,8 +156,83 @@ div#modeButtons {
     flex-wrap: nowrap;
 }
 
+.groupNameDiv {
+    box-sizing: border-box;
+}
+
+.algsetNameHeader {
+    background: var(--backgroundDarker);
+    color: var(--text);
+    text-align: center;
+    box-sizing: border-box;
+}
+
+.caseGroup {
+    display: flex;
+    flex-direction: column;
+    gap: 0.2em;
+    width: fit-content;
+    min-width: min(100%, 26em);
+    max-width: 100%;
+    align-self: flex-start;
+}
+
+.caseGroup.widestCaseGroup {
+    width: 100%;
+}
+
+#trainer-main .caseItem {
+    box-sizing: border-box;
+    width: var(--case-width);
+    flex-shrink: 0;
+}
+
+.caseGroup .groupNameDiv {
+    width: 100%;
+    overflow-wrap: anywhere;
+}
+
+.caseGroup > .rowFlex {
+    width: 100%;
+    max-width: 100%;
+    gap: var(--case-gap);
+}
+
+.algsetSelectors > button.itemSel {
+    background-color: var(--accent);
+    border-color: var(--accent);
+    color: var(--accentText);
+}
+
+.algsetSelectors > button.itemUnsel {
+    background-color: var(--secondary);
+    border-color: var(--secondary);
+    color: var(--secondaryText);
+}
+
+.searchToggle {
+    background: var(--secondary);
+    border-color: var(--secondary);
+    color: var(--secondaryText);
+}
+
+.searchToggle.searchToggleOpen {
+    background: var(--backgroundDarker);
+    border-color: var(--backgroundDarker);
+    color: var(--text);
+}
+
+.searchToggle.searchToggleActive {
+    box-shadow: inset 0 0 0 2px var(--accent);
+}
+
 .algsetSelectors > button {
     flex: 1 1 7em;
+    font: inherit;
+}
+
+.searchToggle {
+    font: inherit;
 }
 
 dialog[open] {
@@ -162,7 +254,6 @@ body:has(dialog[open])::after {
 
 @media (max-width: 700px) {
     #selectionLayout {
-        width: calc(100vw - 0.5em) !important;
         margin: 0.25em !important;
     }
 
@@ -181,7 +272,7 @@ body:has(dialog[open])::after {
     }
 
     .presetActions {
-        gap: 0.1em;
+        gap: 0.2em;
     }
 
     #presetsSettings .presetActions button {

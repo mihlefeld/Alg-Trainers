@@ -11,6 +11,7 @@ div#timerDiv {
     display: flex;
     justify-content: center;
     align-items: center;
+    min-width: 0;
     font-weight: 800;
     font-variant-numeric: tabular-nums;
     touch-action: none;
@@ -18,6 +19,8 @@ div#timerDiv {
 
 div#stats {
     width: 30%;
+    min-width: 0;
+    min-height: 0;
     font-variant-numeric: tabular-nums;
     touch-action: manipulation !important;
 }
@@ -25,15 +28,20 @@ div#stats {
 div#times {
     overflow-y: scroll;
     overflow-x: hidden;
+    min-height: 0;
+    flex: 1 1 0;
 }
 
 div#timer_and_stats {
-    min-height: 1em;
+    min-height: 0;
+    flex: 1 1 0;
 }
 
 div#practiceLayout {
     width: 100%;
-    height: 100%;
+    height: 100vh;
+    height: 100dvh;
+    min-height: 0;
     padding: 0.5em;
     box-sizing: border-box;
     user-select: none;
@@ -47,6 +55,11 @@ div#practiceLayout {
 div#casesBox {
     justify-content: space-between;
     padding: 0.3em;
+    flex-shrink: 0;
+}
+
+.practiceScramble {
+    flex-shrink: 0;
 }
 
 input {
@@ -63,10 +76,6 @@ span.timeResult {
 }
 
 @media (max-width: 700px) {
-    div#timer_and_stats {
-        min-height: 65vh;
-    }
-
     div#timerDiv {
         width: 68%;
     }
@@ -99,12 +108,18 @@ div#scramble span:hover {
 
 div#last_scramble {
     align-items: center;
-    gap: 0.3em;
+    gap: 0.2em;
     justify-content: space-between;
 }
 
 #last-scramble-buttons {
     display: flex;
+    align-items: center;
+    gap: 0.2em;
+}
+
+.practiceFooter {
+    flex-shrink: 0;
 }
 
 .caseNameStats:hover {

@@ -103,12 +103,12 @@ body {
 
 #algtrainer-selections {
     justify-content: center; 
-    width: min(80vw, 52em);
+    width: min(80vw, 62em);
     flex-wrap: wrap;
 }
 
 #algtrainer-selections > div {
-    width: 16em;
+    width: 19em;
 }
 
 dialog::backdrop {
@@ -195,6 +195,11 @@ html {
     background-color: var(--primaryBG);
     color: var(--primaryText);
     font-size: 1em;
+    font-family: inherit;
+    line-height: 1;
+    min-width: 2.2rem;
+    min-height: 2.2rem;
+    box-sizing: border-box;
     border-color: var(--primaryBG);
     touch-action: manipulation;
     user-select: none;
@@ -210,6 +215,10 @@ html {
     font-size: unset !important;
     height: 0.2em;
     width: auto !important;
+}
+
+.abutton.material-symbols-outlined {
+    font-family: "Material Symbols Outlined";
 }
 
 .largeButton {
@@ -265,7 +274,7 @@ html {
 
 .practiceButton {
     position: relative;
-    gap: 0.4em;
+    gap: 0.2em;
     font-weight: 700;
     white-space: nowrap;
 }
@@ -274,7 +283,7 @@ html {
     width: 100%;
     box-sizing: border-box;
     align-items: center;
-    gap: 0.5em;
+    gap: 0.2em;
     background: var(--backgroundDarker);
 }
 
@@ -285,7 +294,7 @@ html {
 
 .searchPanel .searchTextRow {
     align-items: center;
-    gap: 0.5em;
+    gap: 0.2em;
 }
 
 .searchPanel .searchTextRow input {
@@ -332,7 +341,7 @@ html {
 .searchPalette {
     flex-wrap: wrap;
     justify-content: center;
-    gap: 0.3em;
+    gap: 0.2em;
 }
 
 .searchSwatch {
@@ -353,13 +362,13 @@ html {
 .searchAngleToggle {
     align-items: center;
     justify-content: center;
-    gap: 0.5em;
+    gap: 0.2em;
 }
 
 .hotkeyRow {
     justify-content: space-between;
     align-items: center;
-    gap: 1em !important;
+    gap: 0.2em !important;
 }
 
 kbd.hotkey {
@@ -367,7 +376,8 @@ kbd.hotkey {
     border: 1px solid var(--text);
     border-bottom-width: 3px;
     border-radius: 0.25em;
-    background: var(--background);
+    background: #fff;
+    color: #222;
 }
 
 .creditsGrid {
@@ -378,9 +388,9 @@ kbd.hotkey {
 
 .algsheetGrid {
     display: grid;
-    grid-template-columns: repeat(3, minmax(12em, 1fr));
-    gap: 0.45em;
-    width: min(88vw, 62em);
+    grid-template-columns: repeat(auto-fill, minmax(min(18em, 100%), 1fr));
+    gap: 0.2em;
+    width: 80vw;
     padding-bottom: 5em;
 }
 
@@ -395,7 +405,6 @@ kbd.hotkey {
 
 .algsheetCaseImage {
     align-items: center;
-    min-height: 10em;
 }
 
 .algsheetCaseImage img {
@@ -406,19 +415,6 @@ kbd.hotkey {
 .algsheetAlgs > div {
     overflow-wrap: anywhere;
     background: var(--backgroundDarker);
-}
-
-@media (max-width: 850px) {
-    .algsheetGrid {
-        grid-template-columns: repeat(2, minmax(10em, 1fr));
-    }
-}
-
-@media (max-width: 560px) {
-    .algsheetGrid {
-        grid-template-columns: 1fr;
-        width: calc(100vw - 1em);
-    }
 }
 
 .closeButton:hover {
