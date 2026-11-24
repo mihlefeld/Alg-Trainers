@@ -4594,14 +4594,33 @@ async fn sync_now(force: bool) {
     let Ok(dirty_value) = JsFuture::from(promise).await else {
         return;
     };
-    let Ok(dirty) = serde_wasm_bindgen::from_value::<BTreeMap<String, f64>>(dirty_value) else {
+    let Ok(mut dirty) = serde_wasm_bindgen::from_value::<BTreeMap<String, f64>>(dirty_value) else {
         return;
     };
     if dirty.is_empty() {
-        if pull_remote().await {
-            record_sync_completed();
+        if !normalize_legacy_results_in_storage().await {
+            if pull_remote().await {
+                record_sync_completed();
+            }
+            return;
         }
-        return;
+        let Ok(promise) = storageAll("dirty") else {
+            return;
+        };
+        let Ok(dirty_value) = JsFuture::from(promise).await else {
+            return;
+        };
+        let Ok(refreshed) = serde_wasm_bindgen::from_value::<BTreeMap<String, f64>>(dirty_value)
+        else {
+            return;
+        };
+        dirty = refreshed;
+        if dirty.is_empty() {
+            if pull_remote().await {
+                record_sync_completed();
+            }
+            return;
+        }
     }
     let trainers = match Request::get("/api/trainers").send().await {
         Ok(response) if response.ok() => match response.json::<Vec<TrainerSummary>>().await {
@@ -4728,6 +4747,32 @@ async fn sync_now(force: bool) {
         }
         record_sync_completed();
     }
+}
+
+async fn normalize_legacy_results_in_storage() -> bool {
+    let Ok(promise) = storageAll("data") else {
+        return false;
+    };
+    let Ok(data_value) = JsFuture::from(promise).await else {
+        return false;
+    };
+    let Ok(data) = serde_wasm_bindgen::from_value::<BTreeMap<String, String>>(data_value) else {
+        return false;
+    };
+    let mut changed = false;
+    for (key, value) in data {
+        if let Some((results, result_changed)) = parse_stored_results(&value) {
+            if result_changed {
+                put_stored(
+                    key,
+                    serde_json::to_string(&results).unwrap_or_else(|_| "[]".to_owned()),
+                )
+                .await;
+                changed = true;
+            }
+        }
+    }
+    changed
 }
 
 async fn pull_remote() -> bool {
