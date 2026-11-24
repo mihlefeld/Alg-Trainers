@@ -1,9 +1,11 @@
 use sea_orm::{
-    ConnectionTrait, DatabaseBackend, DatabaseConnection, DatabaseTransaction, DbErr, Statement,
-    TransactionTrait,
+    ColumnTrait, ConnectionTrait, DatabaseBackend, DatabaseConnection, DatabaseTransaction, DbErr,
+    EntityTrait, PaginatorTrait, QueryFilter, QueryOrder, Statement, TransactionTrait,
 };
 use serde::{Deserialize, Serialize};
 use std::{collections::BTreeMap, fs, path::Path};
+
+use crate::entity;
 
 pub type CatalogError = Box<dyn std::error::Error + Send + Sync>;
 
@@ -76,12 +78,14 @@ async fn update_max_algs_per_row(
             let max_algs_per_row = read_trainer_metadata(root, &entry.location)
                 .map(|metadata| metadata.max_algs_per_row)
                 .unwrap_or(8);
-            db.execute(Statement::from_sql_and_values(
-                DatabaseBackend::Postgres,
-                "UPDATE trainers SET max_algs_per_row=$1 WHERE trainer_id=$2",
-                vec![max_algs_per_row.into(), entry.location.into()],
-            ))
-            .await?;
+            entity::trainer::Entity::update_many()
+                .col_expr(
+                    entity::trainer::Column::MaxAlgsPerRow,
+                    sea_orm::sea_query::Expr::value(max_algs_per_row),
+                )
+                .filter(entity::trainer::Column::TrainerId.eq(entry.location))
+                .exec(db)
+                .await?;
         }
     }
     Ok(())
@@ -169,16 +173,8 @@ pub async fn seed(db: &DatabaseConnection, root: &Path) -> Result<(), CatalogErr
         .filter(|value| !value.is_empty())
         .is_none()
     {
-        let row = db
-            .query_one(Statement::from_string(
-                DatabaseBackend::Postgres,
-                "SELECT count(*) AS count FROM trainers",
-            ))
-            .await?;
-        let existing = row
-            .and_then(|row| row.try_get::<i64>("", "count").ok())
-            .unwrap_or_default();
-        if existing >= expected {
+        let existing = entity::trainer::Entity::find().count(db).await?;
+        if existing >= expected as u64 {
             update_max_algs_per_row(db, root, &index).await?;
             return Ok(());
         }
@@ -449,27 +445,25 @@ async fn execute_returning_id(
 }
 
 pub async fn list(db: &DatabaseConnection) -> Result<Vec<TrainerSummary>, DbErr> {
-    let rows = db
-        .query_all(Statement::from_string(
-            DatabaseBackend::Postgres,
-            "SELECT trainer_id,puzzle,method,name,\"order\",max_algs_per_row FROM trainers ORDER BY \"order\"",
-        ))
+    let trainers = entity::trainer::Entity::find()
+        .order_by_asc(entity::trainer::Column::Order)
+        .all(db)
         .await?;
-    Ok(rows
+    Ok(trainers
         .into_iter()
-        .filter_map(|row| {
-            let trainer_id: String = row.try_get("", "trainer_id").ok()?;
+        .map(|trainer| {
+            let trainer_id = trainer.trainer_id;
             let (selection_key, times_key) = storage_keys(&trainer_id);
-            Some(TrainerSummary {
+            TrainerSummary {
                 trainer_id,
-                puzzle: row.try_get("", "puzzle").ok()?,
-                method: row.try_get("", "method").ok()?,
-                name: row.try_get("", "name").ok()?,
-                order: row.try_get("", "order").ok()?,
-                max_algs_per_row: row.try_get("", "max_algs_per_row").ok()?,
+                puzzle: trainer.puzzle,
+                method: trainer.method,
+                name: trainer.name,
+                order: trainer.order,
+                max_algs_per_row: trainer.max_algs_per_row,
                 selection_key,
                 times_key,
-            })
+            }
         })
         .collect())
 }
@@ -483,18 +477,13 @@ pub async fn load(
         .execute_unprepared("SET LOCAL statement_timeout = '5s'")
         .await?;
     let db = &transaction;
-    let Some(trainer) = db
-        .query_one(Statement::from_sql_and_values(
-            DatabaseBackend::Postgres,
-            "SELECT trainer_id,title,puzzle,method,pre_rotations,post_rotations,pre_moves,post_moves,selected_algsets,max_algs_per_row
-             FROM trainers WHERE trainer_id=$1",
-            vec![trainer_id.into()],
-        ))
+    let Some(trainer) = entity::trainer::Entity::find_by_id(trainer_id)
+        .one(db)
         .await?
     else {
         return Ok(None);
     };
-    let selected_algsets: serde_json::Value = trainer.try_get("", "selected_algsets")?;
+    let selected_algsets = trainer.selected_algsets.clone();
     let root = std::env::var("CATALOG_ROOT").unwrap_or_else(|_| "static".to_owned());
     let metadata = read_trainer_metadata(Path::new(&root), trainer_id);
     let pre_rotations = metadata
@@ -526,68 +515,68 @@ pub async fn load(
         .and_then(|value| serde_json::from_slice(&value).ok())
         .unwrap_or_default();
 
-    let case_rows = db
-        .query_all(Statement::from_sql_and_values(
-            DatabaseBackend::Postgres,
-            "SELECT case_id,name,case_setup,image_svg FROM cases
-             WHERE trainer_id=$1 ORDER BY case_id",
-            vec![trainer_id.into()],
-        ))
+    let case_models = entity::case::Entity::find()
+        .filter(entity::case::Column::TrainerId.eq(trainer_id))
+        .order_by_asc(entity::case::Column::CaseId)
+        .all(db)
         .await?;
-    let alg_rows = db
-        .query_all(Statement::from_sql_and_values(
-            DatabaseBackend::Postgres,
-            "SELECT case_id,alg_id,alg,position FROM algs
-             WHERE trainer_id=$1 ORDER BY case_id, position",
-            vec![trainer_id.into()],
-        ))
+    let alg_models = entity::alg::Entity::find()
+        .filter(entity::alg::Column::TrainerId.eq(trainer_id))
+        .order_by_asc(entity::alg::Column::CaseId)
+        .order_by_asc(entity::alg::Column::Position)
+        .all(db)
         .await?;
-    let scramble_rows = db
-        .query_all(Statement::from_sql_and_values(
-            DatabaseBackend::Postgres,
-            "SELECT case_id,scramble FROM scrambles
-             WHERE trainer_id=$1 ORDER BY case_id, position",
-            vec![trainer_id.into()],
-        ))
+    let scramble_models = entity::scramble::Entity::find()
+        .filter(entity::scramble::Column::TrainerId.eq(trainer_id))
+        .order_by_asc(entity::scramble::Column::CaseId)
+        .order_by_asc(entity::scramble::Column::Position)
+        .all(db)
         .await?;
 
     let mut algs_by_case: BTreeMap<String, Vec<TrainerAlg>> = BTreeMap::new();
-    for row in alg_rows {
-        let case_id: String = row.try_get("", "case_id")?;
-        algs_by_case.entry(case_id).or_default().push(TrainerAlg {
-            alg_id: row.try_get("", "alg_id")?,
-            alg: row.try_get("", "alg")?,
-            position: row.try_get("", "position")?,
-        });
+    for model in alg_models {
+        algs_by_case
+            .entry(model.case_id)
+            .or_default()
+            .push(TrainerAlg {
+                alg_id: model.alg_id,
+                alg: model.alg,
+                position: model.position,
+            });
     }
     let mut scrambles_by_case: BTreeMap<String, Vec<String>> = BTreeMap::new();
-    for row in scramble_rows {
-        let case_id: String = row.try_get("", "case_id")?;
+    for model in scramble_models {
         scrambles_by_case
-            .entry(case_id)
+            .entry(model.case_id)
             .or_default()
-            .push(row.try_get("", "scramble")?);
+            .push(model.scramble);
     }
 
-    let cases = case_rows
+    let cases = case_models
         .into_iter()
-        .map(|row| -> Result<TrainerCase, DbErr> {
-            let case_id: String = row.try_get("", "case_id")?;
-            Ok(TrainerCase {
-                name: row.try_get("", "name")?,
-                setup: row.try_get("", "case_setup")?,
-                image_svg: row.try_get("", "image_svg")?,
-                algs: algs_by_case.get(&case_id).cloned().unwrap_or_default(),
-                scrambles: scrambles_by_case.get(&case_id).cloned().unwrap_or_default(),
-                case_id,
-            })
+        .map(|model| TrainerCase {
+            name: model.name,
+            setup: model.case_setup,
+            image_svg: model.image_svg,
+            algs: algs_by_case
+                .get(&model.case_id)
+                .cloned()
+                .unwrap_or_default(),
+            scrambles: scrambles_by_case
+                .get(&model.case_id)
+                .cloned()
+                .unwrap_or_default(),
+            case_id: model.case_id,
         })
-        .collect::<Result<Vec<_>, _>>()?;
+        .collect();
 
     let group_rows = db
         .query_all(Statement::from_sql_and_values(
             DatabaseBackend::Postgres,
-            "SELECT g.name,array_agg(ga.case_id ORDER BY ga.\"order\") cases
+            "SELECT g.name,coalesce(
+                array_agg(ga.case_id ORDER BY ga.\"order\") FILTER (WHERE ga.case_id IS NOT NULL),
+                '{}'::text[]
+             ) cases
              FROM groups g LEFT JOIN group_assignments ga ON ga.group_id=g.id
              WHERE g.trainer_id=$1 GROUP BY g.id,g.name,g.\"order\" ORDER BY g.\"order\"",
             vec![trainer_id.into()],
@@ -595,13 +584,13 @@ pub async fn load(
         .await?;
     let groups = group_rows
         .into_iter()
-        .filter_map(|row| {
-            Some(TrainerGroup {
-                name: row.try_get("", "name").ok()?,
-                cases: row.try_get::<Vec<String>>("", "cases").unwrap_or_default(),
+        .map(|row| -> Result<TrainerGroup, DbErr> {
+            Ok(TrainerGroup {
+                name: row.try_get("", "name")?,
+                cases: row.try_get::<Vec<String>>("", "cases")?,
             })
         })
-        .collect();
+        .collect::<Result<Vec<_>, _>>()?;
 
     let algset_rows = db
         .query_all(Statement::from_sql_and_values(
@@ -616,26 +605,26 @@ pub async fn load(
         .await?;
     let algsets = algset_rows
         .into_iter()
-        .filter_map(|row| {
-            let name: String = row.try_get("", "name").ok()?;
-            Some(TrainerAlgset {
+        .map(|row| -> Result<TrainerAlgset, DbErr> {
+            let name: String = row.try_get("", "name")?;
+            Ok(TrainerAlgset {
                 selected: selected_algsets
                     .get(&name)
                     .and_then(serde_json::Value::as_bool)
                     .unwrap_or(true),
                 name,
-                groups: row.try_get::<Vec<String>>("", "groups").unwrap_or_default(),
+                groups: row.try_get::<Vec<String>>("", "groups")?,
             })
         })
-        .collect();
+        .collect::<Result<Vec<_>, _>>()?;
 
     let bundle = TrainerBundle {
         selection_key: storage_keys(trainer_id).0,
         times_key: storage_keys(trainer_id).1,
-        trainer_id: trainer.try_get("", "trainer_id")?,
-        title: trainer.try_get("", "title")?,
-        puzzle: trainer.try_get("", "puzzle")?,
-        method: trainer.try_get("", "method")?,
+        trainer_id: trainer.trainer_id,
+        title: trainer.title.ok_or("trainer title is missing")?,
+        puzzle: trainer.puzzle,
+        method: trainer.method,
         cases,
         groups,
         algsets,
@@ -643,7 +632,7 @@ pub async fn load(
         post_rotations,
         pre_moves,
         post_moves,
-        max_algs_per_row: trainer.try_get("", "max_algs_per_row")?,
+        max_algs_per_row: trainer.max_algs_per_row,
         u_move_cycles,
     };
     transaction.commit().await?;
