@@ -152,9 +152,19 @@ export function randomAlgId() {
   const random = crypto.getRandomValues(new Uint32Array(4));
   return `user:${Array.from(random, value => value.toString(16).padStart(8, "0")).join("")}`;
 }
-function randomUuid() {
-  if (crypto.randomUUID) return crypto.randomUUID();
-  const bytes = crypto.getRandomValues(new Uint8Array(16));
+function stableLegacyUuid(key, index, result) {
+  const input = `${key}\0${index}\0${JSON.stringify(result)}`;
+  const bytes = new Uint8Array(16);
+  let hash = 0x811c9dc5;
+  for (const byte of new TextEncoder().encode(input)) {
+    hash ^= byte;
+    hash = Math.imul(hash, 0x01000193);
+  }
+  for (let offset = 0; offset < bytes.length; offset++) {
+    hash ^= offset + 0x9e3779b9;
+    hash = Math.imul(hash, 0x01000193);
+    bytes[offset] = hash & 0xff;
+  }
   bytes[6] = (bytes[6] & 0x0f) | 0x40;
   bytes[8] = (bytes[8] & 0x3f) | 0x80;
   const hex = Array.from(bytes, value => value.toString(16).padStart(2, "0")).join("");
@@ -173,7 +183,6 @@ export async function importStorageText(text) {
     try {
       data.clear();
       tx.objectStore("dirty").clear();
-      const importedAt = new Date().toISOString();
       for (const [key, value] of Object.entries(values)) {
         if (typeof value !== "string") throw new Error("Invalid trainer backup value");
         let stored = value;
@@ -182,12 +191,15 @@ export async function importStorageText(text) {
           if (Array.isArray(parsed) && parsed.every(result =>
             result && typeof result === "object" && "ms" in result && "case" in result
           )) {
-            stored = JSON.stringify(parsed.map(result => ({
+            stored = JSON.stringify(parsed.map((result, index) => ({
               ...result,
-              id: typeof result.id === "string" && result.id ? result.id : randomUuid(),
-              datetime: typeof result.datetime === "string" && result.datetime ? result.datetime : importedAt,
+              id: typeof result.id === "string" && result.id ? result.id : stableLegacyUuid(key, index, result),
+              datetime: typeof result.datetime === "string" && result.datetime
+                ? result.datetime
+                : new Date(Date.UTC(2000, 0, 1) + index * 1000).toISOString(),
               case: String(result.case),
               time: typeof result.time === "string" && result.time ? result.time : `${Math.trunc(result.ms / 1000)}.${String(result.ms % 1000).padStart(3, "0")}`,
+              deleted: result.deleted === true,
             })));
           }
         } catch {
@@ -260,6 +272,37 @@ async fn put_stored(key: String, value: String) {
             }
         }
     }
+}
+
+async fn put_stored_results(key: String, results: Vec<StoredResult>, deleted_ids: Vec<String>) {
+    let mut merged = get_stored(&key)
+        .await
+        .and_then(|value| parse_stored_results(&key, &value).map(|(results, _)| results))
+        .unwrap_or_default();
+    let deleted_ids = deleted_ids
+        .into_iter()
+        .collect::<std::collections::BTreeSet<_>>();
+    for result in &mut merged {
+        if deleted_ids.contains(&result.id) {
+            result.deleted = true;
+        }
+    }
+    for mut result in results {
+        if deleted_ids.contains(&result.id) {
+            result.deleted = true;
+        }
+        if let Some(existing) = merged.iter_mut().find(|existing| existing.id == result.id) {
+            *existing = result;
+        } else {
+            merged.push(result);
+        }
+    }
+    merged.sort_by(compare_results);
+    put_stored(
+        key,
+        serde_json::to_string(&merged).unwrap_or_else(|_| "[]".to_owned()),
+    )
+    .await;
 }
 
 #[derive(Clone, Routable, PartialEq)]
@@ -381,6 +424,8 @@ struct StoredResult {
     case: String,
     #[serde(default)]
     time: String,
+    #[serde(default)]
+    deleted: bool,
 }
 
 #[derive(Clone, Debug, Default, Deserialize, Serialize, PartialEq)]
@@ -495,20 +540,17 @@ where
     }
 }
 
-fn parse_stored_results(value: &str) -> Option<(Vec<StoredResult>, bool)> {
+fn parse_stored_results(key: &str, value: &str) -> Option<(Vec<StoredResult>, bool)> {
     let mut results = serde_json::from_str::<Vec<StoredResult>>(value).ok()?;
     let mut changed = false;
-    let now = Date::new_0()
-        .to_iso_string()
-        .as_string()
-        .unwrap_or_default();
-    for result in &mut results {
+    for (index, result) in &mut results.iter_mut().enumerate() {
         if result.id.is_empty() {
-            result.id = make_uuid();
+            let stable_input = serde_json::to_string(result).unwrap_or_default();
+            result.id = stable_legacy_uuid(key, index, stable_input.as_bytes());
             changed = true;
         }
         if result.datetime.is_empty() {
-            result.datetime = now.clone();
+            result.datetime = legacy_result_datetime(index);
             changed = true;
         }
         if result.time.is_empty() {
@@ -516,7 +558,80 @@ fn parse_stored_results(value: &str) -> Option<(Vec<StoredResult>, bool)> {
             changed = true;
         }
     }
+    results.sort_by(compare_results);
     Some((results, changed))
+}
+
+fn stable_legacy_uuid(key: &str, index: usize, canonical: &[u8]) -> String {
+    let mut hash = [0x811c9dc5_u32, 0x9e3779b9_u32];
+    for (byte_index, byte) in key
+        .as_bytes()
+        .iter()
+        .chain([0].iter())
+        .chain(index.to_string().as_bytes())
+        .chain([0].iter())
+        .chain(canonical)
+        .enumerate()
+    {
+        let slot = byte_index % 2;
+        hash[slot] ^= *byte as u32;
+        hash[slot] = hash[slot].wrapping_mul(0x01000193);
+    }
+    let mut bytes = [0_u8; 16];
+    for (index, byte) in bytes.iter_mut().enumerate() {
+        let slot = index % 2;
+        let shift = (index / 2 % 4) * 8;
+        hash[slot] ^= (index as u32 + 0x9e3779b9) & 0xffff_ffff;
+        hash[slot] = hash[slot].wrapping_mul(0x01000193);
+        *byte = (hash[slot] >> shift) as u8;
+    }
+    bytes[6] = (bytes[6] & 0x0f) | 0x40;
+    bytes[8] = (bytes[8] & 0x3f) | 0x80;
+    format!(
+        "{:02x}{:02x}{:02x}{:02x}-{:02x}{:02x}-{:02x}{:02x}-{:02x}{:02x}-{:02x}{:02x}{:02x}{:02x}{:02x}{:02x}",
+        bytes[0], bytes[1], bytes[2], bytes[3], bytes[4], bytes[5], bytes[6], bytes[7],
+        bytes[8], bytes[9], bytes[10], bytes[11], bytes[12], bytes[13], bytes[14], bytes[15]
+    )
+}
+
+fn legacy_result_datetime(index: usize) -> String {
+    let seconds = index % 86_400;
+    let days = index / 86_400;
+    format!(
+        "2000-01-{:02}T{:02}:{:02}:{:02}.000Z",
+        days + 1,
+        seconds / 3_600,
+        seconds % 3_600 / 60,
+        seconds % 60
+    )
+}
+
+fn compare_results(left: &StoredResult, right: &StoredResult) -> std::cmp::Ordering {
+    left.datetime
+        .cmp(&right.datetime)
+        .then_with(|| left.id.cmp(&right.id))
+}
+
+fn merge_remote_result(mut merged: Vec<StoredResult>, result: ResultSync) -> Vec<StoredResult> {
+    if result.deleted {
+        merged.retain(|existing| existing.id != result.id);
+    } else {
+        let stored = StoredResult {
+            id: result.id,
+            datetime: result.datetime,
+            ms: result.result_ms,
+            case: result.case_id,
+            time: format_time(result.result_ms),
+            deleted: false,
+        };
+        if let Some(existing) = merged.iter_mut().find(|existing| existing.id == stored.id) {
+            *existing = stored;
+        } else {
+            merged.push(stored);
+        }
+    }
+    merged.sort_by(compare_results);
+    merged
 }
 
 fn custom_algs_payload(
@@ -1203,7 +1318,7 @@ fn loaded_trainer(props: &LoadedTrainerProps) -> Html {
                 }
                 let mut loaded_results = Vec::new();
                 if let Some(value) = get_stored(&times_key).await {
-                    if let Some((parsed, changed)) = parse_stored_results(&value) {
+                    if let Some((parsed, changed)) = parse_stored_results(&times_key, &value) {
                         if changed {
                             put_stored(
                                 times_key.clone(),
@@ -1211,7 +1326,10 @@ fn loaded_trainer(props: &LoadedTrainerProps) -> Html {
                             )
                             .await;
                         }
-                        loaded_results = parsed;
+                        loaded_results = parsed
+                            .into_iter()
+                            .filter(|result| !result.deleted)
+                            .collect();
                         results.set(loaded_results.clone());
                     }
                 }
@@ -1571,11 +1689,12 @@ fn loaded_trainer(props: &LoadedTrainerProps) -> Html {
                     ms,
                     case: case.case_id.clone(),
                     time: format_time(ms),
+                    deleted: false,
                 });
                 results.set(next.clone());
                 let key = times_key.clone();
                 spawn_local(async move {
-                    put_stored(key, serde_json::to_string(&next).unwrap()).await;
+                    put_stored_results(key, next, Vec::new()).await;
                 });
             }
             choose_case.emit(());
@@ -1768,19 +1887,17 @@ fn loaded_trainer(props: &LoadedTrainerProps) -> Html {
                     }
                     "Delete" => {
                         let mut next = (*results).clone();
-                        if event.shift_key() {
+                        let deleted_ids = if event.shift_key() {
+                            let deleted = next.iter().map(|result| result.id.clone()).collect();
                             next.clear();
+                            deleted
                         } else {
-                            next.pop();
-                        }
+                            next.pop().map(|result| vec![result.id]).unwrap_or_default()
+                        };
                         results.set(next.clone());
                         let times_key = times_key.clone();
                         spawn_local(async move {
-                            put_stored(
-                                times_key,
-                                serde_json::to_string(&next).unwrap_or_else(|_| "[]".to_owned()),
-                            )
-                            .await;
+                            put_stored_results(times_key, next, deleted_ids).await;
                         });
                         return;
                     }
@@ -2504,15 +2621,11 @@ fn loaded_trainer(props: &LoadedTrainerProps) -> Html {
         let times_key = times_storage_key.clone();
         Callback::from(move |_| {
             let mut next = (*results).clone();
-            next.pop();
+            let deleted_ids = next.pop().map(|result| vec![result.id]).unwrap_or_default();
             results.set(next.clone());
             let times_key = times_key.clone();
             spawn_local(async move {
-                put_stored(
-                    times_key,
-                    serde_json::to_string(&next).unwrap_or_else(|_| "[]".to_owned()),
-                )
-                .await;
+                put_stored_results(times_key, next, deleted_ids).await;
             });
         })
     };
@@ -3211,9 +3324,12 @@ fn loaded_trainer(props: &LoadedTrainerProps) -> Html {
                                     let results = results.clone();
                                     let times_key = times_storage_key.clone();
                                     Callback::from(move |_| {
+                                        let deleted_ids = (*results).iter().map(|result| result.id.clone()).collect();
                                         results.set(Vec::new());
                                         let key = times_key.clone();
-                                        spawn_local(async move { put_stored(key, "[]".to_owned()).await; });
+                                        spawn_local(async move {
+                                            put_stored_results(key, Vec::new(), deleted_ids).await;
+                                        });
                                     })
                                 }}>{"delete"}</button>
                             </div>
@@ -4706,7 +4822,7 @@ async fn sync_now(force: bool) {
                 }
             }
         } else if let Some(trainer) = trainers.iter().find(|trainer| trainer.times_key == *key) {
-            if let Some((results, changed)) = parse_stored_results(value) {
+            if let Some((results, changed)) = parse_stored_results(key, value) {
                 if changed {
                     put_stored(
                         key.clone(),
@@ -4723,7 +4839,7 @@ async fn sync_now(force: bool) {
                         trainer_id: trainer.trainer_id.clone(),
                         case_id: result.case,
                         updated_at: updated_at.clone(),
-                        deleted: false,
+                        deleted: result.deleted,
                     }));
             }
         }
@@ -4761,7 +4877,7 @@ async fn normalize_legacy_results_in_storage() -> bool {
     };
     let mut changed = false;
     for (key, value) in data {
-        if let Some((results, result_changed)) = parse_stored_results(&value) {
+        if let Some((results, result_changed)) = parse_stored_results(&key, &value) {
             if result_changed {
                 put_stored(
                     key,
@@ -4903,8 +5019,8 @@ async fn pull_remote() -> bool {
             imported.push(key);
         }
     }
-    let mut remote_results = BTreeMap::<String, Vec<StoredResult>>::new();
-    for result in bundle.results.into_iter().filter(|result| !result.deleted) {
+    let mut remote_results = BTreeMap::<String, Vec<ResultSync>>::new();
+    for result in bundle.results {
         remote_results
             .entry(
                 trainers
@@ -4914,27 +5030,16 @@ async fn pull_remote() -> bool {
                     .unwrap_or_else(|| format!("{}Times", result.trainer_id)),
             )
             .or_default()
-            .push(StoredResult {
-                id: result.id,
-                datetime: result.datetime,
-                ms: result.result_ms,
-                case: result.case_id,
-                time: format_time(result.result_ms),
-            });
+            .push(result);
     }
     for (key, results) in remote_results {
         if !dirty.contains_key(&key) {
             let mut merged = get_stored(&key)
                 .await
-                .and_then(|value| parse_stored_results(&value).map(|(results, _)| results))
+                .and_then(|value| parse_stored_results(&key, &value).map(|(results, _)| results))
                 .unwrap_or_default();
             for result in results {
-                if let Some(existing) = merged.iter_mut().find(|existing| existing.id == result.id)
-                {
-                    *existing = result;
-                } else {
-                    merged.push(result);
-                }
+                merged = merge_remote_result(merged, result);
             }
             put_stored(
                 key.clone(),
@@ -4965,6 +5070,74 @@ use base64::{engine::general_purpose::STANDARD, Engine};
 #[cfg(test)]
 mod cube_image_tests {
     use super::*;
+
+    #[test]
+    fn legacy_result_identity_and_sequence_are_deterministic() {
+        let value = r#"[{"ms":3100,"case":7},{"ms":4890,"case":4}]"#;
+        let (first, _) = parse_stored_results("sq1cpepTimesArray", value).expect("first parse");
+        let (second, _) = parse_stored_results("sq1cpepTimesArray", value).expect("second parse");
+
+        assert_eq!(
+            first.iter().map(|result| &result.id).collect::<Vec<_>>(),
+            second.iter().map(|result| &result.id).collect::<Vec<_>>()
+        );
+        assert_eq!(first[0].datetime, "2000-01-01T00:00:00.000Z");
+        assert_eq!(first[1].datetime, "2000-01-01T00:00:01.000Z");
+    }
+
+    #[test]
+    fn stored_results_sort_oldest_first_with_id_tiebreaker() {
+        let mut results = vec![
+            StoredResult {
+                id: "b".to_owned(),
+                datetime: "2026-01-02T00:00:00Z".to_owned(),
+                ms: 2,
+                case: "1".to_owned(),
+                time: "0.002".to_owned(),
+                deleted: false,
+            },
+            StoredResult {
+                id: "a".to_owned(),
+                datetime: "2026-01-01T00:00:00Z".to_owned(),
+                ms: 1,
+                case: "1".to_owned(),
+                time: "0.001".to_owned(),
+                deleted: false,
+            },
+        ];
+        results.sort_by(compare_results);
+
+        assert_eq!(
+            results
+                .iter()
+                .map(|result| result.id.as_str())
+                .collect::<Vec<_>>(),
+            vec!["a", "b"]
+        );
+    }
+
+    #[test]
+    fn remote_tombstones_remove_local_results() {
+        let result = StoredResult {
+            id: "result".to_owned(),
+            datetime: "2026-01-01T00:00:00Z".to_owned(),
+            ms: 1000,
+            case: "1".to_owned(),
+            time: "1.00".to_owned(),
+            deleted: false,
+        };
+        let tombstone = ResultSync {
+            id: result.id.clone(),
+            datetime: result.datetime.clone(),
+            result_ms: result.ms,
+            trainer_id: "trainer".to_owned(),
+            case_id: result.case.clone(),
+            updated_at: "2026-01-02T00:00:00Z".to_owned(),
+            deleted: true,
+        };
+
+        assert!(merge_remote_result(vec![result], tombstone).is_empty());
+    }
 
     #[test]
     fn reads_legacy_results_with_numeric_case_ids() {
