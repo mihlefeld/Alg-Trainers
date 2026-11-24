@@ -94,11 +94,17 @@ export async function storageAll(storeName) {
     tx.onerror = () => reject(tx.error);
   });
 }
-export async function storageClearDirty(keys) {
+export async function storageClearDirtyIfUnchanged(expected) {
   const db = await openStorage();
   await new Promise((resolve, reject) => {
     const tx = db.transaction("dirty", "readwrite");
-    for (const key of keys) tx.objectStore("dirty").delete(key);
+    const store = tx.objectStore("dirty");
+    for (const [key, timestamp] of Object.entries(expected)) {
+      const request = store.get(key);
+      request.onsuccess = () => {
+        if (request.result === timestamp) store.delete(key);
+      };
+    }
     tx.oncomplete = resolve;
     tx.onerror = () => reject(tx.error);
   });
@@ -153,7 +159,7 @@ export function randomAlgId() {
   return `user:${Array.from(random, value => value.toString(16).padStart(8, "0")).join("")}`;
 }
 function stableLegacyUuid(key, index, result) {
-  const input = `${key}\0${index}\0${JSON.stringify(result)}`;
+  const input = `${key}\0${index}\0${Number(result.ms)}\0${String(result.case)}`;
   const bytes = new Uint8Array(16);
   let hash = 0x811c9dc5;
   for (const byte of new TextEncoder().encode(input)) {
@@ -226,7 +232,7 @@ extern "C" {
     #[wasm_bindgen(catch)]
     fn storageAll(store_name: &str) -> Result<js_sys::Promise, JsValue>;
     #[wasm_bindgen(catch)]
-    fn storageClearDirty(keys: js_sys::Array) -> Result<js_sys::Promise, JsValue>;
+    fn storageClearDirtyIfUnchanged(expected: &JsValue) -> Result<js_sys::Promise, JsValue>;
     #[wasm_bindgen(catch)]
     fn prefersLightTheme() -> Result<bool, JsValue>;
     #[wasm_bindgen(catch)]
@@ -545,8 +551,7 @@ fn parse_stored_results(key: &str, value: &str) -> Option<(Vec<StoredResult>, bo
     let mut changed = false;
     for (index, result) in &mut results.iter_mut().enumerate() {
         if result.id.is_empty() {
-            let stable_input = serde_json::to_string(result).unwrap_or_default();
-            result.id = stable_legacy_uuid(key, index, stable_input.as_bytes());
+            result.id = stable_legacy_uuid(key, index, result.ms, &result.case);
             changed = true;
         }
         if result.datetime.is_empty() {
@@ -562,28 +567,18 @@ fn parse_stored_results(key: &str, value: &str) -> Option<(Vec<StoredResult>, bo
     Some((results, changed))
 }
 
-fn stable_legacy_uuid(key: &str, index: usize, canonical: &[u8]) -> String {
-    let mut hash = [0x811c9dc5_u32, 0x9e3779b9_u32];
-    for (byte_index, byte) in key
-        .as_bytes()
-        .iter()
-        .chain([0].iter())
-        .chain(index.to_string().as_bytes())
-        .chain([0].iter())
-        .chain(canonical)
-        .enumerate()
-    {
-        let slot = byte_index % 2;
-        hash[slot] ^= *byte as u32;
-        hash[slot] = hash[slot].wrapping_mul(0x01000193);
+fn stable_legacy_uuid(key: &str, index: usize, milliseconds: i64, case: &str) -> String {
+    let canonical = format!("{}\0{}\0{}\0{}", key, index, milliseconds, case);
+    let mut hash = 0x811c9dc5_u32;
+    for byte in canonical.as_bytes() {
+        hash ^= *byte as u32;
+        hash = hash.wrapping_mul(0x01000193);
     }
     let mut bytes = [0_u8; 16];
     for (index, byte) in bytes.iter_mut().enumerate() {
-        let slot = index % 2;
-        let shift = (index / 2 % 4) * 8;
-        hash[slot] ^= (index as u32 + 0x9e3779b9) & 0xffff_ffff;
-        hash[slot] = hash[slot].wrapping_mul(0x01000193);
-        *byte = (hash[slot] >> shift) as u8;
+        hash ^= (index as u32).wrapping_add(0x9e3779b9);
+        hash = hash.wrapping_mul(0x01000193);
+        *byte = hash as u8;
     }
     bytes[6] = (bytes[6] & 0x0f) | 0x40;
     bytes[8] = (bytes[8] & 0x3f) | 0x80;
@@ -595,15 +590,31 @@ fn stable_legacy_uuid(key: &str, index: usize, canonical: &[u8]) -> String {
 }
 
 fn legacy_result_datetime(index: usize) -> String {
-    let seconds = index % 86_400;
-    let days = index / 86_400;
+    let seconds = (index % 86_400) as i64;
+    let (year, month, day) = civil_date_from_days_since_1970(10_957 + index as i64 / 86_400);
     format!(
-        "2000-01-{:02}T{:02}:{:02}:{:02}.000Z",
-        days + 1,
+        "{year:04}-{month:02}-{day:02}T{:02}:{:02}:{:02}.000Z",
         seconds / 3_600,
         seconds % 3_600 / 60,
         seconds % 60
     )
+}
+
+fn civil_date_from_days_since_1970(mut days: i64) -> (i64, i64, i64) {
+    days += 719_468;
+    let era = if days >= 0 { days } else { days - 146_096 } / 146_097;
+    let day_of_era = days - era * 146_097;
+    let year_of_era =
+        (day_of_era - day_of_era / 1_460 + day_of_era / 36_524 - day_of_era / 146_096) / 365;
+    let mut year = year_of_era + era * 400;
+    let day_of_year = day_of_era - (365 * year_of_era + year_of_era / 4 - year_of_era / 100);
+    let month_prime = (5 * day_of_year + 2) / 153;
+    let day = day_of_year - (153 * month_prime + 2) / 5 + 1;
+    let month = month_prime + if month_prime < 10 { 3 } else { -9 };
+    if month <= 2 {
+        year += 1;
+    }
+    (year, month, day)
 }
 
 fn compare_results(left: &StoredResult, right: &StoredResult) -> std::cmp::Ordering {
@@ -632,6 +643,26 @@ fn merge_remote_result(mut merged: Vec<StoredResult>, result: ResultSync) -> Vec
     }
     merged.sort_by(compare_results);
     merged
+}
+
+fn split_sync_batches(mut bundle: SyncBundle) -> Vec<SyncBundle> {
+    let results = std::mem::take(&mut bundle.results);
+    if results.is_empty() {
+        return vec![bundle];
+    }
+    results
+        .chunks(SYNC_RESULT_BATCH_SIZE)
+        .enumerate()
+        .map(|(index, chunk)| {
+            let mut batch = if index == 0 {
+                bundle.clone()
+            } else {
+                SyncBundle::default()
+            };
+            batch.results = chunk.to_vec();
+            batch
+        })
+        .collect()
 }
 
 fn custom_algs_payload(
@@ -4639,6 +4670,8 @@ thread_local! {
     static LAST_SYNC_COMPLETED: RefCell<Option<f64>> = const { RefCell::new(None) };
 }
 
+const SYNC_RESULT_BATCH_SIZE: usize = 10_000;
+
 fn start_sync_engine() {
     SYNC_STARTED.with(|started| {
         if *started.borrow() {
@@ -4844,25 +4877,26 @@ async fn sync_now(force: bool) {
             }
         }
     }
-    let Ok(response) = Request::put("/api/sync")
-        .header("Content-Type", "application/json")
-        .body(serde_json::to_string(&bundle).unwrap_or_default())
-        .unwrap()
-        .send()
-        .await
-    else {
-        return;
-    };
-    if response.ok() {
-        let keys = js_sys::Array::new();
-        for key in dirty.keys() {
-            keys.push(&JsValue::from_str(key));
+    for batch in split_sync_batches(bundle) {
+        let Ok(response) = Request::put("/api/sync")
+            .header("Content-Type", "application/json")
+            .body(serde_json::to_string(&batch).unwrap_or_default())
+            .unwrap()
+            .send()
+            .await
+        else {
+            return;
+        };
+        if !response.ok() {
+            return;
         }
-        if let Ok(promise) = storageClearDirty(keys) {
+    }
+    if let Ok(expected) = serde_wasm_bindgen::to_value(&dirty) {
+        if let Ok(promise) = storageClearDirtyIfUnchanged(&expected) {
             let _ = JsFuture::from(promise).await;
         }
-        record_sync_completed();
     }
+    record_sync_completed();
 }
 
 async fn normalize_legacy_results_in_storage() -> bool {
@@ -4914,10 +4948,15 @@ async fn pull_remote() -> bool {
     let Ok(mut bundle) = response.json::<SyncBundle>().await else {
         return false;
     };
-    for _ in 0..100 {
+    let mut seen_cursors = BTreeMap::<String, ()>::new();
+    loop {
         let Some(cursor) = bundle.next_results.take() else {
             break;
         };
+        let cursor_key = format!("{}|{}", cursor.datetime, cursor.id);
+        if seen_cursors.insert(cursor_key, ()).is_some() {
+            return false;
+        }
         let url = format!(
             "/api/sync?before_datetime={}&before_id={}",
             js_sys::encode_uri_component(&cursor.datetime),
@@ -5050,12 +5089,20 @@ async fn pull_remote() -> bool {
         }
     }
     if !imported.is_empty() {
-        let keys = js_sys::Array::new();
-        for key in imported {
-            keys.push(&JsValue::from_str(&key));
-        }
-        if let Ok(promise) = storageClearDirty(keys) {
-            let _ = JsFuture::from(promise).await;
+        let imported = imported
+            .into_iter()
+            .collect::<std::collections::BTreeSet<_>>();
+        if let Ok(promise) = storageAll("dirty") {
+            if let Ok(value) = JsFuture::from(promise).await {
+                let mut current = serde_wasm_bindgen::from_value::<BTreeMap<String, f64>>(value)
+                    .unwrap_or_default();
+                current.retain(|key, _| imported.contains(key));
+                if let Ok(expected) = serde_wasm_bindgen::to_value(&current) {
+                    if let Ok(promise) = storageClearDirtyIfUnchanged(&expected) {
+                        let _ = JsFuture::from(promise).await;
+                    }
+                }
+            }
         }
     }
     true
@@ -5077,12 +5124,46 @@ mod cube_image_tests {
         let (first, _) = parse_stored_results("sq1cpepTimesArray", value).expect("first parse");
         let (second, _) = parse_stored_results("sq1cpepTimesArray", value).expect("second parse");
 
+        assert_eq!(first[0].id, "01612ed6-71dd-46f2-89d1-56d6e9fd4ef2");
         assert_eq!(
             first.iter().map(|result| &result.id).collect::<Vec<_>>(),
             second.iter().map(|result| &result.id).collect::<Vec<_>>()
         );
         assert_eq!(first[0].datetime, "2000-01-01T00:00:00.000Z");
         assert_eq!(first[1].datetime, "2000-01-01T00:00:01.000Z");
+        assert_eq!(legacy_result_datetime(86_400), "2000-01-02T00:00:00.000Z");
+    }
+
+    #[test]
+    fn legacy_result_identity_uses_canonical_fields() {
+        let first = r#"[{"ms":3100,"case":7,"details":"first","index":0}]"#;
+        let second =
+            r#"[{"ms":3100,"case":"7","time":"3.10","details":"second","id":"","datetime":""}]"#;
+        let (first, _) = parse_stored_results("results", first).expect("first parse");
+        let (second, _) = parse_stored_results("results", second).expect("second parse");
+
+        assert_eq!(first[0].id, second[0].id);
+    }
+
+    #[test]
+    fn sync_pushes_results_in_server_sized_batches() {
+        let result = ResultSync {
+            id: "00000000-0000-4000-8000-000000000000".to_owned(),
+            datetime: "2026-01-01T00:00:00Z".to_owned(),
+            result_ms: 1,
+            trainer_id: "trainer".to_owned(),
+            case_id: "case".to_owned(),
+            updated_at: "2026-01-01T00:00:00Z".to_owned(),
+            deleted: false,
+        };
+        let mut bundle = SyncBundle::default();
+        bundle.results = vec![result; SYNC_RESULT_BATCH_SIZE + 1];
+
+        let batches = split_sync_batches(bundle);
+
+        assert_eq!(batches.len(), 2);
+        assert_eq!(batches[0].results.len(), SYNC_RESULT_BATCH_SIZE);
+        assert_eq!(batches[1].results.len(), 1);
     }
 
     #[test]
