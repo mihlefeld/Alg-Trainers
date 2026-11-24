@@ -152,6 +152,14 @@ export function randomAlgId() {
   const random = crypto.getRandomValues(new Uint32Array(4));
   return `user:${Array.from(random, value => value.toString(16).padStart(8, "0")).join("")}`;
 }
+function randomUuid() {
+  if (crypto.randomUUID) return crypto.randomUUID();
+  const bytes = crypto.getRandomValues(new Uint8Array(16));
+  bytes[6] = (bytes[6] & 0x0f) | 0x40;
+  bytes[8] = (bytes[8] & 0x3f) | 0x80;
+  const hex = Array.from(bytes, value => value.toString(16).padStart(2, "0")).join("");
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
+}
 export async function importStorageText(text) {
   const parsed = JSON.parse(text);
   const values = parsed.data && typeof parsed.data === "object" ? parsed.data : parsed;
@@ -164,9 +172,28 @@ export async function importStorageText(text) {
     const data = tx.objectStore("data");
     try {
       data.clear();
+      tx.objectStore("dirty").clear();
+      const importedAt = new Date().toISOString();
       for (const [key, value] of Object.entries(values)) {
         if (typeof value !== "string") throw new Error("Invalid trainer backup value");
-        data.put(value, key);
+        let stored = value;
+        try {
+          const parsed = JSON.parse(value);
+          if (Array.isArray(parsed) && parsed.every(result =>
+            result && typeof result === "object" && "ms" in result && "case" in result
+          )) {
+            stored = JSON.stringify(parsed.map(result => ({
+              ...result,
+              id: typeof result.id === "string" && result.id ? result.id : randomUuid(),
+              datetime: typeof result.datetime === "string" && result.datetime ? result.datetime : importedAt,
+              case: String(result.case),
+              time: typeof result.time === "string" && result.time ? result.time : `${Math.trunc(result.ms / 1000)}.${String(result.ms % 1000).padStart(3, "0")}`,
+            })));
+          }
+        } catch {
+          // Other stored values retain their original representation.
+        }
+        data.put(stored, key);
         tx.objectStore("dirty").put(Date.now(), key);
       }
     } catch (error) {
@@ -345,10 +372,14 @@ struct TrainerBundle {
 
 #[derive(Clone, Debug, Default, Deserialize, Serialize, PartialEq)]
 struct StoredResult {
+    #[serde(default)]
     id: String,
+    #[serde(default)]
     datetime: String,
     ms: i64,
+    #[serde(deserialize_with = "deserialize_case_id")]
     case: String,
+    #[serde(default)]
     time: String,
 }
 
@@ -450,6 +481,42 @@ fn parse_custom_algs(value: &serde_json::Value, case_id: &str) -> Vec<UserAlgSta
                 })
         })
         .unwrap_or_default()
+}
+
+fn deserialize_case_id<'de, D>(deserializer: D) -> Result<String, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    let value = serde_json::Value::deserialize(deserializer)?;
+    match value {
+        serde_json::Value::String(value) => Ok(value),
+        serde_json::Value::Number(value) => Ok(value.to_string()),
+        _ => Err(serde::de::Error::custom("case must be a string or number")),
+    }
+}
+
+fn parse_stored_results(value: &str) -> Option<(Vec<StoredResult>, bool)> {
+    let mut results = serde_json::from_str::<Vec<StoredResult>>(value).ok()?;
+    let mut changed = false;
+    let now = Date::new_0()
+        .to_iso_string()
+        .as_string()
+        .unwrap_or_default();
+    for result in &mut results {
+        if result.id.is_empty() {
+            result.id = make_uuid();
+            changed = true;
+        }
+        if result.datetime.is_empty() {
+            result.datetime = now.clone();
+            changed = true;
+        }
+        if result.time.is_empty() {
+            result.time = format_time(result.ms);
+            changed = true;
+        }
+    }
+    Some((results, changed))
 }
 
 fn custom_algs_payload(
@@ -1136,7 +1203,14 @@ fn loaded_trainer(props: &LoadedTrainerProps) -> Html {
                 }
                 let mut loaded_results = Vec::new();
                 if let Some(value) = get_stored(&times_key).await {
-                    if let Ok(parsed) = serde_json::from_str::<Vec<StoredResult>>(&value) {
+                    if let Some((parsed, changed)) = parse_stored_results(&value) {
+                        if changed {
+                            put_stored(
+                                times_key.clone(),
+                                serde_json::to_string(&parsed).unwrap_or_else(|_| "[]".to_owned()),
+                            )
+                            .await;
+                        }
                         loaded_results = parsed;
                         results.set(loaded_results.clone());
                     }
@@ -4530,11 +4604,11 @@ async fn sync_now(force: bool) {
         return;
     }
     let trainers = match Request::get("/api/trainers").send().await {
-        Ok(response) => response
-            .json::<Vec<TrainerSummary>>()
-            .await
-            .unwrap_or_default(),
-        Err(_) => Vec::new(),
+        Ok(response) if response.ok() => match response.json::<Vec<TrainerSummary>>().await {
+            Ok(trainers) if !trainers.is_empty() => trainers,
+            _ => return,
+        },
+        _ => return,
     };
     let Ok(promise) = storageAll("data") else {
         return;
@@ -4613,7 +4687,14 @@ async fn sync_now(force: bool) {
                 }
             }
         } else if let Some(trainer) = trainers.iter().find(|trainer| trainer.times_key == *key) {
-            if let Ok(results) = serde_json::from_str::<Vec<StoredResult>>(value) {
+            if let Some((results, changed)) = parse_stored_results(value) {
+                if changed {
+                    put_stored(
+                        key.clone(),
+                        serde_json::to_string(&results).unwrap_or_else(|_| "[]".to_owned()),
+                    )
+                    .await;
+                }
                 bundle
                     .results
                     .extend(results.into_iter().map(|result| ResultSync {
@@ -4660,11 +4741,11 @@ async fn pull_remote() -> bool {
         Err(_) => BTreeMap::new(),
     };
     let trainers = match Request::get("/api/trainers").send().await {
-        Ok(response) => response
-            .json::<Vec<TrainerSummary>>()
-            .await
-            .unwrap_or_default(),
-        Err(_) => Vec::new(),
+        Ok(response) if response.ok() => match response.json::<Vec<TrainerSummary>>().await {
+            Ok(trainers) if !trainers.is_empty() => trainers,
+            _ => return false,
+        },
+        _ => return false,
     };
     let Ok(response) = Request::get("/api/sync").send().await else {
         return false;
@@ -4800,7 +4881,7 @@ async fn pull_remote() -> bool {
         if !dirty.contains_key(&key) {
             let mut merged = get_stored(&key)
                 .await
-                .and_then(|value| serde_json::from_str::<Vec<StoredResult>>(&value).ok())
+                .and_then(|value| parse_stored_results(&value).map(|(results, _)| results))
                 .unwrap_or_default();
             for result in results {
                 if let Some(existing) = merged.iter_mut().find(|existing| existing.id == result.id)
@@ -4839,6 +4920,19 @@ use base64::{engine::general_purpose::STANDARD, Engine};
 #[cfg(test)]
 mod cube_image_tests {
     use super::*;
+
+    #[test]
+    fn reads_legacy_results_with_numeric_case_ids() {
+        let result = serde_json::from_str::<StoredResult>(
+            r#"{"time":"3.10","ms":3100,"details":"scramble","index":0,"case":7}"#,
+        )
+        .expect("legacy result");
+        assert_eq!(result.ms, 3100);
+        assert_eq!(result.case, "7");
+        assert_eq!(result.time, "3.10");
+        assert!(result.id.is_empty());
+        assert!(result.datetime.is_empty());
+    }
 
     #[test]
     fn recoloring_does_not_replace_new_colors_twice() {
