@@ -14,19 +14,39 @@ services:
       timeout: 5s
       retries: 20
 
+  alg-trainers-migrate:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    depends_on:
+      psql:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgres://alg_trainers:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set}@psql:5432/alg_trainers
+      DATABASE_MIGRATE_ONLY: "true"
+      CATALOG_ROOT: /app/static
+      FORCE_CATALOG_SEED: ${FORCE_CATALOG_SEED:-}
+
   alg-trainers-server:
     build:
       context: .
       dockerfile: Dockerfile
     restart: unless-stopped
     depends_on:
-      psql:
-        condition: service_healthy
+      alg-trainers-migrate:
+        condition: service_completed_successfully
     environment:
       ROCKET_ADDRESS: 0.0.0.0
       ROCKET_PORT: 8000
       ROCKET_SECRET_KEY: ${ROCKET_SECRET_KEY:?ROCKET_SECRET_KEY must be set}
       DATABASE_URL: postgres://alg_trainers:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set}@psql:5432/alg_trainers
+      DATABASE_RUN_MIGRATIONS: "false"
+      DATABASE_MAX_CONNECTIONS: ${DATABASE_MAX_CONNECTIONS:-20}
+      DATABASE_MIN_CONNECTIONS: ${DATABASE_MIN_CONNECTIONS:-2}
+      DATABASE_CONNECT_TIMEOUT_SECS: ${DATABASE_CONNECT_TIMEOUT_SECS:-5}
+      DATABASE_ACQUIRE_TIMEOUT_SECS: ${DATABASE_ACQUIRE_TIMEOUT_SECS:-5}
+      DATABASE_IDLE_TIMEOUT_SECS: ${DATABASE_IDLE_TIMEOUT_SECS:-300}
+      DATABASE_MAX_LIFETIME_SECS: ${DATABASE_MAX_LIFETIME_SECS:-1800}
       WCA_BASE_URL: ${WCA_BASE_URL:-https://www.worldcubeassociation.org}
       WCA_CLIENT_ID: ${WCA_CLIENT_ID:-}
       WCA_CLIENT_SECRET: ${WCA_CLIENT_SECRET:-}

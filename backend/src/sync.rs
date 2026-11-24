@@ -1,10 +1,13 @@
 use chrono::{DateTime, Duration, Utc};
 use sea_orm::{
-    ConnectionTrait, DatabaseBackend, DatabaseConnection, DatabaseTransaction, DbErr, Statement,
+    ColumnTrait, Condition, ConnectionTrait, DatabaseBackend, DatabaseConnection,
+    DatabaseTransaction, DbErr, EntityTrait, QueryFilter, QueryOrder, QuerySelect, Statement,
     TransactionTrait,
 };
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
+
+use crate::entity;
 
 const MAX_SELECTIONS: usize = 100;
 const MAX_USER_ALGS: usize = 10_000;
@@ -65,6 +68,12 @@ pub struct ResultSync {
 pub struct ResultCursor {
     pub datetime: DateTime<Utc>,
     pub id: Uuid,
+}
+
+#[derive(Deserialize)]
+struct SelectionPayload {
+    trainer_id: String,
+    selection_json: serde_json::Value,
 }
 
 #[derive(Debug)]
@@ -148,109 +157,83 @@ pub async fn load_page(
     user_id: Uuid,
     cursor: Option<ResultCursor>,
 ) -> Result<SyncBundle, DbErr> {
-    let settings_row = db
-        .query_one(Statement::from_sql_and_values(
-            DatabaseBackend::Postgres,
-            "SELECT settings_json, updated_at FROM settings WHERE user_id = $1",
-            vec![user_id.into()],
-        ))
-        .await?;
-    let settings = settings_row.map(|row| SettingsSync {
-        settings_json: row
-            .try_get("", "settings_json")
-            .unwrap_or(serde_json::json!({})),
-        updated_at: row.try_get("", "updated_at").unwrap_or_else(|_| Utc::now()),
+    let settings_model = entity::setting::Entity::find_by_id(user_id).one(db).await?;
+    let settings = settings_model.map(|model| SettingsSync {
+        settings_json: model.settings_json,
+        updated_at: model.updated_at,
     });
 
-    let selection_rows = db
-        .query_all(Statement::from_sql_and_values(
-            DatabaseBackend::Postgres,
-            "SELECT payload, updated_at FROM sync_revisions
-             WHERE user_id = $1 AND kind = 'selection'
-             ORDER BY entity_id",
-            vec![user_id.into()],
-        ))
+    let selection_models = entity::sync_revision::Entity::find()
+        .filter(entity::sync_revision::Column::UserId.eq(user_id))
+        .filter(entity::sync_revision::Column::Kind.eq("selection"))
+        .order_by_asc(entity::sync_revision::Column::EntityId)
+        .all(db)
         .await?;
-    let selections = selection_rows
+    let selections = selection_models
         .into_iter()
-        .filter_map(|row| {
-            let value: serde_json::Value = row.try_get("", "payload").ok()?;
-            Some(SelectionSync {
-                trainer_id: value.get("trainer_id")?.as_str()?.to_owned(),
-                selection_json: value.get("selection_json")?.clone(),
-                updated_at: row.try_get("", "updated_at").ok()?,
+        .map(|model| {
+            let payload: SelectionPayload = serde_json::from_value(model.payload)
+                .map_err(|error| DbErr::Custom(format!("invalid selection payload: {error}")))?;
+            Ok(SelectionSync {
+                trainer_id: payload.trainer_id,
+                selection_json: payload.selection_json,
+                updated_at: model.updated_at,
             })
+        })
+        .collect::<Result<Vec<_>, DbErr>>()?;
+
+    let alg_models = entity::user_alg::Entity::find()
+        .filter(entity::user_alg::Column::UserId.eq(user_id))
+        .order_by_asc(entity::user_alg::Column::TrainerId)
+        .order_by_asc(entity::user_alg::Column::CaseId)
+        .order_by_asc(entity::user_alg::Column::Position)
+        .all(db)
+        .await?;
+    let user_algs = alg_models
+        .into_iter()
+        .map(|model| UserAlgSync {
+            trainer_id: model.trainer_id,
+            case_id: model.case_id,
+            alg_id: model.alg_id,
+            alg: model.alg,
+            position: model.position,
+            hidden: model.hidden,
+            deleted: model.deleted,
+            updated_at: model.updated_at,
         })
         .collect();
 
-    let alg_rows = db
-        .query_all(Statement::from_sql_and_values(
-            DatabaseBackend::Postgres,
-            "SELECT trainer_id, case_id, alg_id, alg, position, hidden, deleted, updated_at
-             FROM user_algs WHERE user_id = $1
-             ORDER BY trainer_id, case_id, position",
-            vec![user_id.into()],
-        ))
-        .await?;
-    let user_algs = alg_rows
-        .into_iter()
-        .filter_map(|row| {
-            Some(UserAlgSync {
-                trainer_id: row.try_get("", "trainer_id").ok()?,
-                case_id: row.try_get("", "case_id").ok()?,
-                alg_id: row.try_get("", "alg_id").ok()?,
-                alg: row.try_get("", "alg").ok()?,
-                position: row.try_get("", "position").ok()?,
-                hidden: row.try_get("", "hidden").ok()?,
-                deleted: row.try_get("", "deleted").ok()?,
-                updated_at: row.try_get("", "updated_at").ok()?,
-            })
-        })
-        .collect();
-
-    let result_rows = match cursor {
-        Some(cursor) => {
-            db.query_all(Statement::from_sql_and_values(
-                DatabaseBackend::Postgres,
-                "SELECT id, datetime, result_ms, trainer_id, case_id, updated_at, deleted
-                 FROM results
-                 WHERE user_id = $1
-                   AND (datetime, id) < ($2, $3)
-                 ORDER BY datetime DESC, id DESC LIMIT $4",
-                vec![
-                    user_id.into(),
-                    cursor.datetime.into(),
-                    cursor.id.into(),
-                    (RESULTS_PAGE_SIZE + 1).into(),
-                ],
-            ))
-            .await?
-        }
-        None => {
-            db.query_all(Statement::from_sql_and_values(
-                DatabaseBackend::Postgres,
-                "SELECT id, datetime, result_ms, trainer_id, case_id, updated_at, deleted
-                 FROM results WHERE user_id = $1
-                 ORDER BY datetime DESC, id DESC LIMIT $2",
-                vec![user_id.into(), (RESULTS_PAGE_SIZE + 1).into()],
-            ))
-            .await?
-        }
+    let mut result_query =
+        entity::result::Entity::find().filter(entity::result::Column::UserId.eq(user_id));
+    if let Some(cursor) = cursor {
+        result_query = result_query.filter(
+            Condition::any()
+                .add(entity::result::Column::Datetime.lt(cursor.datetime))
+                .add(
+                    Condition::all()
+                        .add(entity::result::Column::Datetime.eq(cursor.datetime))
+                        .add(entity::result::Column::Id.lt(cursor.id)),
+                ),
+        );
     };
-    let has_more = result_rows.len() as u64 > RESULTS_PAGE_SIZE;
-    let results: Vec<ResultSync> = result_rows
+    let result_models = result_query
+        .order_by_desc(entity::result::Column::Datetime)
+        .order_by_desc(entity::result::Column::Id)
+        .limit(RESULTS_PAGE_SIZE + 1)
+        .all(db)
+        .await?;
+    let has_more = result_models.len() as u64 > RESULTS_PAGE_SIZE;
+    let results: Vec<ResultSync> = result_models
         .into_iter()
         .take(RESULTS_PAGE_SIZE as usize)
-        .filter_map(|row| {
-            Some(ResultSync {
-                id: row.try_get("", "id").ok()?,
-                datetime: row.try_get("", "datetime").ok()?,
-                result_ms: row.try_get("", "result_ms").ok()?,
-                trainer_id: row.try_get("", "trainer_id").ok()?,
-                case_id: row.try_get("", "case_id").ok()?,
-                updated_at: row.try_get("", "updated_at").unwrap_or_else(|_| Utc::now()),
-                deleted: row.try_get("", "deleted").unwrap_or(false),
-            })
+        .map(|model| ResultSync {
+            id: model.id,
+            datetime: model.datetime,
+            result_ms: model.result_ms,
+            trainer_id: model.trainer_id,
+            case_id: model.case_id,
+            updated_at: model.updated_at,
+            deleted: model.deleted,
         })
         .collect();
     let next_results = has_more.then(|| {

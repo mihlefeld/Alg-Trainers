@@ -7,10 +7,10 @@
 3. Run `docker compose up --build -d`.
 4. Open `http://localhost:8000`.
 
-The stack starts PostgreSQL and the Rocket server. SeaORM migrations run when the server starts.
-Trainer definitions are imported into PostgreSQL before the server starts
-accepting connections on the first startup. Follow progress with
-`docker compose logs -f alg-trainers-server`. Set
+The stack starts PostgreSQL, a one-shot database bootstrap service, and then the
+Rocket server. SeaORM migrations and trainer catalog imports finish successfully
+before the server starts accepting connections. Follow progress with
+`docker compose logs -f alg-trainers-migrate`. Set
 `FORCE_CATALOG_SEED=1` when intentionally rebuilding catalog content from the
 checked-in trainer JSON files.
 
@@ -36,6 +36,8 @@ IP-aware rate limits.
 
 - Rocket serves the Yew WASM application and all authenticated APIs.
 - SeaORM migrations create and update the PostgreSQL schema.
+- Docker Compose runs migrations and catalog initialization in a dedicated
+  one-shot service so multiple web replicas do not perform startup DDL.
 - Trainer cases, groups, algsets, algorithms, scrambles, and SVG diagrams are
   imported into PostgreSQL from the checked-in `static/` catalog on initial startup.
 - Browser state remains in IndexedDB under the existing trainer storage keys.
@@ -58,3 +60,19 @@ and trainer backups; previous custom cube colors are retained during migration.
 - `WCA_CLIENT_ID`
 - `WCA_CLIENT_SECRET`
 - `WCA_REDIRECT_URL`
+
+## Database environment variables
+
+`DATABASE_URL` selects PostgreSQL. Pool behavior is configurable per process:
+
+- `DATABASE_MAX_CONNECTIONS` (default `20`)
+- `DATABASE_MIN_CONNECTIONS` (default `2`)
+- `DATABASE_CONNECT_TIMEOUT_SECS` (default `5`)
+- `DATABASE_ACQUIRE_TIMEOUT_SECS` (default `5`)
+- `DATABASE_IDLE_TIMEOUT_SECS` (default `300`)
+- `DATABASE_MAX_LIFETIME_SECS` (default `1800`)
+
+Set the connection maximum low enough to leave PostgreSQL capacity for every
+replica plus operational headroom. Standalone server runs migrate by default;
+set `DATABASE_RUN_MIGRATIONS=false` when bootstrap is managed separately.
+`DATABASE_MIGRATE_ONLY=true` runs migrations and catalog initialization and exits.

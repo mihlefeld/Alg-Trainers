@@ -1,4 +1,7 @@
 mod catalog;
+mod database;
+#[allow(dead_code)]
+mod entity;
 mod sync;
 
 use alg_trainers_migration::Migrator;
@@ -11,7 +14,10 @@ use rocket::{
     serde::json::Json,
     Responder, State,
 };
-use sea_orm::{ConnectOptions, ConnectionTrait, Database, DatabaseConnection, Statement};
+use sea_orm::{
+    ActiveModelTrait, ActiveValue::Set, ColumnTrait, DatabaseConnection, DbErr, EntityTrait,
+    QueryFilter,
+};
 use sea_orm_migration::MigratorTrait;
 use serde::{Deserialize, Serialize};
 use std::{
@@ -133,16 +139,14 @@ fn cookie_user(cookies: &CookieJar<'_>) -> Option<String> {
         .map(|c| c.value().to_owned())
 }
 
-async fn find_user(db: &DatabaseConnection, email: &str) -> Option<uuid::Uuid> {
-    db.query_one(Statement::from_sql_and_values(
-        sea_orm::DatabaseBackend::Postgres,
-        "SELECT id FROM users WHERE email = $1",
-        vec![email.into()],
-    ))
-    .await
-    .ok()
-    .flatten()
-    .and_then(|row| row.try_get("", "id").ok())
+async fn find_user(
+    db: &DatabaseConnection,
+    email: &str,
+) -> Result<Option<entity::user::Model>, DbErr> {
+    entity::user::Entity::find()
+        .filter(entity::user::Column::Email.eq(email))
+        .one(db)
+        .await
 }
 
 fn random_state() -> String {
@@ -174,38 +178,29 @@ async fn me(
     cookies: &CookieJar<'_>,
     state: &State<AppState>,
     _rate_limit: ApiRateLimit,
-) -> PrivateMe {
+) -> Result<PrivateMe, Status> {
     let email = cookie_user(cookies);
     let (email, wca_id) = match email {
         Some(email) => {
-            let row = state
-                .db
-                .query_one(Statement::from_sql_and_values(
-                    sea_orm::DatabaseBackend::Postgres,
-                    "SELECT email, wca_id FROM users WHERE email = $1",
-                    vec![email.into()],
-                ))
-                .await
-                .ok()
-                .flatten();
-            match row {
-                Some(row) => (
-                    row.try_get::<String>("", "email").ok(),
-                    row.try_get::<Option<String>>("", "wca_id").ok().flatten(),
-                ),
+            let user = find_user(&state.db, &email).await.map_err(|error| {
+                tracing::error!(%error, "failed to load authenticated user");
+                Status::InternalServerError
+            })?;
+            match user {
+                Some(user) => (Some(user.email), user.wca_id),
                 None => (None, None),
             }
         }
         None => (None, None),
     };
-    PrivateMe(
+    Ok(PrivateMe(
         Json(MeResponse {
             authenticated: email.is_some(),
             email,
             wca_id,
         }),
         Header::new("Cache-Control", "no-store"),
-    )
+    ))
 }
 
 #[rocket::get("/api/auth/wca")]
@@ -284,31 +279,29 @@ async fn wca_callback(
 
     let email = envelope.me.email.ok_or(Status::Unauthorized)?;
     let wca_id = envelope.me.wca_id;
-    if let Some(id) = find_user(&app_state.db, &email).await {
-        app_state
-            .db
-            .execute(Statement::from_sql_and_values(
-                sea_orm::DatabaseBackend::Postgres,
-                "UPDATE users SET wca_id = $1 WHERE id = $2",
-                vec![wca_id.clone().into(), id.into()],
-            ))
-            .await
-            .map_err(|_| Status::InternalServerError)?;
+    if let Some(user) = find_user(&app_state.db, &email).await.map_err(|error| {
+        tracing::error!(%error, "failed to look up WCA user");
+        Status::InternalServerError
+    })? {
+        let mut active: entity::user::ActiveModel = user.into();
+        active.wca_id = Set(wca_id.clone());
+        active.update(&app_state.db).await.map_err(|error| {
+            tracing::error!(%error, "failed to update WCA user");
+            Status::InternalServerError
+        })?;
     } else {
-        app_state
-            .db
-            .execute(Statement::from_sql_and_values(
-                sea_orm::DatabaseBackend::Postgres,
-                "INSERT INTO users (id, email, wca_id, created_at) VALUES ($1, $2, $3, $4)",
-                vec![
-                    uuid::Uuid::new_v4().into(),
-                    email.clone().into(),
-                    wca_id.clone().into(),
-                    Utc::now().into(),
-                ],
-            ))
-            .await
-            .map_err(|_| Status::InternalServerError)?;
+        entity::user::ActiveModel {
+            id: Set(uuid::Uuid::new_v4()),
+            email: Set(email.clone()),
+            wca_id: Set(wca_id.clone()),
+            created_at: Set(Utc::now()),
+        }
+        .insert(&app_state.db)
+        .await
+        .map_err(|error| {
+            tracing::error!(%error, "failed to create WCA user");
+            Status::InternalServerError
+        })?;
     }
     let mut cookie = Cookie::new("alg_trainers_session", email.clone());
     cookie.set_http_only(true);
@@ -332,7 +325,10 @@ async fn trainers(
 ) -> Result<CachedTrainers, Status> {
     let trainers = catalog::list(&state.db)
         .await
-        .map_err(|_| Status::InternalServerError)?
+        .map_err(|error| {
+            tracing::error!(%error, "failed to list trainer catalog");
+            Status::InternalServerError
+        })?
         .into_iter()
         .map(serde_json::to_value)
         .collect::<Result<Vec<_>, _>>()
@@ -354,7 +350,10 @@ async fn trainer(
 ) -> Result<CachedTrainer, Status> {
     catalog::load(&state.db, trainer_id)
         .await
-        .map_err(|_| Status::InternalServerError)?
+        .map_err(|error| {
+            tracing::error!(%error, %trainer_id, "failed to load trainer catalog entry");
+            Status::InternalServerError
+        })?
         .map(|trainer| {
             CachedTrainer(
                 Json(trainer),
@@ -376,8 +375,12 @@ async fn sync_get(
     before_id: Option<String>,
 ) -> Result<PrivateSync, Status> {
     let email = cookie_user(cookies).ok_or(Status::Unauthorized)?;
-    let user_id = find_user(&state.db, &email)
+    let user = find_user(&state.db, &email)
         .await
+        .map_err(|error| {
+            tracing::error!(%error, "failed to load sync user");
+            Status::InternalServerError
+        })?
         .ok_or(Status::Unauthorized)?;
     let cursor = match (before_datetime, before_id) {
         (None, None) => None,
@@ -389,10 +392,13 @@ async fn sync_get(
         }),
         _ => return Err(Status::BadRequest),
     };
-    sync::load_page(&state.db, user_id, cursor)
+    sync::load_page(&state.db, user.id, cursor)
         .await
         .map(|bundle| PrivateSync(Json(bundle), Header::new("Cache-Control", "no-store")))
-        .map_err(|_| Status::InternalServerError)
+        .map_err(|error| {
+            tracing::error!(%error, user_id = %user.id, "failed to load sync data");
+            Status::InternalServerError
+        })
 }
 
 #[rocket::put("/api/sync", data = "<bundle>")]
@@ -403,19 +409,23 @@ async fn sync_put(
     _rate_limit: ApiRateLimit,
 ) -> Result<PrivateSync, Status> {
     let email = cookie_user(cookies).ok_or(Status::Unauthorized)?;
-    let user_id = find_user(&state.db, &email)
+    let user = find_user(&state.db, &email)
         .await
+        .map_err(|error| {
+            tracing::error!(%error, "failed to load sync user");
+            Status::InternalServerError
+        })?
         .ok_or(Status::Unauthorized)?;
-    sync::save(&state.db, user_id, bundle.into_inner())
+    sync::save(&state.db, user.id, bundle.into_inner())
         .await
         .map(|bundle| PrivateSync(Json(bundle), Header::new("Cache-Control", "no-store")))
         .map_err(|error| match error {
             sync::SaveError::Validation(error) => {
-                tracing::warn!(%error, user_id = %user_id, "rejected invalid sync payload");
+                tracing::warn!(%error, user_id = %user.id, "rejected invalid sync payload");
                 Status::UnprocessableEntity
             }
             sync::SaveError::Database(error) => {
-                tracing::error!(%error, user_id = %user_id, "failed to save sync payload");
+                tracing::error!(%error, user_id = %user.id, "failed to save sync payload");
                 Status::InternalServerError
             }
         })
@@ -464,6 +474,26 @@ async fn rocket() -> _ {
     tracing_subscriber::fmt()
         .with_env_filter(tracing_subscriber::EnvFilter::from_default_env())
         .init();
+    let db = database::connect()
+        .await
+        .expect("Unable to connect to PostgreSQL");
+    let migrate_only = env_bool("DATABASE_MIGRATE_ONLY").unwrap_or(false);
+    let run_migrations = migrate_only || env_bool("DATABASE_RUN_MIGRATIONS").unwrap_or(true);
+    if run_migrations {
+        Migrator::up(&db, None)
+            .await
+            .expect("Database migrations failed");
+        let catalog_root = env::var("CATALOG_ROOT")
+            .map(std::path::PathBuf::from)
+            .unwrap_or_else(|_| "static".into());
+        catalog::seed(&db, &catalog_root)
+            .await
+            .expect("Unable to seed trainer catalog");
+    }
+    if migrate_only {
+        std::process::exit(0);
+    }
+
     let secret_key = env::var("ROCKET_SECRET_KEY").expect("ROCKET_SECRET_KEY must be configured");
     if secret_key == DEFAULT_SECRET_KEY
         || secret_key.len() < 32
@@ -472,29 +502,6 @@ async fn rocket() -> _ {
     {
         panic!("ROCKET_SECRET_KEY must be replaced with a high-entropy secret");
     }
-    let database_url =
-        env::var("DATABASE_URL").expect("DATABASE_URL must be configured explicitly");
-    let mut connect_options = ConnectOptions::new(database_url);
-    connect_options
-        .max_connections(20)
-        .min_connections(2)
-        .connect_timeout(Duration::from_secs(5))
-        .acquire_timeout(Duration::from_secs(5))
-        .idle_timeout(Duration::from_secs(300))
-        .max_lifetime(Duration::from_secs(1800));
-    let db = Database::connect(connect_options)
-        .await
-        .expect("Unable to connect to PostgreSQL");
-    Migrator::up(&db, None)
-        .await
-        .expect("Database migrations failed");
-    let catalog_root = env::var("CATALOG_ROOT")
-        .map(std::path::PathBuf::from)
-        .unwrap_or_else(|_| std::path::PathBuf::from("static"));
-    catalog::seed(&db, &catalog_root)
-        .await
-        .expect("Unable to seed trainer catalog");
-
     let wca_redirect_url = env::var("WCA_REDIRECT_URL")
         .unwrap_or_else(|_| "http://localhost:8000/api/auth/wca/callback".to_owned());
     let configured_cookie_secure = env::var("COOKIE_SECURE").ok();
@@ -535,6 +542,15 @@ async fn rocket() -> _ {
             catch_all
         ],
     )
+}
+
+fn env_bool(name: &str) -> Result<bool, &'static str> {
+    match env::var(name).ok().as_deref() {
+        None | Some("") => Err("not configured"),
+        Some("1" | "true" | "TRUE") => Ok(true),
+        Some("0" | "false" | "FALSE") => Ok(false),
+        Some(_) => panic!("{name} must be true, false, 1, or 0"),
+    }
 }
 
 #[cfg(test)]
