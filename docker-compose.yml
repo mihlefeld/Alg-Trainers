@@ -55,7 +55,7 @@ services:
       FORCE_CATALOG_SEED: ${FORCE_CATALOG_SEED:-}
       COOKIE_SECURE: ${COOKIE_SECURE:-}
     ports:
-      - "${ALG_TRAINERS_PORT:-8000}:8000"
+      - "127.0.0.1:${ALG_TRAINERS_PORT:-8000}:8000"
 
 volumes:
   psql-data:
