@@ -674,16 +674,27 @@ pub fn use_trainer_controller(bundle: Rc<TrainerBundle>) -> TrainerController {
     let on_step_hint = {
         let hint_case = hint_case.clone();
         let hint_open = hint_open.clone();
-        let cases = bundle.cases.clone();
+        let bundle = bundle.clone();
+        let cases_by_id = cases_by_id.clone();
+        let selected_algsets = selected_algsets.clone();
+        let search_query = search_query.clone();
+        let search_cells = search_cells.clone();
+        let search_all_angles = search_all_angles.clone();
         Callback::from(move |delta: isize| {
             if let Some(current) = hint_case.as_ref() {
-                if let Some(index) = cases
-                    .iter()
-                    .position(|item| item.case_id == current.case_id)
+                let search_needle = search_query.trim().to_lowercase();
+                let visible_case_ids = selection::ordered_visible_case_ids(
+                    &bundle,
+                    &selected_algsets,
+                    &search_needle,
+                    &search_cells,
+                    *search_all_angles,
+                );
+                if let Some(target_id) =
+                    selection::step_visible_case_id(&visible_case_ids, &current.case_id, delta)
                 {
-                    let target = index as isize + delta;
-                    if target >= 0 && (target as usize) < cases.len() {
-                        hint_case.set(Some(cases[target as usize].clone()));
+                    if let Some(next_case) = cases_by_id.get(&target_id) {
+                        hint_case.set(Some(next_case.clone()));
                         hint_open.set(true);
                     }
                 }
@@ -815,7 +826,7 @@ pub fn use_trainer_controller(bundle: Rc<TrainerBundle>) -> TrainerController {
                 timer.finish.emit(());
                 return;
             }
-            if *hint_open {
+            if *hint_open && !is_typing {
                 match event.code().as_str() {
                     "ArrowLeft" => {
                         event.prevent_default();

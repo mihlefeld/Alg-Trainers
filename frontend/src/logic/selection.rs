@@ -141,6 +141,61 @@ pub struct SelectionMetrics {
     pub selection_columns: usize,
 }
 
+pub fn ordered_visible_case_ids(
+    bundle: &TrainerBundle,
+    selected_algsets: &BTreeMap<String, bool>,
+    search_needle: &str,
+    search_cells: &BTreeMap<usize, String>,
+    search_all_angles: bool,
+) -> Vec<String> {
+    let cases_by_id = bundle
+        .cases
+        .iter()
+        .map(|case| (case.case_id.as_str(), case))
+        .collect::<BTreeMap<_, _>>();
+    let mut seen = BTreeSet::new();
+    let mut visible = Vec::new();
+    for group in &bundle.groups {
+        let group_enabled = bundle.algsets.iter().any(|algset| {
+            algset.groups.contains(&group.name)
+                && selected_algsets
+                    .get(&algset.name)
+                    .copied()
+                    .unwrap_or(algset.selected)
+        });
+        if !group_enabled {
+            continue;
+        }
+        for case_id in &group.cases {
+            let Some(case) = cases_by_id.get(case_id.as_str()) else {
+                continue;
+            };
+            if case_matches_search(case, bundle, search_needle, search_cells, search_all_angles)
+                && seen.insert(case.case_id.clone())
+            {
+                visible.push(case.case_id.clone());
+            }
+        }
+    }
+    visible
+}
+
+pub fn step_visible_case_id(
+    visible_case_ids: &[String],
+    current_case_id: &str,
+    delta: isize,
+) -> Option<String> {
+    let index = visible_case_ids
+        .iter()
+        .position(|id| id == current_case_id)?;
+    let target = index as isize + delta;
+    if target >= 0 && (target as usize) < visible_case_ids.len() {
+        Some(visible_case_ids[target as usize].clone())
+    } else {
+        None
+    }
+}
+
 pub fn compute_selection_metrics(
     bundle: &TrainerBundle,
     selected: &[String],
@@ -164,15 +219,13 @@ pub fn compute_selection_metrics(
         })
         .flat_map(|group| group.cases.iter().cloned())
         .collect::<BTreeSet<_>>();
-    let visible_case_ids = bundle
-        .cases
-        .iter()
-        .filter(|case| enabled_case_ids.contains(&case.case_id))
-        .filter(|case| {
-            case_matches_search(case, bundle, search_needle, search_cells, search_all_angles)
-        })
-        .map(|case| case.case_id.clone())
-        .collect::<Vec<_>>();
+    let visible_case_ids = ordered_visible_case_ids(
+        bundle,
+        selected_algsets,
+        search_needle,
+        search_cells,
+        search_all_angles,
+    );
     let hidden_cases = bundle.cases.len().saturating_sub(visible_case_ids.len());
     let hidden_selected = selected
         .iter()
@@ -261,5 +314,92 @@ mod tests {
         assert_eq!(presets["Bookmarks"].sel_cases, vec!["case1"]);
         let presets = toggle_bookmark(&presets, "case1");
         assert!(!presets.contains_key("Bookmarks"));
+    }
+
+    fn sample_bundle() -> TrainerBundle {
+        use crate::models::{TrainerAlgset, TrainerCase, TrainerGroup};
+        let make_case = |id: &str, name: &str| TrainerCase {
+            case_id: id.to_owned(),
+            name: name.to_owned(),
+            setup: None,
+            image_svg: None,
+            algs: Vec::new(),
+            scrambles: Vec::new(),
+        };
+        TrainerBundle {
+            trainer_id: "test".to_owned(),
+            title: "Test Trainer".to_owned(),
+            puzzle: "3x3".to_owned(),
+            method: "Test".to_owned(),
+            // Intentionally in lexicographical order, different from group display order.
+            cases: vec![
+                make_case("1", "Aa"),
+                make_case("10", "Ra"),
+                make_case("2", "Ab"),
+                make_case("3", "T"),
+            ],
+            groups: vec![
+                TrainerGroup {
+                    name: "G1".to_owned(),
+                    cases: vec!["1".to_owned(), "2".to_owned(), "10".to_owned()],
+                },
+                TrainerGroup {
+                    name: "G2".to_owned(),
+                    cases: vec!["3".to_owned()],
+                },
+            ],
+            algsets: vec![
+                TrainerAlgset {
+                    name: "SetA".to_owned(),
+                    groups: vec!["G1".to_owned()],
+                    selected: true,
+                },
+                TrainerAlgset {
+                    name: "SetB".to_owned(),
+                    groups: vec!["G2".to_owned()],
+                    selected: true,
+                },
+            ],
+            pre_rotations: Vec::new(),
+            post_rotations: Vec::new(),
+            pre_moves: Vec::new(),
+            post_moves: Vec::new(),
+            max_algs_per_row: 4,
+            u_move_cycles: Vec::new(),
+            selection_key: "testSel".to_owned(),
+            times_key: "testTimes".to_owned(),
+        }
+    }
+
+    #[test]
+    fn ordered_visible_cases_follow_display_order() {
+        let bundle = sample_bundle();
+        let visible =
+            ordered_visible_case_ids(&bundle, &BTreeMap::new(), "", &BTreeMap::new(), true);
+        assert_eq!(visible, vec!["1", "2", "10", "3"]);
+        assert_eq!(step_visible_case_id(&visible, "2", 1), Some("10".to_owned()));
+        assert_eq!(step_visible_case_id(&visible, "10", -1), Some("2".to_owned()));
+        assert_eq!(step_visible_case_id(&visible, "1", -1), None);
+        assert_eq!(step_visible_case_id(&visible, "3", 1), None);
+    }
+
+    #[test]
+    fn disabled_algset_cases_are_excluded_from_navigation() {
+        let bundle = sample_bundle();
+        let algsets = BTreeMap::from([("SetA".to_owned(), true), ("SetB".to_owned(), false)]);
+        let visible = ordered_visible_case_ids(&bundle, &algsets, "", &BTreeMap::new(), true);
+        assert_eq!(visible, vec!["1", "2", "10"]);
+        assert_eq!(step_visible_case_id(&visible, "10", 1), None);
+        assert_eq!(step_visible_case_id(&visible, "3", -1), None);
+    }
+
+    #[test]
+    fn active_search_filters_navigation_targets() {
+        let bundle = sample_bundle();
+        let visible =
+            ordered_visible_case_ids(&bundle, &BTreeMap::new(), "a", &BTreeMap::new(), true);
+        assert_eq!(visible, vec!["1", "2", "10"]);
+        assert_eq!(step_visible_case_id(&visible, "1", 1), Some("2".to_owned()));
+        assert_eq!(step_visible_case_id(&visible, "10", 1), None);
     }
 }

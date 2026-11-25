@@ -130,12 +130,12 @@ pub fn hint_dialog(props: &HintDialogProps) -> Html {
                     <b>{&case.name}</b>
                     <button class="material-symbols-outlined abutton prevNext" onclick={on_next} title="Next case">{"arrow_forward"}</button>
                 </div>
-                <div class="borderedContainer colFlex center" style="background-color:var(--secondary);">
+                <div class="borderedContainer colFlex center hintCaseImage" style="background-color:var(--secondary);">
                     if let Some(svg) = case.image_svg.as_ref() {
                         <CaseImage svg={svg.clone()} colors={props.cube_colors.clone()} style="width:16em;" />
                     }
                 </div>
-                <div class="borderedContainer grow rowFlex center pad">{case.setup.as_deref().unwrap_or("")}</div>
+                <div class="borderedContainer rowFlex center pad hintCaseSetup">{case.setup.as_deref().unwrap_or("")}</div>
                 <div class="borderedContainer grow colFlex algList">
                     {for display_algs(case, &props.custom_algs).into_iter().map(|item| {
                         let editing = alg_editor.as_ref().is_some_and(|(id, _)| id.as_deref() == Some(item.alg_id.as_str()));

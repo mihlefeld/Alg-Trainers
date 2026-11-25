@@ -171,7 +171,7 @@ pub fn selection_view(props: &SelectionViewProps) -> Html {
             id="selectionLayout"
             class="colFlex scroller"
             style={format!(
-                "--selection-columns:{}; margin: 0.5em; max-width: 70em; width: fit-content; display:flex;",
+                "--selection-columns:{}; margin: 0.5em; width: fit-content; display:flex; min-width: 50vw;",
                 metrics.selection_columns
             )}
         >
