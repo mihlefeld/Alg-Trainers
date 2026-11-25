@@ -1,6 +1,7 @@
 use crate::logic::results::format_time;
 use gloo_timers::callback::{Interval, Timeout};
 use js_sys::Date;
+use std::rc::Rc;
 use web_sys::PointerEvent;
 use yew::prelude::*;
 
@@ -44,7 +45,7 @@ impl TrainerTimer {
 
 #[hook]
 pub fn use_trainer_timer(
-    settings: UseStateHandle<serde_json::Value>,
+    settings: Rc<serde_json::Value>,
     on_finish: Callback<i64>,
 ) -> TrainerTimer {
     let running = use_state(|| false);

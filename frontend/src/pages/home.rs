@@ -2,7 +2,6 @@ use crate::logic::theme;
 use crate::models::{MeResponse, TrainerSummary};
 use crate::services::api::{fetch_account_status, fetch_trainers, logout};
 use crate::services::pwa::isNavigatorOnline;
-use crate::services::storage::{get_stored, SETTINGS_KEY};
 use crate::Route;
 use wasm_bindgen_futures::spawn_local;
 use yew::prelude::*;
@@ -21,15 +20,7 @@ pub fn home() -> Html {
         let offline = offline.clone();
         let error = error.clone();
         use_effect_with((), move |_| {
-            spawn_local(async move {
-                if let Some(value) = get_stored(SETTINGS_KEY).await {
-                    if let Ok(settings) = serde_json::from_str(&value) {
-                        theme::apply_settings(&settings);
-                    }
-                } else {
-                    theme::apply_settings(&serde_json::Value::Null);
-                }
-            });
+            theme::set_body_background("var(--backgroundDarker)");
             spawn_local(async move {
                 match fetch_trainers().await {
                     Ok(value) => trainers.set(value),

@@ -1,31 +1,27 @@
 use crate::components::case_image::CaseImage;
-use crate::logic::{algs, cube_schemes, search};
+use crate::logic::{algs, cube_schemes, search, theme};
 use crate::models::{TrainerBundle, UserAlgState};
 use crate::services::api::fetch_trainer_bundle;
-use crate::services::storage::{load_custom_algs, load_settings};
+use crate::services::settings::use_settings;
+use crate::services::storage::load_custom_algs;
+use crate::Route;
 use std::collections::BTreeMap;
 use std::rc::Rc;
 use wasm_bindgen_futures::spawn_local;
 use web_sys::HtmlInputElement;
 use yew::prelude::*;
+use yew_router::prelude::*;
 
 #[function_component(AlgSheetPage)]
 pub fn alg_sheet_page() -> Html {
     let bundle = use_state(|| None::<TrainerBundle>);
     let query = use_state(String::new);
     let custom_algs = use_state(BTreeMap::<String, Vec<UserAlgState>>::new);
-    let settings = use_state(|| {
-        let mut initial = serde_json::json!({});
-        cube_schemes::migrate(&mut initial);
-        initial
-    });
+    let settings_ctx = use_settings();
 
     {
-        let settings = settings.clone();
         use_effect_with((), move |_| {
-            spawn_local(async move {
-                settings.set(load_settings(false).await);
-            });
+            theme::set_body_background("var(--backgroundDarker)");
             || ()
         });
     }
@@ -76,7 +72,7 @@ pub fn alg_sheet_page() -> Html {
 
     let needle = query.trim().to_lowercase();
     let cube_colors = Rc::new(cube_schemes::active_colors(
-        &settings,
+        &settings_ctx.settings,
         &bundle.trainer_id,
         &bundle.puzzle,
     ));
@@ -90,7 +86,7 @@ pub fn alg_sheet_page() -> Html {
         <main class="colFlex" style="align-items:center;width:100%;padding:0.5em;">
             <div class="rowFlex center" style="justify-content:space-between;width:min(80vw,62em);">
                 <h1>{format!("{} algorithms", bundle.title)}</h1>
-                <a class="abutton" href={format!("/trainer/{}", bundle.trainer_id)}>{"Back"}</a>
+                <Link<Route> classes="abutton" to={Route::Trainer { id: bundle.trainer_id.clone() }}>{"Back"}</Link<Route>>
             </div>
             <div class="borderedContainer pad rowFlex" style="width:min(80vw,62em);">
                 <input

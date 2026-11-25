@@ -8,10 +8,17 @@ use crate::components::update_prompt::UpdatePrompt;
 use crate::pages::alg_sheet::AlgSheetPage;
 use crate::pages::home::Home;
 use crate::pages::trainer::TrainerPage;
+use crate::services::settings::SettingsProvider;
 use crate::services::sync::start_sync_engine;
+use serde::{Deserialize, Serialize};
 use wasm_bindgen::prelude::*;
 use yew::prelude::*;
 use yew_router::prelude::*;
+
+#[derive(Clone, PartialEq, Serialize, Deserialize)]
+pub struct AlgSheetQuery {
+    pub algset: String,
+}
 
 #[derive(Clone, Routable, PartialEq)]
 pub enum Route {
@@ -30,12 +37,12 @@ pub enum Route {
 fn app() -> Html {
     start_sync_engine();
     html! {
-        <>
+        <SettingsProvider>
             <UpdatePrompt />
             <BrowserRouter>
                 <Switch<Route> render={switch} />
             </BrowserRouter>
-        </>
+        </SettingsProvider>
     }
 }
 

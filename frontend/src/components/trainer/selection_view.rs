@@ -4,11 +4,13 @@ use crate::components::trainer::search_panel::SearchPanel;
 use crate::logic::search::case_matches_search;
 use crate::logic::selection::compute_selection_metrics;
 use crate::models::{Dialog, SelectionPreset, TrainerBundle, TrainerCase};
+use crate::Route;
 use gloo_timers::callback::Timeout;
 use std::collections::{BTreeMap, BTreeSet};
 use std::rc::Rc;
 use web_sys::{MouseEvent, PointerEvent};
 use yew::prelude::*;
+use yew_router::prelude::*;
 
 #[derive(Properties, PartialEq)]
 struct CaseCardProps {
@@ -175,7 +177,7 @@ pub fn selection_view(props: &SelectionViewProps) -> Html {
         >
             <div class="colFlex">
                 <div class="rowFlex center" style="justify-content: space-between;">
-                    <h1 id="trainerTitle">{&bundle.title}<span>{" | "}</span><a href="/">{"Back"}</a></h1>
+                    <h1 id="trainerTitle">{&bundle.title}<span>{" | "}</span><Link<Route> to={Route::Home}>{"Back"}</Link<Route>></h1>
                     <div class="colFlex">
                         <div id="settingsButton">
                             <button

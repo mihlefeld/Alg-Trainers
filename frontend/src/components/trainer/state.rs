@@ -4,10 +4,10 @@ use crate::models::{
     Dialog, DisplayAlg, Mode, SelectionPreset, StoredResult, TrainerBundle, TrainerCase,
     UserAlgState,
 };
+use crate::services::settings::use_settings;
 use crate::services::storage::{
-    get_stored, load_custom_algs, load_settings, put_stored, put_stored_results, randomAlgId,
-    save_custom_algs, save_presets, save_selected_cases, save_selection_and_algsets,
-    save_settings_async,
+    get_stored, load_custom_algs, put_stored, put_stored_results, randomAlgId, save_custom_algs,
+    save_presets, save_selected_cases, save_selection_and_algsets,
 };
 use gloo_timers::callback::Timeout;
 use js_sys::Date;
@@ -114,12 +114,11 @@ pub fn use_trainer_controller(bundle: Rc<TrainerBundle>) -> TrainerController {
     let search_cells = use_state(BTreeMap::<usize, String>::new);
     let search_color = use_state(|| search::search_color_names()[0].to_owned());
     let search_all_angles = use_state(|| true);
-    let settings = use_state(|| {
-        let mut initial = serde_json::json!({});
-        cube_schemes::migrate(&mut initial);
-        initial
-    });
-    let settings_ready = use_state(|| false);
+    let settings_ctx = use_settings();
+    let settings = settings_ctx.settings.clone();
+    let settings_ready = settings_ctx.ready;
+    let settings_ref = use_mut_ref(|| settings.clone());
+    *settings_ref.borrow_mut() = settings.clone();
     let presets = use_state(BTreeMap::<String, SelectionPreset>::new);
     let current_scramble = use_state(String::new);
     let last_case = use_state(|| None::<TrainerCase>);
@@ -139,7 +138,6 @@ pub fn use_trainer_controller(bundle: Rc<TrainerBundle>) -> TrainerController {
         let selected_algsets = selected_algsets.clone();
         let stored_results = stored_results.clone();
         let settings = settings.clone();
-        let settings_ready = settings_ready.clone();
         let presets = presets.clone();
         let custom_algs = custom_algs.clone();
         let selection_key = selection_storage_key.clone();
@@ -207,9 +205,6 @@ pub fn use_trainer_controller(bundle: Rc<TrainerBundle>) -> TrainerController {
                         stored_results.set(loaded_results.clone());
                     }
                 }
-                let loaded_settings = load_settings(true).await;
-                settings.set(loaded_settings.clone());
-                settings_ready.set(true);
                 if let Some(value) = get_stored(&format!("{selection_key}Presets")).await {
                     if let Ok(parsed) =
                         serde_json::from_str::<BTreeMap<String, SelectionPreset>>(&value)
@@ -227,7 +222,7 @@ pub fn use_trainer_controller(bundle: Rc<TrainerBundle>) -> TrainerController {
                         &query,
                         &loaded_selected,
                         &loaded_results,
-                        &loaded_settings,
+                        &settings,
                     );
                     recap_remaining.set(remaining);
                     recap_active.set(active_recap);
@@ -237,7 +232,7 @@ pub fn use_trainer_controller(bundle: Rc<TrainerBundle>) -> TrainerController {
                         current_scramble.set(scramble::make_scramble(
                             &case,
                             &bundle,
-                            &loaded_settings,
+                            &settings,
                             &bundle.selection_key,
                         ));
                         active_case.set(Some(case));
@@ -255,7 +250,7 @@ pub fn use_trainer_controller(bundle: Rc<TrainerBundle>) -> TrainerController {
         let recap_remaining = recap_remaining.clone();
         let selected = selected.clone();
         let stored_results = stored_results.clone();
-        let settings = settings.clone();
+        let settings_ref = settings_ref.clone();
         let active_case = active_case.clone();
         let current_scramble = current_scramble.clone();
         let bundle = bundle.clone();
@@ -263,12 +258,13 @@ pub fn use_trainer_controller(bundle: Rc<TrainerBundle>) -> TrainerController {
             let set_from_location = Rc::new(move || {
                 if let Some(window) = web_sys::window() {
                     let state = window.location().search().unwrap_or_default();
+                    let current_settings = settings_ref.borrow().clone();
                     if state == "?train" || state == "?recap" {
                         let (case_id, remaining, is_recap) = scramble::pick_initial_case_for_query(
                             &state,
                             &selected,
                             &stored_results,
-                            &settings,
+                            &current_settings,
                         );
                         mode.set(Mode::Practice);
                         theme::set_body_background("var(--backgroundDarker)");
@@ -280,7 +276,7 @@ pub fn use_trainer_controller(bundle: Rc<TrainerBundle>) -> TrainerController {
                             current_scramble.set(scramble::make_scramble(
                                 &case,
                                 &bundle,
-                                &settings,
+                                &current_settings,
                                 &bundle.selection_key,
                             ));
                             active_case.set(Some(case));
@@ -303,6 +299,7 @@ pub fn use_trainer_controller(bundle: Rc<TrainerBundle>) -> TrainerController {
                 );
             }
             move || {
+                theme::set_body_background("var(--backgroundDarker)");
                 if let Some(window) = window {
                     let _ = window.remove_event_listener_with_callback(
                         "popstate",
@@ -310,15 +307,6 @@ pub fn use_trainer_controller(bundle: Rc<TrainerBundle>) -> TrainerController {
                     );
                 }
             }
-        });
-    }
-
-    // Apply CSS theme variables whenever settings change.
-    {
-        let settings = settings.clone();
-        use_effect_with(settings.clone(), move |settings| {
-            theme::apply_settings(settings);
-            || ()
         });
     }
 
@@ -763,13 +751,7 @@ pub fn use_trainer_controller(bundle: Rc<TrainerBundle>) -> TrainerController {
         })
     };
 
-    let on_update_settings = {
-        let settings = settings.clone();
-        Callback::from(move |next: serde_json::Value| {
-            settings.set(next.clone());
-            save_settings_async(next);
-        })
-    };
+    let on_update_settings = settings_ctx.update.clone();
 
     let on_open_dialog = {
         let dialog = dialog.clone();
@@ -955,7 +937,7 @@ pub fn use_trainer_controller(bundle: Rc<TrainerBundle>) -> TrainerController {
         search_color: (*search_color).clone(),
         search_all_angles: *search_all_angles,
         settings: (*settings).clone(),
-        settings_ready: *settings_ready,
+        settings_ready,
         presets: (*presets).clone(),
         current_scramble: (*current_scramble).clone(),
         last_case: (*last_case).clone(),

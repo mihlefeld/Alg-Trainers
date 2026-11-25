@@ -1,7 +1,9 @@
 use crate::models::{Dialog, SelectionPreset};
+use crate::{AlgSheetQuery, Route};
 use std::collections::BTreeMap;
 use web_sys::HtmlInputElement;
 use yew::prelude::*;
+use yew_router::prelude::*;
 
 #[derive(Properties, PartialEq)]
 struct PresetRowProps {
@@ -165,7 +167,7 @@ pub fn presets_panel(props: &PresetsPanelProps) -> Html {
                     let open_dialog = props.on_open_dialog.clone();
                     Callback::from(move |_| open_dialog.emit(Dialog::Hotkeys))
                 }}>{"Hotkeys"}</button>
-                <a href={format!("/algsheet?algset={}", props.trainer_id)}>{"Algs lookup"}</a>
+                <Link<Route, AlgSheetQuery> to={Route::AlgSheet} query={Some(AlgSheetQuery { algset: props.trainer_id.clone() })}>{"Algs lookup"}</Link<Route, AlgSheetQuery>>
                 <button class="linkButton" onclick={{
                     let open_dialog = props.on_open_dialog.clone();
                     Callback::from(move |_| open_dialog.emit(Dialog::Credits))
