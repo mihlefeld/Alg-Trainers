@@ -1,5 +1,8 @@
-use crate::{color_input_style, cube_schemes, TrainerSummary};
-use gloo_net::http::Request;
+use crate::components::settings_controls::ColorInputRow;
+use crate::logic::cube_schemes;
+use crate::logic::theme::{default_cube_colors, setting_color};
+use crate::models::TrainerSummary;
+use crate::services::api::fetch_trainers;
 use serde_json::{json, Value};
 use std::collections::BTreeMap;
 use wasm_bindgen_futures::spawn_local;
@@ -35,30 +38,6 @@ fn options(settings: &Value, fallback: Option<&str>, selected: &str) -> Vec<Html
     result
 }
 
-fn scheme_label(settings: &Value, id: &str) -> String {
-    if id.is_empty() {
-        return "Use global scheme".to_owned();
-    }
-    cube_schemes::PRESETS
-        .iter()
-        .find(|(preset_id, _)| *preset_id == id)
-        .map(|(_, name)| (*name).to_owned())
-        .or_else(|| {
-            settings
-                .get("cubeColorSchemes")
-                .and_then(Value::as_array)
-                .and_then(|schemes| {
-                    schemes
-                        .iter()
-                        .find(|scheme| scheme.get("id").and_then(Value::as_str) == Some(id))
-                })
-                .and_then(|scheme| scheme.get("name"))
-                .and_then(Value::as_str)
-                .map(str::to_owned)
-        })
-        .unwrap_or_else(|| "Unknown scheme".to_owned())
-}
-
 fn notify(message: &str) {
     if let Some(window) = web_sys::window() {
         let _ = window.alert_with_message(message);
@@ -75,18 +54,7 @@ pub fn cube_settings(props: &Props) -> Html {
         use_effect_with(*retry, move |_| {
             catalog.set(None);
             spawn_local(async move {
-                let result = match Request::get("/api/trainers").send().await {
-                    Ok(response) if response.ok() => response
-                        .json::<Vec<TrainerSummary>>()
-                        .await
-                        .map_err(|error| format!("Unable to decode trainer list: {error}")),
-                    Ok(response) => Err(format!(
-                        "Unable to load trainer list (HTTP {}).",
-                        response.status()
-                    )),
-                    Err(error) => Err(format!("Unable to load trainer list: {error}")),
-                };
-                catalog.set(Some(result));
+                catalog.set(Some(fetch_trainers().await));
             });
             || ()
         });
@@ -147,7 +115,7 @@ pub fn cube_settings(props: &Props) -> Html {
         .to_owned();
     let is_custom = custom.is_some();
     let colors = cube_schemes::scheme_colors(settings, &selected_id);
-    let background = crate::setting_color(settings, "--background");
+    let background = setting_color(settings, "--background");
     let mut groups = BTreeMap::<String, Vec<TrainerSummary>>::new();
     if let Some(Ok(trainers)) = catalog.as_ref() {
         for trainer in trainers {
@@ -162,6 +130,7 @@ pub fn cube_settings(props: &Props) -> Html {
         .and_then(Value::as_str)
         .unwrap_or("default")
         .to_owned();
+
     html! {
         <div class="colFlex">
             <div class="trainerScrambleHelp">{"Choose a global scheme and optional puzzle or trainer overrides. Changes apply immediately. Schemes are included in backups."}</div>
@@ -173,7 +142,7 @@ pub fn cube_settings(props: &Props) -> Html {
                     Callback::from(move |event: Event| {
                         let mut next = next.clone();
                         next["defaultCubeScheme"] = json!(event.target_unchecked_into::<HtmlSelectElement>().value());
-                        on_change.emit(next.clone());
+                        on_change.emit(next);
                     })
                 }}>{for options(settings, None, &global)}</select>
             </label>
@@ -208,7 +177,7 @@ pub fn cube_settings(props: &Props) -> Html {
                             if let Some(scheme) = next["cubeColorSchemes"].as_array_mut()
                                 .and_then(|schemes| schemes.iter_mut().find(|s| s["id"].as_str() == Some(&id))) {
                                 scheme["name"] = json!(value.trim());
-                                on_change.emit(next.clone());
+                                on_change.emit(next);
                             }
                         })
                     }} />
@@ -228,7 +197,7 @@ pub fn cube_settings(props: &Props) -> Html {
                             };
                             schemes.push(json!({"id": id, "name": format!("Custom scheme {}", schemes.len() + 1), "colors": colors}));
                             editing.set(id);
-                            on_change.emit(next.clone());
+                            on_change.emit(next);
                         })
                     }}>{"Add copy"}</button>
                     <button class="abutton" disabled={!is_custom} onclick={{
@@ -243,40 +212,33 @@ pub fn cube_settings(props: &Props) -> Html {
                             if confirmed {
                                 cube_schemes::delete_scheme(&mut next, &id);
                                 editing.set("default".to_owned());
-                                on_change.emit(next.clone());
+                                on_change.emit(next);
                             }
                         })
                     }}>{"Delete"}</button>
                 </div>
-                {for crate::default_cube_colors().keys().map(|key| {
+                {for default_cube_colors().keys().map(|key| {
                     let key = *key;
                     let value = colors.get(key).cloned().unwrap_or_default();
-                    let style = color_input_style(&value, &background);
+                    let next = settings.clone();
+                    let id = selected_id.clone();
+                    let on_change = props.on_change.clone();
                     html! {
-                        <label class="settingsEntry colorSetting">
-                            <span>{key}</span>
-                            <input type="text" aria-label={format!("{key} cube color")} value={value.clone()} style={style} disabled={!is_custom} onchange={{
-                                let next = settings.clone();
-                                let id = selected_id.clone();
-                                let background = background.clone();
-                                let on_change = props.on_change.clone();
-                                Callback::from(move |event: Event| {
-                                    let mut next = next.clone();
-                                    let input = event.target_unchecked_into::<HtmlInputElement>();
-                                    let new_value = input.value();
-                                    if crate::colorInputStyle(&new_value, &background).is_err() {
-                                        notify("Please enter a valid CSS color.");
-                                        input.set_value(&value);
-                                        return;
-                                    }
-                                    if let Some(scheme) = next["cubeColorSchemes"].as_array_mut()
-                                        .and_then(|schemes| schemes.iter_mut().find(|s| s["id"].as_str() == Some(&id))) {
-                                        scheme["colors"][key] = json!(new_value);
-                                        on_change.emit(next.clone());
-                                    }
-                                })
-                            }} />
-                        </label>
+                        <ColorInputRow
+                            label={key}
+                            aria_label={format!("{key} cube color")}
+                            value={value}
+                            background={background.clone()}
+                            disabled={!is_custom}
+                            on_change={Callback::from(move |new_value: String| {
+                                let mut next = next.clone();
+                                if let Some(scheme) = next["cubeColorSchemes"].as_array_mut()
+                                    .and_then(|schemes| schemes.iter_mut().find(|s| s["id"].as_str() == Some(&id))) {
+                                    scheme["colors"][key] = json!(new_value);
+                                    on_change.emit(next);
+                                }
+                            })}
+                        />
                     }
                 })}
             </details>
@@ -295,7 +257,7 @@ pub fn cube_settings(props: &Props) -> Html {
                         .and_then(|v| v.get("scheme")).and_then(Value::as_str).unwrap_or("").to_owned();
                     let next = settings.clone();
                     let puzzle_key = puzzle.clone();
-                    let puzzle_scheme_label = scheme_label(settings, &puzzle_value);
+                    let puzzle_scheme_label = cube_schemes::scheme_label(settings, &puzzle_value);
                     let trainer_ids = trainers.iter().map(|t| t.trainer_id.clone()).collect::<Vec<_>>();
                     let on_change = props.on_change.clone();
                     html! {
@@ -313,7 +275,7 @@ pub fn cube_settings(props: &Props) -> Html {
                                     } else {
                                         next["puzzleCubeSchemes"][&puzzle_key] = json!({"scheme": value, "trainers": trainer_ids});
                                     }
-                                    on_change.emit(next.clone());
+                                    on_change.emit(next);
                                 })}>{for options(settings, Some("Use global scheme"), &puzzle_value)}</select>
                             </label>
                             {for trainers.into_iter().map(|trainer| {
@@ -333,7 +295,7 @@ pub fn cube_settings(props: &Props) -> Html {
                                             } else {
                                                 next["trainerCubeSchemes"][&id] = json!(value);
                                             }
-                                            on_change.emit(next.clone());
+                                            on_change.emit(next);
                                         })}>{for options(settings, Some("Use puzzle scheme"), &value)}</select>
                                     </label>
                                 }

@@ -1,3 +1,4 @@
+use crate::logic::theme::default_cube_colors;
 use serde_json::{json, Value};
 use std::collections::BTreeMap;
 
@@ -8,7 +9,7 @@ pub const PRESETS: [(&str, &str); 3] = [
 ];
 
 pub fn preset_colors(id: &str) -> BTreeMap<&'static str, &'static str> {
-    let mut colors = super::default_cube_colors();
+    let mut colors = default_cube_colors();
     match id {
         "redgreen" => {
             colors.insert("red", "#E157BD");
@@ -176,6 +177,30 @@ pub fn delete_scheme(settings: &mut Value, id: &str) {
     {
         overrides.retain(|_, value| value.get("scheme").and_then(Value::as_str) != Some(id));
     }
+}
+
+pub fn scheme_label(settings: &Value, id: &str) -> String {
+    if id.is_empty() {
+        return "Use global scheme".to_owned();
+    }
+    PRESETS
+        .iter()
+        .find(|(preset_id, _)| *preset_id == id)
+        .map(|(_, name)| (*name).to_owned())
+        .or_else(|| {
+            settings
+                .get("cubeColorSchemes")
+                .and_then(Value::as_array)
+                .and_then(|schemes| {
+                    schemes
+                        .iter()
+                        .find(|scheme| scheme.get("id").and_then(Value::as_str) == Some(id))
+                })
+                .and_then(|scheme| scheme.get("name"))
+                .and_then(Value::as_str)
+                .map(str::to_owned)
+        })
+        .unwrap_or_else(|| "Unknown scheme".to_owned())
 }
 
 #[cfg(test)]
