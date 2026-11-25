@@ -624,8 +624,11 @@ async fn catch_all(path: std::path::PathBuf) -> Option<rocket::fs::NamedFile> {
             .extension()
             .is_some_and(|extension| extension == "png")
         {
+            let catalog_root = env::var("CATALOG_ROOT")
+                .map(std::path::PathBuf::from)
+                .unwrap_or_else(|_| std::path::PathBuf::from("static"));
             if let Ok(file) =
-                rocket::fs::NamedFile::open(std::path::Path::new("static").join(stripped)).await
+                rocket::fs::NamedFile::open(catalog_root.join(stripped)).await
             {
                 return Some(file);
             }

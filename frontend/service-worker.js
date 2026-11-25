@@ -16,10 +16,18 @@ self.addEventListener("install", event => {
     const info = await versionInfo();
     const manifest = await fetch("/offline-manifest.json", { cache: "no-store" }).then(r => r.json());
     const shell = await caches.open(`${SHELL_PREFIX}-${info.version}`);
+    const catalog = await caches.open(`${CATALOG_PREFIX}-${info.catalogVersion}`);
     await Promise.all(manifest.assets.map(async entry => {
       const response = await fetch(entry.url, { cache: "no-store" });
       if (!response.ok) throw new Error(`Unable to cache ${entry.url}`);
-      await shell.put(entry.url, response);
+      if (entry.url.startsWith("/api/trainers")) {
+        await catalog.put(entry.url, response);
+      } else {
+        await shell.put(entry.url, response);
+        if (entry.url === "/" || entry.url === "/index.html") {
+          await catalog.put(entry.url, response.clone());
+        }
+      }
     }));
     await self.skipWaiting();
   })());

@@ -224,9 +224,10 @@ export async function storageAcknowledgeOutbox(operationIds) {
 export async function setActiveAccount(email) {
   const db = await openStorage();
   await new Promise((resolve, reject) => {
-    const tx = db.transaction(["metadata", "dirty"], "readwrite");
+    const tx = db.transaction(["metadata", "dirty", "outbox"], "readwrite");
     const metadata = tx.objectStore("metadata");
     const dirty = tx.objectStore("dirty");
+    const outbox = tx.objectStore("outbox");
     metadata.put(email || null, "activeAccount");
     if (email) {
       const keysRequest = dirty.getAllKeys();
@@ -234,8 +235,18 @@ export async function setActiveAccount(email) {
         for (const key of keysRequest.result) {
           const scopeRequest = metadata.get(`dirtyScope:${key}`);
           scopeRequest.onsuccess = () => {
-            if (!scopeRequest.result) metadata.put(email, `dirtyScope:${key}`);
+            if (!scopeRequest.result || scopeRequest.result === "anonymous") {
+              metadata.put(email, `dirtyScope:${key}`);
+            }
           };
+        }
+      };
+      const outboxRequest = outbox.getAll();
+      outboxRequest.onsuccess = () => {
+        for (const record of outboxRequest.result) {
+          if (record.userScope === "anonymous") {
+            outbox.put({ ...record, userScope: email });
+          }
         }
       };
     }
