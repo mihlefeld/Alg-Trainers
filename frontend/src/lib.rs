@@ -87,6 +87,21 @@ export async function storagePut(key, value) {
     const tx = db.transaction(["data", "dirty", "outbox", "tombstones", "metadata"], "readwrite");
     tx.objectStore("data").put(value, key);
     tx.objectStore("dirty").put(Date.now(), key);
+    const metadata = tx.objectStore("metadata");
+    const accountRequest = metadata.get("activeAccount");
+    accountRequest.onsuccess = () => {
+      const scope = accountRequest.result || "anonymous";
+      metadata.put(scope, `dirtyScope:${key}`);
+      tx.objectStore("outbox").put({
+        operationId: (crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`),
+        userScope: scope,
+        entityType: key,
+        entityId: key,
+        timestamp: Date.now(),
+        payload: value,
+        retryState: { attempts: 0 }
+      });
+    };
     try {
       const parsed = JSON.parse(value);
       if (Array.isArray(parsed)) {
@@ -96,28 +111,38 @@ export async function storagePut(key, value) {
               entityId: item.id,
               entityType: "result",
               deletedAt: item.datetime || Date.now(),
-            }, item.id);
+            });
           }
         }
       }
     } catch {}
-    const metadata = tx.objectStore("metadata");
-    const accountRequest = metadata.get("activeAccount");
-    accountRequest.onsuccess = () => {
-      tx.objectStore("outbox").put({
-        operationId: (crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`),
-        userScope: accountRequest.result || "anonymous",
-        entityType: key,
-        entityId: key,
-        timestamp: Date.now(),
-        payload: value,
-        retryState: { attempts: 0 }
-      });
-    };
     tx.oncomplete = resolve;
     tx.onerror = () => reject(tx.error);
   });
   window.dispatchEvent(new CustomEvent("alg-trainers-change", { detail: { key, value } }));
+}
+export async function storagePutRemote(key, value) {
+  const db = await openStorage();
+  await new Promise((resolve, reject) => {
+    const tx = db.transaction(["data", "tombstones"], "readwrite");
+    tx.objectStore("data").put(value, key);
+    try {
+      const parsed = JSON.parse(value);
+      if (Array.isArray(parsed)) {
+        for (const item of parsed) {
+          if (item?.deleted === true && item?.id) {
+            tx.objectStore("tombstones").put({
+              entityId: item.id,
+              entityType: "result",
+              deletedAt: item.datetime || Date.now(),
+            });
+          }
+        }
+      }
+    } catch {}
+    tx.oncomplete = resolve;
+    tx.onerror = () => reject(tx.error);
+  });
 }
 export async function storageAll(storeName) {
   const db = await openStorage();
@@ -144,6 +169,39 @@ export async function storageClearDirtyIfUnchanged(expected) {
     tx.onerror = () => reject(tx.error);
   });
 }
+export async function storageDirtyForAccount(account) {
+  const db = await openStorage();
+  return await new Promise((resolve, reject) => {
+    const tx = db.transaction(["dirty", "metadata"], "readonly");
+    const dirty = tx.objectStore("dirty");
+    const metadata = tx.objectStore("metadata");
+    const result = {};
+    let pending = 0;
+    let completed = false;
+    const keysRequest = dirty.getAllKeys();
+    const valuesRequest = dirty.getAll();
+    keysRequest.onsuccess = () => {
+      pending = keysRequest.result.length;
+      for (let i = 0; i < keysRequest.result.length; i++) {
+        const key = keysRequest.result[i];
+        const scopeRequest = metadata.get(`dirtyScope:${key}`);
+        scopeRequest.onsuccess = () => {
+          if ((scopeRequest.result || "anonymous") === account) {
+            result[key] = valuesRequest.result[i];
+          }
+          pending -= 1;
+          if (completed && pending === 0) resolve(result);
+        };
+      }
+      if (pending === 0) completed = true;
+    };
+    tx.oncomplete = () => {
+      completed = true;
+      if (pending === 0) resolve(result);
+    };
+    tx.onerror = () => reject(tx.error);
+  });
+}
 export async function storageOutboxAll() {
   const db = await openStorage();
   return await new Promise((resolve, reject) => {
@@ -166,8 +224,21 @@ export async function storageAcknowledgeOutbox(operationIds) {
 export async function setActiveAccount(email) {
   const db = await openStorage();
   await new Promise((resolve, reject) => {
-    const tx = db.transaction("metadata", "readwrite");
-    tx.objectStore("metadata").put(email || null, "activeAccount");
+    const tx = db.transaction(["metadata", "dirty"], "readwrite");
+    const metadata = tx.objectStore("metadata");
+    const dirty = tx.objectStore("dirty");
+    metadata.put(email || null, "activeAccount");
+    if (email) {
+      const keysRequest = dirty.getAllKeys();
+      keysRequest.onsuccess = () => {
+        for (const key of keysRequest.result) {
+          const scopeRequest = metadata.get(`dirtyScope:${key}`);
+          scopeRequest.onsuccess = () => {
+            if (!scopeRequest.result) metadata.put(email, `dirtyScope:${key}`);
+          };
+        }
+      };
+    }
     tx.oncomplete = resolve;
     tx.onerror = () => reject(tx.error);
   });
@@ -188,6 +259,11 @@ export async function catalogFetch(url) {
 export async function initializePwa() {
   if (!("serviceWorker" in navigator)) return;
   await navigator.serviceWorker.register("/service-worker.js");
+  const pending = localStorage.getItem("alg-trainers-pending-version");
+  if (pending) {
+    localStorage.setItem("alg-trainers-active-version", pending);
+    localStorage.removeItem("alg-trainers-pending-version");
+  }
   if (navigator.storage?.persist) {
     try { await navigator.storage.persist(); } catch {}
   }
@@ -205,6 +281,7 @@ export async function initializePwa() {
       if (!prompted && window.confirm(`An updated ALLG Trainer is available (${version.version}). Reload now?`)) {
         sessionStorage.setItem("alg-trainers-update-prompted", "1");
         localStorage.setItem("alg-trainers-pending-version", version.version);
+        localStorage.setItem("alg-trainers-active-version", version.version);
         window.location.reload();
       } else if (!prompted) {
         sessionStorage.setItem("alg-trainers-update-prompted", "1");
@@ -361,6 +438,10 @@ extern "C" {
     #[wasm_bindgen(catch)]
     fn storageAcknowledgeOutbox(operation_ids: &JsValue) -> Result<js_sys::Promise, JsValue>;
     #[wasm_bindgen(catch)]
+    fn storagePutRemote(key: &str, value: &str) -> Result<js_sys::Promise, JsValue>;
+    #[wasm_bindgen(catch)]
+    fn storageDirtyForAccount(account: &str) -> Result<js_sys::Promise, JsValue>;
+    #[wasm_bindgen(catch)]
     fn initializePwa() -> Result<js_sys::Promise, JsValue>;
     #[wasm_bindgen(catch)]
     fn setActiveAccount(email: &JsValue) -> Result<js_sys::Promise, JsValue>;
@@ -406,6 +487,16 @@ async fn put_stored(key: String, value: String) {
                 let _ = window.alert_with_message("Unable to save settings to browser storage.");
             }
         }
+    }
+}
+
+async fn put_stored_remote(key: String, value: String) {
+    let result = match storagePutRemote(&key, &value) {
+        Ok(promise) => JsFuture::from(promise).await.map(|_| ()),
+        Err(error) => Err(error),
+    };
+    if let Err(error) = result {
+        web_sys::console::error_1(&error);
     }
 }
 
@@ -4890,6 +4981,9 @@ async fn sync_now(force: bool) {
         return;
     };
     if !me.authenticated {
+        if let Ok(promise) = setActiveAccount(&JsValue::NULL) {
+            let _ = JsFuture::from(promise).await;
+        }
         return;
     }
     if let Ok(email) = serde_wasm_bindgen::to_value(&me.email) {
@@ -4897,7 +4991,8 @@ async fn sync_now(force: bool) {
             let _ = JsFuture::from(promise).await;
         }
     }
-    let Ok(promise) = storageAll("dirty") else {
+    let account = me.email.clone().unwrap_or_default();
+    let Ok(promise) = storageDirtyForAccount(&account) else {
         return;
     };
     let Ok(dirty_value) = JsFuture::from(promise).await else {
@@ -4908,12 +5003,12 @@ async fn sync_now(force: bool) {
     };
     if dirty.is_empty() {
         if !normalize_legacy_results_in_storage().await {
-            if pull_remote().await {
+            if pull_remote(&account).await {
                 record_sync_completed();
             }
             return;
         }
-        let Ok(promise) = storageAll("dirty") else {
+        let Ok(promise) = storageDirtyForAccount(&account) else {
             return;
         };
         let Ok(dirty_value) = JsFuture::from(promise).await else {
@@ -4925,7 +5020,7 @@ async fn sync_now(force: bool) {
         };
         dirty = refreshed;
         if dirty.is_empty() {
-            if pull_remote().await {
+            if pull_remote(&account).await {
                 record_sync_completed();
             }
             return;
@@ -5102,8 +5197,8 @@ async fn normalize_legacy_results_in_storage() -> bool {
     changed
 }
 
-async fn pull_remote() -> bool {
-    let dirty = match storageAll("dirty") {
+async fn pull_remote(account: &str) -> bool {
+    let dirty = match storageDirtyForAccount(account) {
         Ok(promise) => match JsFuture::from(promise).await {
             Ok(value) => {
                 serde_wasm_bindgen::from_value::<BTreeMap<String, f64>>(value).unwrap_or_default()
@@ -5149,7 +5244,7 @@ async fn pull_remote() -> bool {
     if let Some(settings) = bundle.settings {
         let key = "ALLGSettings".to_owned();
         if !dirty.contains_key(&key) {
-            put_stored(key.clone(), settings.settings_json.to_string()).await;
+            put_stored_remote(key.clone(), settings.settings_json.to_string()).await;
             imported.push(key);
         }
     }
@@ -5167,20 +5262,20 @@ async fn pull_remote() -> bool {
         let presets = selection.selection_json.get("presets").cloned();
         let algsets = selection.selection_json.get("algsets").cloned();
         if !dirty.contains_key(&key) {
-            put_stored(key.clone(), cases.to_string()).await;
+            put_stored_remote(key.clone(), cases.to_string()).await;
             imported.push(key.clone());
         }
         let preset_key = format!("{key}Presets");
         if let Some(presets) = presets {
             if !dirty.contains_key(&preset_key) {
-                put_stored(preset_key.clone(), presets.to_string()).await;
+                put_stored_remote(preset_key.clone(), presets.to_string()).await;
                 imported.push(preset_key);
             }
         }
         let algset_key = format!("{key}Algsets");
         if let Some(algsets) = algsets {
             if !dirty.contains_key(&algset_key) {
-                put_stored(algset_key.clone(), algsets.to_string()).await;
+                put_stored_remote(algset_key.clone(), algsets.to_string()).await;
                 imported.push(algset_key);
             }
         }
@@ -5224,7 +5319,7 @@ async fn pull_remote() -> bool {
     }
     for (key, algs) in remote_algs {
         if !dirty.contains_key(&key) {
-            put_stored(
+            put_stored_remote(
                 key.clone(),
                 serde_json::Value::Object(custom_algs_payload(&algs)).to_string(),
             )
@@ -5254,7 +5349,7 @@ async fn pull_remote() -> bool {
             for result in results {
                 merged = merge_remote_result(merged, result);
             }
-            put_stored(
+            put_stored_remote(
                 key.clone(),
                 serde_json::to_string(&merged).unwrap_or_else(|_| "[]".to_owned()),
             )

@@ -18,6 +18,10 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+      args:
+        APP_VERSION: ${APP_VERSION:-dev}
+        GIT_SHA: ${GIT_SHA:-dev}
+        CATALOG_VERSION: ${CATALOG_VERSION:-catalog-v1}
     depends_on:
       psql:
         condition: service_healthy
@@ -31,6 +35,10 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+      args:
+        APP_VERSION: ${APP_VERSION:-dev}
+        GIT_SHA: ${GIT_SHA:-dev}
+        CATALOG_VERSION: ${CATALOG_VERSION:-catalog-v1}
     restart: unless-stopped
     depends_on:
       alg-trainers-migrate:

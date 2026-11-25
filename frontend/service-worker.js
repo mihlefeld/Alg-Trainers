@@ -57,8 +57,18 @@ self.addEventListener("fetch", event => {
       try {
         return await fetch(request);
       } catch {
-        const response = await caches.match("/");
-        return response || await caches.match("/index.html");
+        for (const name of await caches.keys()) {
+          if (!name.startsWith(`${SHELL_PREFIX}-`)) continue;
+          const shell = await caches.open(name);
+          const root = await shell.match("/");
+          if (root) return root;
+          const index = await shell.match("/index.html");
+          if (index) return index;
+        }
+        return new Response("The app is not available offline yet.", {
+          status: 503,
+          headers: { "Content-Type": "text/plain" },
+        });
       }
     })());
     return;

@@ -34,10 +34,14 @@ RUN --mount=type=cache,id=alg-trainers-frontend-target,target=/app/target \
 FROM frontend-tools AS frontend-builder
 COPY frontend frontend
 COPY Trunk.toml Trunk.toml
+ARG GIT_SHA=dev
+ARG APP_VERSION=dev
+ARG CATALOG_VERSION=catalog-v1
 RUN --mount=type=cache,id=alg-trainers-frontend-target,target=/app/target \
     --mount=type=cache,id=alg-trainers-frontend-registry,target=/usr/local/cargo/registry \
     --mount=type=cache,id=alg-trainers-frontend-git,target=/usr/local/cargo/git \
-    cd frontend && trunk build --release
+    cd frontend && trunk build --release \
+    && cp /app/frontend/service-worker.js /app/frontend/dist/service-worker.js
 
 FROM chef AS backend-builder
 COPY --from=chef /app/recipe.json recipe.json
@@ -53,6 +57,10 @@ RUN --mount=type=cache,id=alg-trainers-backend-target,target=/app/target \
     && cp /app/target/release/alg-trainers-server /app/alg-trainers-server
 
 FROM debian:bookworm-slim AS runtime
+ARG APP_VERSION=dev
+ARG GIT_SHA=dev
+ARG CATALOG_VERSION=catalog-v1
+ENV APP_VERSION=$APP_VERSION GIT_SHA=$GIT_SHA CATALOG_VERSION=$CATALOG_VERSION
 RUN apt-get update && apt-get install -y ca-certificates && rm -rf /var/lib/apt/lists/*
 WORKDIR /app
 COPY --from=backend-builder /app/alg-trainers-server /app/alg-trainers-server

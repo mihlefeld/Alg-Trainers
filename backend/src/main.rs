@@ -496,7 +496,10 @@ fn offline_manifest() -> Json<OfflineManifest> {
         OfflineAsset { url: "/api/trainers".to_owned() },
     ];
     collect_dist_assets(Path::new("frontend/dist"), "frontend/dist", &mut assets);
-    if let Ok(entries) = fs::read_dir("static") {
+    let catalog_root = env::var("CATALOG_ROOT")
+        .map(std::path::PathBuf::from)
+        .unwrap_or_else(|_| std::path::PathBuf::from("static"));
+    if let Ok(entries) = fs::read_dir(catalog_root) {
         for entry in entries.flatten() {
             let path = entry.path();
             if path.is_dir() {
