@@ -15,7 +15,7 @@ use yew_router::prelude::*;
 #[wasm_bindgen(inline_js = r#"
 function openStorage() {
   return new Promise((resolve, reject) => {
-    const request = indexedDB.open("alg-trainers", 2);
+    const request = indexedDB.open("alg-trainers", 3);
     request.onupgradeneeded = () => {
       if (!request.result.objectStoreNames.contains("data")) {
         request.result.createObjectStore("data");
@@ -25,6 +25,14 @@ function openStorage() {
       }
       if (!request.result.objectStoreNames.contains("dirty")) {
         request.result.createObjectStore("dirty");
+      }
+      if (!request.result.objectStoreNames.contains("outbox")) {
+        const outbox = request.result.createObjectStore("outbox", { keyPath: "operationId" });
+        outbox.createIndex("timestamp", "timestamp");
+        outbox.createIndex("userScope", "userScope");
+      }
+      if (!request.result.objectStoreNames.contains("tombstones")) {
+        request.result.createObjectStore("tombstones", { keyPath: "entityId" });
       }
     };
     request.onsuccess = () => {
@@ -76,9 +84,36 @@ export async function storageGet(key) {
 export async function storagePut(key, value) {
   const db = await openStorage();
   await new Promise((resolve, reject) => {
-    const tx = db.transaction(["data", "dirty"], "readwrite");
+    const tx = db.transaction(["data", "dirty", "outbox", "tombstones", "metadata"], "readwrite");
     tx.objectStore("data").put(value, key);
     tx.objectStore("dirty").put(Date.now(), key);
+    try {
+      const parsed = JSON.parse(value);
+      if (Array.isArray(parsed)) {
+        for (const item of parsed) {
+          if (item?.deleted === true && item?.id) {
+            tx.objectStore("tombstones").put({
+              entityId: item.id,
+              entityType: "result",
+              deletedAt: item.datetime || Date.now(),
+            }, item.id);
+          }
+        }
+      }
+    } catch {}
+    const metadata = tx.objectStore("metadata");
+    const accountRequest = metadata.get("activeAccount");
+    accountRequest.onsuccess = () => {
+      tx.objectStore("outbox").put({
+        operationId: (crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`),
+        userScope: accountRequest.result || "anonymous",
+        entityType: key,
+        entityId: key,
+        timestamp: Date.now(),
+        payload: value,
+        retryState: { attempts: 0 }
+      });
+    };
     tx.oncomplete = resolve;
     tx.onerror = () => reject(tx.error);
   });
@@ -107,6 +142,82 @@ export async function storageClearDirtyIfUnchanged(expected) {
     }
     tx.oncomplete = resolve;
     tx.onerror = () => reject(tx.error);
+  });
+}
+export async function storageOutboxAll() {
+  const db = await openStorage();
+  return await new Promise((resolve, reject) => {
+    const tx = db.transaction("outbox", "readonly");
+    const request = tx.objectStore("outbox").getAll();
+    request.onsuccess = () => resolve(request.result);
+    request.onerror = () => reject(request.error);
+  });
+}
+export async function storageAcknowledgeOutbox(operationIds) {
+  const db = await openStorage();
+  await new Promise((resolve, reject) => {
+    const tx = db.transaction(["outbox", "dirty"], "readwrite");
+    const outbox = tx.objectStore("outbox");
+    for (const operationId of operationIds) outbox.delete(operationId);
+    tx.oncomplete = resolve;
+    tx.onerror = () => reject(tx.error);
+  });
+}
+export async function setActiveAccount(email) {
+  const db = await openStorage();
+  await new Promise((resolve, reject) => {
+    const tx = db.transaction("metadata", "readwrite");
+    tx.objectStore("metadata").put(email || null, "activeAccount");
+    tx.oncomplete = resolve;
+    tx.onerror = () => reject(tx.error);
+  });
+}
+export async function catalogFetch(url) {
+  const cache = await caches.open("catalog-fallback");
+  try {
+    const response = await fetch(url, { cache: "no-store" });
+    if (response.ok) {
+      await cache.put(url, response.clone());
+      return await response.json();
+    }
+  } catch {}
+  const cached = await cache.match(url);
+  if (cached) return await cached.json();
+  throw new Error("Catalog unavailable while offline");
+}
+export async function initializePwa() {
+  if (!("serviceWorker" in navigator)) return;
+  await navigator.serviceWorker.register("/service-worker.js");
+  if (navigator.storage?.persist) {
+    try { await navigator.storage.persist(); } catch {}
+  }
+  const monitor = async () => {
+    if (!navigator.onLine) return;
+    let version;
+    try {
+      const response = await fetch("/version.json", { cache: "no-store" });
+      if (!response.ok) return;
+      version = await response.json();
+    } catch { return; }
+    const installed = localStorage.getItem("alg-trainers-active-version");
+    if (installed && version.version !== installed) {
+      const prompted = sessionStorage.getItem("alg-trainers-update-prompted");
+      if (!prompted && window.confirm(`An updated ALLG Trainer is available (${version.version}). Reload now?`)) {
+        sessionStorage.setItem("alg-trainers-update-prompted", "1");
+        localStorage.setItem("alg-trainers-pending-version", version.version);
+        window.location.reload();
+      } else if (!prompted) {
+        sessionStorage.setItem("alg-trainers-update-prompted", "1");
+      }
+    } else if (!installed) {
+      localStorage.setItem("alg-trainers-active-version", version.version);
+    }
+  };
+  await monitor();
+  setInterval(monitor, 300_000);
+  window.addEventListener("online", monitor);
+  window.addEventListener("visibilitychange", () => {
+    if (!document.hidden) monitor();
   });
 }
 export function prefersLightTheme() {
@@ -243,6 +354,16 @@ extern "C" {
     fn randomAlgId() -> String;
     #[wasm_bindgen(catch)]
     fn importStorageText(text: &str) -> Result<js_sys::Promise, JsValue>;
+    #[wasm_bindgen(catch)]
+    fn catalogFetch(url: &str) -> Result<js_sys::Promise, JsValue>;
+    #[wasm_bindgen(catch)]
+    fn storageOutboxAll() -> Result<js_sys::Promise, JsValue>;
+    #[wasm_bindgen(catch)]
+    fn storageAcknowledgeOutbox(operation_ids: &JsValue) -> Result<js_sys::Promise, JsValue>;
+    #[wasm_bindgen(catch)]
+    fn initializePwa() -> Result<js_sys::Promise, JsValue>;
+    #[wasm_bindgen(catch)]
+    fn setActiveAccount(email: &JsValue) -> Result<js_sys::Promise, JsValue>;
 }
 
 async fn get_stored(key: &str) -> Option<String> {
@@ -263,6 +384,14 @@ async fn get_stored(key: &str) -> Option<String> {
             None
         }
     }
+}
+
+pub(crate) async fn catalog_fetch_json<T: for<'de> Deserialize<'de>>(url: &str) -> Result<T, String> {
+    let promise = catalogFetch(url).map_err(|error| format!("Catalog unavailable: {error:?}"))?;
+    let value = JsFuture::from(promise)
+        .await
+        .map_err(|error| format!("Catalog unavailable: {error:?}"))?;
+    serde_wasm_bindgen::from_value(value).map_err(|error| error.to_string())
 }
 
 async fn put_stored(key: String, value: String) {
@@ -450,6 +579,17 @@ struct SyncBundle {
     results: Vec<ResultSync>,
     #[serde(default)]
     next_results: Option<ResultCursor>,
+    #[serde(default)]
+    operation_ids: Vec<String>,
+    #[serde(default)]
+    acknowledgements: Vec<String>,
+}
+
+#[derive(Clone, Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct OutboxRecord {
+    operation_id: String,
+    user_scope: String,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -762,6 +902,11 @@ fn save_custom_algs(selection_key: &str, custom_algs: &BTreeMap<String, Vec<User
 #[function_component(App)]
 fn app() -> Html {
     start_sync_engine();
+    spawn_local(async move {
+        if let Ok(promise) = initializePwa() {
+            let _ = JsFuture::from(promise).await;
+        }
+    });
     html! {
         <BrowserRouter>
             <Switch<Route> render={switch} />
@@ -813,10 +958,8 @@ fn alg_sheet_page() -> Html {
                 .unwrap_or("")
                 .to_owned();
             spawn_local(async move {
-                if let Ok(response) = Request::get(&format!("/api/trainers/{id}")).send().await {
-                    if let Ok(value) = response.json::<TrainerBundle>().await {
-                        bundle.set(Some(value));
-                    }
+                if let Ok(value) = catalog_fetch_json::<TrainerBundle>(&format!("/api/trainers/{id}")).await {
+                    bundle.set(Some(value));
                 }
             });
             || ()
@@ -951,16 +1094,9 @@ fn home() -> Html {
                 }
             });
             spawn_local(async move {
-                match Request::get("/api/trainers").send().await {
-                    Ok(response) if response.ok() => {
-                        match response.json::<Vec<TrainerSummary>>().await {
-                            Ok(value) => trainers.set(value),
-                            Err(cause) => {
-                                error.set(Some(format!("Unable to load trainers: {cause}")))
-                            }
-                        }
-                    }
-                    _ => error.set(Some("Unable to load trainers.".to_owned())),
+                match catalog_fetch_json::<Vec<TrainerSummary>>("/api/trainers").await {
+                    Ok(value) => trainers.set(value),
+                    Err(cause) => error.set(Some(format!("Offline catalog unavailable: {cause}"))),
                 }
             });
             spawn_local(async move {
@@ -1045,12 +1181,9 @@ fn trainer_page(props: &TrainerPageProps) -> Html {
         let id = props.id.clone();
         use_effect_with(id.clone(), move |_| {
             spawn_local(async move {
-                match Request::get(&format!("/api/trainers/{id}")).send().await {
-                    Ok(response) if response.ok() => match response.json::<TrainerBundle>().await {
-                        Ok(value) => bundle.set(Some(value)),
-                        Err(cause) => error.set(Some(format!("Unable to decode trainer: {cause}"))),
-                    },
-                    _ => error.set(Some("Unable to load this trainer.".to_owned())),
+                match catalog_fetch_json::<TrainerBundle>(&format!("/api/trainers/{id}")).await {
+                    Ok(value) => bundle.set(Some(value)),
+                    Err(cause) => error.set(Some(format!("Unable to load this trainer offline: {cause}"))),
                 }
             });
             || ()
@@ -4708,6 +4841,28 @@ fn start_sync_engine() {
                 closure.as_ref().unchecked_ref(),
             );
             closure.forget();
+                let online = Closure::<dyn FnMut()>::new(|| {
+                    spawn_local(async move {
+                        sync_now(false).await;
+                    });
+                });
+                let _ = window.add_event_listener_with_callback(
+                    "online",
+                    online.as_ref().unchecked_ref(),
+                );
+                online.forget();
+                let visibility = Closure::<dyn FnMut()>::new(|| {
+                    if web_sys::window().is_some_and(|window| window.document().is_some_and(|document| !document.hidden())) {
+                        spawn_local(async move {
+                            sync_now(false).await;
+                        });
+                    }
+                });
+                let _ = window.add_event_listener_with_callback(
+                    "visibilitychange",
+                    visibility.as_ref().unchecked_ref(),
+                );
+                visibility.forget();
         }
     });
 }
@@ -4736,6 +4891,11 @@ async fn sync_now(force: bool) {
     };
     if !me.authenticated {
         return;
+    }
+    if let Ok(email) = serde_wasm_bindgen::to_value(&me.email) {
+        if let Ok(promise) = setActiveAccount(&email) {
+            let _ = JsFuture::from(promise).await;
+        }
     }
     let Ok(promise) = storageAll("dirty") else {
         return;
@@ -4771,11 +4931,8 @@ async fn sync_now(force: bool) {
             return;
         }
     }
-    let trainers = match Request::get("/api/trainers").send().await {
-        Ok(response) if response.ok() => match response.json::<Vec<TrainerSummary>>().await {
-            Ok(trainers) if !trainers.is_empty() => trainers,
-            _ => return,
-        },
+    let trainers = match catalog_fetch_json::<Vec<TrainerSummary>>("/api/trainers").await {
+        Ok(trainers) if !trainers.is_empty() => trainers,
         _ => return,
     };
     let Ok(promise) = storageAll("data") else {
@@ -4877,6 +5034,17 @@ async fn sync_now(force: bool) {
             }
         }
     }
+    if let Ok(promise) = storageOutboxAll() {
+        if let Ok(value) = JsFuture::from(promise).await {
+            if let Ok(records) = serde_wasm_bindgen::from_value::<Vec<OutboxRecord>>(value) {
+                bundle.operation_ids = records
+                    .into_iter()
+                    .filter(|record| record.user_scope == me.email.clone().unwrap_or_default())
+                    .map(|record| record.operation_id)
+                    .collect();
+            }
+        }
+    }
     for batch in split_sync_batches(bundle) {
         let Ok(response) = Request::put("/api/sync")
             .header("Content-Type", "application/json")
@@ -4889,6 +5057,15 @@ async fn sync_now(force: bool) {
         };
         if !response.ok() {
             return;
+        }
+        if let Ok(reply) = response.json::<SyncBundle>().await {
+            if !reply.acknowledgements.is_empty() {
+                if let Ok(ids) = serde_wasm_bindgen::to_value(&reply.acknowledgements) {
+                    if let Ok(promise) = storageAcknowledgeOutbox(&ids) {
+                        let _ = JsFuture::from(promise).await;
+                    }
+                }
+            }
         }
     }
     if let Ok(expected) = serde_wasm_bindgen::to_value(&dirty) {
@@ -4935,11 +5112,8 @@ async fn pull_remote() -> bool {
         },
         Err(_) => BTreeMap::new(),
     };
-    let trainers = match Request::get("/api/trainers").send().await {
-        Ok(response) if response.ok() => match response.json::<Vec<TrainerSummary>>().await {
-            Ok(trainers) if !trainers.is_empty() => trainers,
-            _ => return false,
-        },
+    let trainers = match catalog_fetch_json::<Vec<TrainerSummary>>("/api/trainers").await {
+        Ok(trainers) if !trainers.is_empty() => trainers,
         _ => return false,
     };
     let Ok(response) = Request::get("/api/sync").send().await else {

@@ -59,5 +59,9 @@ COPY --from=backend-builder /app/alg-trainers-server /app/alg-trainers-server
 COPY --from=frontend-builder /app/frontend/dist /app/frontend/dist
 COPY static /app/static
 COPY style /app/style
+COPY manifest.json /app/manifest.json
+COPY icon.png /app/icon.png
+COPY mobile.png /app/mobile.png
+COPY frontend/service-worker.js /app/service-worker.js
 EXPOSE 8000
 CMD ["/app/alg-trainers-server"]

@@ -1,3 +1,7 @@
 [build]
 target = "frontend/index.html"
 dist = "frontend/dist"
+
+[[copy]]
+source = "service-worker.js"
+dest = "."

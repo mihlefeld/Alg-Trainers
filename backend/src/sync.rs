@@ -25,6 +25,10 @@ pub struct SyncBundle {
     pub results: Vec<ResultSync>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub next_results: Option<ResultCursor>,
+    #[serde(default)]
+    pub operation_ids: Vec<String>,
+    #[serde(default)]
+    pub acknowledgements: Vec<String>,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -252,6 +256,8 @@ pub async fn load_page(
         user_algs,
         results,
         next_results,
+        operation_ids: Vec::new(),
+        acknowledgements: Vec::new(),
     })
 }
 
@@ -261,12 +267,15 @@ pub async fn save(
     incoming: SyncBundle,
 ) -> Result<SyncBundle, SaveError> {
     incoming.validate().map_err(SaveError::Validation)?;
+    let operation_ids = incoming.operation_ids.clone();
     let transaction = db.begin().await.map_err(SaveError::Database)?;
     save_in_transaction(&transaction, user_id, incoming)
         .await
         .map_err(SaveError::Database)?;
     transaction.commit().await.map_err(SaveError::Database)?;
-    load(db, user_id).await.map_err(SaveError::Database)
+    let mut bundle = load(db, user_id).await.map_err(SaveError::Database)?;
+    bundle.acknowledgements = operation_ids;
+    Ok(bundle)
 }
 
 async fn save_in_transaction(

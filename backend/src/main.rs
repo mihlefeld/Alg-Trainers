@@ -23,7 +23,9 @@ use serde::{Deserialize, Serialize};
 use std::{
     collections::HashMap,
     env,
+    fs,
     net::IpAddr,
+    path::Path,
     sync::Mutex,
     time::{Duration, Instant},
 };
@@ -109,6 +111,14 @@ struct PrivateMe(Json<MeResponse>, Header<'static>);
 
 #[derive(Responder)]
 struct PrivateSync(Json<sync::SyncBundle>, Header<'static>);
+#[derive(Responder)]
+struct VersionJson(Json<serde_json::Value>, Header<'static>);
+
+#[derive(Responder)]
+struct PwaManifest(Json<serde_json::Value>, Header<'static>);
+
+#[derive(Responder)]
+struct ServiceWorker(rocket::fs::NamedFile, Header<'static>, Header<'static>);
 
 #[derive(Serialize)]
 struct MeResponse {
@@ -431,6 +441,148 @@ async fn sync_put(
         })
 }
 
+#[derive(Serialize)]
+struct OfflineAsset {
+    url: String,
+}
+
+#[derive(Serialize)]
+struct OfflineManifest {
+    version: String,
+    catalog_version: String,
+    assets: Vec<OfflineAsset>,
+}
+
+fn collect_dist_assets(root: &Path, prefix: &str, assets: &mut Vec<OfflineAsset>) {
+    let Ok(entries) = fs::read_dir(root) else {
+        return;
+    };
+    for entry in entries.flatten() {
+        let path = entry.path();
+        if path.is_dir() {
+            collect_dist_assets(&path, prefix, assets);
+        } else if let Ok(relative) = path.strip_prefix(prefix) {
+            if let Some(url) = relative.to_str() {
+                assets.push(OfflineAsset {
+                    url: format!("/{}", url.replace('\\', "/")),
+                });
+            }
+        }
+    }
+}
+
+#[rocket::get("/offline-manifest.json")]
+fn offline_manifest() -> Json<OfflineManifest> {
+    let version = env::var("APP_VERSION")
+        .or_else(|_| env::var("GIT_SHA"))
+        .unwrap_or_else(|_| "dev".to_owned());
+    let catalog_version = env::var("CATALOG_VERSION").unwrap_or_else(|_| "catalog-v1".to_owned());
+    let mut assets = vec![
+        OfflineAsset { url: "/".to_owned() },
+        OfflineAsset { url: "/manifest.json".to_owned() },
+        OfflineAsset { url: "/icon.png".to_owned() },
+        OfflineAsset { url: "/mobile.png".to_owned() },
+        OfflineAsset { url: "/style/main.css".to_owned() },
+        OfflineAsset { url: "/style/selection.css".to_owned() },
+        OfflineAsset { url: "/style/timer.css".to_owned() },
+        OfflineAsset { url: "/style/settings.css".to_owned() },
+        OfflineAsset { url: "/style/hint.css".to_owned() },
+        OfflineAsset { url: "/style/algsheet.css".to_owned() },
+        OfflineAsset { url: "/style/fonts/titillium-web-latin-400-normal.woff2".to_owned() },
+        OfflineAsset { url: "/style/fonts/titillium-web-latin-400-italic.woff2".to_owned() },
+        OfflineAsset { url: "/style/fonts/titillium-web-latin-600-normal.woff2".to_owned() },
+        OfflineAsset { url: "/style/fonts/titillium-web-latin-700-normal.woff2".to_owned() },
+        OfflineAsset { url: "/style/fonts/material-symbols-outlined-latin-400-normal.woff2".to_owned() },
+        OfflineAsset { url: "/api/trainers".to_owned() },
+    ];
+    collect_dist_assets(Path::new("frontend/dist"), "frontend/dist", &mut assets);
+    if let Ok(entries) = fs::read_dir("static") {
+        for entry in entries.flatten() {
+            let path = entry.path();
+            if path.is_dir() {
+                if let Some(id) = path.file_name().and_then(|value| value.to_str()) {
+                    assets.push(OfflineAsset {
+                        url: format!("/api/trainers/{id}"),
+                    });
+                    let icon = path.join("icon.png");
+                    if icon.exists() {
+                        assets.push(OfflineAsset {
+                            url: format!("/catalog/{id}/icon.png"),
+                        });
+                    }
+                }
+            }
+        }
+    }
+    Json(OfflineManifest {
+        version,
+        catalog_version,
+        assets,
+    })
+}
+
+#[rocket::get("/manifest.json")]
+fn manifest_json() -> PwaManifest {
+    PwaManifest(
+        Json(serde_json::json!({
+            "name": "ALLG Trainer",
+            "short_name": "ALLG",
+            "id": "/",
+            "start_url": "/",
+            "scope": "/",
+            "description": "Alg trainer for all types of algs!",
+            "display": "standalone",
+            "background_color": "#353535",
+            "theme_color": "#353535",
+            "icons": [
+                {"src": "/icon.png", "sizes": "512x512", "type": "image/png", "purpose": "any"},
+                {"src": "/mobile.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable"}
+            ]
+        })),
+        Header::new("Cache-Control", "public, max-age=3600"),
+    )
+}
+
+#[rocket::get("/version.json")]
+fn version_json() -> VersionJson {
+    let version = env::var("APP_VERSION")
+        .or_else(|_| env::var("GIT_SHA"))
+        .unwrap_or_else(|_| "dev".to_owned());
+    let catalog_version = env::var("CATALOG_VERSION").unwrap_or_else(|_| "catalog-v1".to_owned());
+    VersionJson(
+        Json(serde_json::json!({
+            "version": version,
+            "build": env::var("GIT_SHA").unwrap_or_else(|_| "dev".to_owned()),
+            "catalogVersion": catalog_version,
+            "manifest": "offline-manifest.json"
+        })),
+        Header::new("Cache-Control", "no-store"),
+    )
+}
+
+#[rocket::get("/service-worker.js")]
+async fn service_worker() -> Option<ServiceWorker> {
+    let file = rocket::fs::NamedFile::open("service-worker.js")
+        .await
+        .ok()
+        .or_else(|| None);
+    if let Some(file) = file {
+        return Some(ServiceWorker(
+            file,
+            Header::new("Service-Worker-Allowed", "/"),
+            Header::new("Cache-Control", "no-cache"),
+        ));
+    }
+    rocket::fs::NamedFile::open("frontend/dist/service-worker.js")
+        .await
+        .ok()
+        .map(|file| ServiceWorker(
+            file,
+            Header::new("Service-Worker-Allowed", "/"),
+            Header::new("Cache-Control", "no-cache"),
+        ))
+}
+
 #[rocket::get("/")]
 async fn index() -> Option<rocket::fs::NamedFile> {
     rocket::fs::NamedFile::open("frontend/dist/index.html")
@@ -440,6 +592,30 @@ async fn index() -> Option<rocket::fs::NamedFile> {
 
 #[rocket::get("/<path..>", rank = 20)]
 async fn catch_all(path: std::path::PathBuf) -> Option<rocket::fs::NamedFile> {
+    if path == std::path::Path::new("manifest.json") {
+        if let Ok(file) = rocket::fs::NamedFile::open("manifest.json").await {
+            return Some(file);
+        }
+        if let Ok(file) = rocket::fs::NamedFile::open("frontend/dist/manifest.json").await {
+            return Some(file);
+        }
+    }
+    if matches!(path.to_str(), Some("icon.png" | "mobile.png")) {
+        if let Ok(file) = rocket::fs::NamedFile::open(path.clone()).await {
+            return Some(file);
+        }
+        if let Ok(file) = rocket::fs::NamedFile::open(format!("frontend/dist/{}", path.display())).await {
+            return Some(file);
+        }
+    }
+    if path == std::path::Path::new("service-worker.js") {
+        if let Ok(file) = rocket::fs::NamedFile::open("service-worker.js").await {
+            return Some(file);
+        }
+        if let Ok(file) = rocket::fs::NamedFile::open("frontend/dist/service-worker.js").await {
+            return Some(file);
+        }
+    }
     if let Ok(stripped) = path.strip_prefix("catalog") {
         if stripped
             .extension()
@@ -531,6 +707,7 @@ async fn rocket() -> _ {
         "/",
         rocket::routes![
             index,
+            service_worker,
             me,
             wca_login,
             wca_callback,
@@ -539,6 +716,9 @@ async fn rocket() -> _ {
             trainer,
             sync_get,
             sync_put,
+            manifest_json,
+            offline_manifest,
+            version_json,
             catch_all
         ],
     )

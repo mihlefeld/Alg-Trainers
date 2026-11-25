@@ -1,5 +1,4 @@
 use crate::{color_input_style, cube_schemes, TrainerSummary};
-use gloo_net::http::Request;
 use serde_json::{json, Value};
 use std::collections::BTreeMap;
 use wasm_bindgen_futures::spawn_local;
@@ -75,17 +74,7 @@ pub fn cube_settings(props: &Props) -> Html {
         use_effect_with(*retry, move |_| {
             catalog.set(None);
             spawn_local(async move {
-                let result = match Request::get("/api/trainers").send().await {
-                    Ok(response) if response.ok() => response
-                        .json::<Vec<TrainerSummary>>()
-                        .await
-                        .map_err(|error| format!("Unable to decode trainer list: {error}")),
-                    Ok(response) => Err(format!(
-                        "Unable to load trainer list (HTTP {}).",
-                        response.status()
-                    )),
-                    Err(error) => Err(format!("Unable to load trainer list: {error}")),
-                };
+                let result = crate::catalog_fetch_json::<Vec<TrainerSummary>>("/api/trainers").await;
                 catalog.set(Some(result));
             });
             || ()

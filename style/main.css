@@ -1,3 +1,43 @@
+@font-face {
+  font-family: "Titillium Web";
+  src: url("/style/fonts/titillium-web-latin-400-normal.woff2") format("woff2");
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Titillium Web";
+  src: url("/style/fonts/titillium-web-latin-400-italic.woff2") format("woff2");
+  font-style: italic;
+  font-weight: 400;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Titillium Web";
+  src: url("/style/fonts/titillium-web-latin-600-normal.woff2") format("woff2");
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Titillium Web";
+  src: url("/style/fonts/titillium-web-latin-700-normal.woff2") format("woff2");
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Material Symbols Outlined";
+  src: url("/style/fonts/material-symbols-outlined-latin-400-normal.woff2") format("woff2");
+  font-style: normal;
+  font-weight: 400;
+  font-display: block;
+}
+
 .borderedContainer {
     border-width: var(--borderWidth);
     border-style: solid;
