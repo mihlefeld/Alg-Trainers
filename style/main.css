@@ -135,6 +135,7 @@ dialog[open] {
     align-items: center;
     justify-content: center;
     overflow: auto;
+    box-sizing: border-box;
 }
 
 .dialogBackground {
@@ -159,8 +160,7 @@ dialog[open] {
     box-shadow: 5px 5px 30px black;
     outline: none;
     border-color: transparent;
-    width: 32em;
-    max-width: 95%;
+    width: min(32em, 95vw);
     max-height: 90vh;
     overflow: auto;
 }

@@ -106,7 +106,7 @@ pub fn account_settings() -> Html {
     };
 
     html! {
-        <SettingsSection title="Account" class="accountDetails">
+        <SettingsSection title="Account" class="accountDetails" open=true>
             <div class="colFlex accountSection">
                 if account.authenticated {
                     <div class="settingsEntry accountIdentity">

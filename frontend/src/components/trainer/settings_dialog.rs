@@ -125,7 +125,9 @@ pub fn settings_dialog(props: &SettingsDialogProps) -> Html {
 
     html! {
         <ModalDialog id="settings" class="colFlex borderedContainer" on_close={props.on_close.clone()}>
-            <SettingsSection title="Behavior" open=true>
+            <AccountSettings />
+
+            <SettingsSection title="Behavior">
                 <div class="colFlex">
                     {for BEHAVIOR_TOGGLES.into_iter().map(|(key, label)| {
                         let checked = settings
@@ -149,7 +151,6 @@ pub fn settings_dialog(props: &SettingsDialogProps) -> Html {
                 </div>
             </SettingsSection>
 
-            <AccountSettings />
 
             <SettingsSection title="Scramble options">
                 <div class="colFlex">

@@ -178,7 +178,7 @@ div#modeButtons {
 }
 
 .caseGroup.widestCaseGroup {
-    width: 100%;
+    /* width: 100%; */
 }
 
 #trainer-main .caseItem {

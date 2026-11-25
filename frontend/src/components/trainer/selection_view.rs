@@ -75,7 +75,6 @@ fn case_card(props: &CaseCardProps) -> Html {
             id={format!("itemTd{}", case.case_id)}
             class={classes!("borderedContainer", "caseItem", if props.selected { "itemSel" } else { "itemUnsel" })}
             {onclick}
-            ondblclick={open_hint_mouse.clone()}
             oncontextmenu={open_hint_mouse}
             {onpointerdown}
             {onpointerup}

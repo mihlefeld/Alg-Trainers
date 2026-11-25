@@ -18,11 +18,16 @@ input[type=text]:focus {
     outline-width: var(--borderWidth);    
 }
 
+#settings > .dialogDiv {
+    width: min(80em, 95vw);
+    height: 95vh;
+}
 
 details.settingsDetails:open {
     display: flex;
     flex-direction: column;
     gap: 0.2em;
+    transition: max-height 400ms ease-out;
 }
 
 details.settingsDetails details.settingsDetails {
