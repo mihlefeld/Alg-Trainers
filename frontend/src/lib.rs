@@ -15,7 +15,7 @@ use yew_router::prelude::*;
 #[wasm_bindgen(inline_js = r#"
 function openStorage() {
   return new Promise((resolve, reject) => {
-    const request = indexedDB.open("alg-trainers", 3);
+    const request = indexedDB.open("alg-trainers", 4);
     request.onupgradeneeded = () => {
       if (!request.result.objectStoreNames.contains("data")) {
         request.result.createObjectStore("data");
@@ -33,6 +33,9 @@ function openStorage() {
       }
       if (!request.result.objectStoreNames.contains("tombstones")) {
         request.result.createObjectStore("tombstones", { keyPath: "entityId" });
+      }
+      if (!request.result.objectStoreNames.contains("catalog")) {
+        request.result.createObjectStore("catalog");
       }
     };
     request.onsuccess = () => {
@@ -256,11 +259,34 @@ export async function setActiveAccount(email) {
 }
 export async function catalogFetch(url) {
   const cache = await caches.open("catalog-fallback");
+  let db;
+  try {
+    db = await openStorage();
+    const stored = await new Promise((resolve, reject) => {
+      const tx = db.transaction("catalog", "readonly");
+      const request = tx.objectStore("catalog").get(url);
+      request.onsuccess = () => resolve(request.result ?? null);
+      request.onerror = () => reject(request.error);
+    });
+    if (stored !== null) return stored;
+  } catch {}
+
   try {
     const response = await fetch(url, { cache: "no-store" });
     if (response.ok) {
+      const value = await response.clone().json();
+      if (db) {
+        try {
+          await new Promise((resolve, reject) => {
+            const tx = db.transaction("catalog", "readwrite");
+            tx.objectStore("catalog").put(value, url);
+            tx.oncomplete = resolve;
+            tx.onerror = () => reject(tx.error);
+          });
+        } catch {}
+      }
       await cache.put(url, response.clone());
-      return await response.json();
+      return value;
     }
   } catch {}
   const cached = await cache.match(url);

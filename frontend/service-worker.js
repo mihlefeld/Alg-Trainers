@@ -3,6 +3,44 @@ const CATALOG_PREFIX = "catalog";
 const RUNTIME_PREFIX = "runtime";
 const CACHE_LIMIT = 80;
 
+function openCatalogDatabase() {
+  return new Promise((resolve, reject) => {
+    const request = indexedDB.open("alg-trainers", 4);
+    request.onupgradeneeded = () => {
+      const db = request.result;
+      if (!db.objectStoreNames.contains("catalog")) db.createObjectStore("catalog");
+      if (!db.objectStoreNames.contains("metadata")) db.createObjectStore("metadata");
+    };
+    request.onsuccess = () => resolve(request.result);
+    request.onerror = () => reject(request.error);
+  });
+}
+
+async function putCatalogEntry(url, response) {
+  const db = await openCatalogDatabase();
+  const value = await response.clone().json();
+  await new Promise((resolve, reject) => {
+    const tx = db.transaction("catalog", "readwrite");
+    tx.objectStore("catalog").put(value, url);
+    tx.oncomplete = resolve;
+    tx.onerror = () => reject(tx.error);
+  });
+  db.close();
+}
+
+async function markOfflineReady(catalogVersion) {
+  const db = await openCatalogDatabase();
+  await new Promise((resolve, reject) => {
+    const tx = db.transaction("metadata", "readwrite");
+    const metadata = tx.objectStore("metadata");
+    metadata.put(true, "catalogOfflineReady");
+    metadata.put(catalogVersion, "catalogVersion");
+    tx.oncomplete = resolve;
+    tx.onerror = () => reject(tx.error);
+  });
+  db.close();
+}
+
 async function versionInfo() {
   try {
     const response = await fetch("/version.json", { cache: "no-store" });
@@ -22,6 +60,7 @@ self.addEventListener("install", event => {
       if (!response.ok) throw new Error(`Unable to cache ${entry.url}`);
       if (entry.url.startsWith("/api/trainers")) {
         await catalog.put(entry.url, response);
+        await putCatalogEntry(entry.url, response);
       } else {
         await shell.put(entry.url, response);
         if (entry.url === "/" || entry.url === "/index.html") {
@@ -29,6 +68,7 @@ self.addEventListener("install", event => {
         }
       }
     }));
+    await markOfflineReady(info.catalogVersion);
     await self.skipWaiting();
   })());
 });
