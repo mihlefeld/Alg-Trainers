@@ -639,6 +639,185 @@ pub async fn load(
     Ok(Some(bundle))
 }
 
+pub async fn load_all(db: &DatabaseConnection) -> Result<Vec<TrainerBundle>, CatalogError> {
+    let transaction = db.begin().await?;
+    transaction
+        .execute_unprepared("SET LOCAL statement_timeout = '30s'")
+        .await?;
+    let tx = &transaction;
+
+    let trainers = entity::trainer::Entity::find()
+        .order_by_asc(entity::trainer::Column::Order)
+        .all(tx)
+        .await?;
+    let case_models = entity::case::Entity::find()
+        .order_by_asc(entity::case::Column::TrainerId)
+        .order_by_asc(entity::case::Column::CaseId)
+        .all(tx)
+        .await?;
+    let alg_models = entity::alg::Entity::find()
+        .order_by_asc(entity::alg::Column::TrainerId)
+        .order_by_asc(entity::alg::Column::CaseId)
+        .order_by_asc(entity::alg::Column::Position)
+        .all(tx)
+        .await?;
+    let scramble_models = entity::scramble::Entity::find()
+        .order_by_asc(entity::scramble::Column::TrainerId)
+        .order_by_asc(entity::scramble::Column::CaseId)
+        .order_by_asc(entity::scramble::Column::Position)
+        .all(tx)
+        .await?;
+
+    let mut algs_by_case: BTreeMap<(String, String), Vec<TrainerAlg>> = BTreeMap::new();
+    for model in alg_models {
+        algs_by_case
+            .entry((model.trainer_id, model.case_id))
+            .or_default()
+            .push(TrainerAlg {
+                alg_id: model.alg_id,
+                alg: model.alg,
+                position: model.position,
+            });
+    }
+    let mut scrambles_by_case: BTreeMap<(String, String), Vec<String>> = BTreeMap::new();
+    for model in scramble_models {
+        scrambles_by_case
+            .entry((model.trainer_id, model.case_id))
+            .or_default()
+            .push(model.scramble);
+    }
+    let mut cases_by_trainer: BTreeMap<String, Vec<TrainerCase>> = BTreeMap::new();
+    for model in case_models {
+        let key = (model.trainer_id.clone(), model.case_id.clone());
+        cases_by_trainer
+            .entry(model.trainer_id)
+            .or_default()
+            .push(TrainerCase {
+                name: model.name,
+                setup: model.case_setup,
+                image_svg: model.image_svg,
+                algs: algs_by_case.remove(&key).unwrap_or_default(),
+                scrambles: scrambles_by_case.remove(&key).unwrap_or_default(),
+                case_id: model.case_id,
+            });
+    }
+
+    let group_rows = tx
+        .query_all(Statement::from_string(
+            DatabaseBackend::Postgres,
+            "SELECT g.trainer_id, g.name, coalesce(
+                array_agg(ga.case_id ORDER BY ga.\"order\") FILTER (WHERE ga.case_id IS NOT NULL),
+                '{}'::text[]
+             ) cases
+             FROM groups g LEFT JOIN group_assignments ga ON ga.group_id=g.id
+             GROUP BY g.id, g.trainer_id, g.name, g.\"order\"
+             ORDER BY g.trainer_id, g.\"order\""
+                .to_owned(),
+        ))
+        .await?;
+    let mut groups_by_trainer: BTreeMap<String, Vec<TrainerGroup>> = BTreeMap::new();
+    for row in group_rows {
+        let trainer_id: String = row.try_get("", "trainer_id")?;
+        groups_by_trainer
+            .entry(trainer_id)
+            .or_default()
+            .push(TrainerGroup {
+                name: row.try_get("", "name")?,
+                cases: row.try_get::<Vec<String>>("", "cases")?,
+            });
+    }
+
+    let algset_rows = tx
+        .query_all(Statement::from_string(
+            DatabaseBackend::Postgres,
+            "SELECT a.trainer_id, a.name, array_agg(g.name ORDER BY g.\"order\") groups
+             FROM algsets a
+             JOIN algset_assignments aa ON aa.algset_id=a.id
+             JOIN groups g ON g.id=aa.group_id
+             GROUP BY a.id, a.trainer_id, a.name, a.\"order\"
+             ORDER BY a.trainer_id, a.\"order\""
+                .to_owned(),
+        ))
+        .await?;
+    let mut algsets_by_trainer: BTreeMap<String, Vec<(String, Vec<String>)>> = BTreeMap::new();
+    for row in algset_rows {
+        let trainer_id: String = row.try_get("", "trainer_id")?;
+        algsets_by_trainer
+            .entry(trainer_id)
+            .or_default()
+            .push((row.try_get("", "name")?, row.try_get::<Vec<String>>("", "groups")?));
+    }
+
+    let root = std::env::var("CATALOG_ROOT").unwrap_or_else(|_| "static".to_owned());
+    let mut bundles = Vec::with_capacity(trainers.len());
+    for trainer in trainers {
+        let trainer_id = trainer.trainer_id;
+        let selected_algsets = trainer.selected_algsets;
+        let metadata = read_trainer_metadata(Path::new(&root), &trainer_id);
+        let pre_rotations = metadata
+            .as_ref()
+            .map(|value| value.pre_rotations.clone())
+            .unwrap_or_default();
+        let post_rotations = normalize_option_alias_text(
+            metadata
+                .as_ref()
+                .map(|value| value.post_rotations.clone())
+                .unwrap_or_default(),
+            &pre_rotations,
+            "preRotations",
+        );
+        let pre_moves = metadata
+            .as_ref()
+            .map(|value| value.pre_moves.clone())
+            .unwrap_or_default();
+        let post_moves = normalize_option_alias_text(
+            metadata
+                .as_ref()
+                .map(|value| value.post_moves.clone())
+                .unwrap_or_default(),
+            &pre_moves,
+            "preMoves",
+        );
+        let u_move_cycles = fs::read(Path::new(&root).join(&trainer_id).join("u_move.json"))
+            .ok()
+            .and_then(|value| serde_json::from_slice(&value).ok())
+            .unwrap_or_default();
+        let algsets = algsets_by_trainer
+            .remove(&trainer_id)
+            .unwrap_or_default()
+            .into_iter()
+            .map(|(name, groups)| TrainerAlgset {
+                selected: selected_algsets
+                    .get(&name)
+                    .and_then(serde_json::Value::as_bool)
+                    .unwrap_or(true),
+                name,
+                groups,
+            })
+            .collect();
+        let (selection_key, times_key) = storage_keys(&trainer_id);
+        bundles.push(TrainerBundle {
+            selection_key,
+            times_key,
+            title: trainer.title.ok_or("trainer title is missing")?,
+            puzzle: trainer.puzzle,
+            method: trainer.method,
+            cases: cases_by_trainer.remove(&trainer_id).unwrap_or_default(),
+            groups: groups_by_trainer.remove(&trainer_id).unwrap_or_default(),
+            algsets,
+            pre_rotations,
+            post_rotations,
+            pre_moves,
+            post_moves,
+            max_algs_per_row: trainer.max_algs_per_row,
+            u_move_cycles,
+            trainer_id,
+        });
+    }
+    transaction.commit().await?;
+    Ok(bundles)
+}
+
 fn normalize_option_alias_text(
     values: Vec<String>,
     fallback: &[String],

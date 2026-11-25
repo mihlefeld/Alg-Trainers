@@ -2,16 +2,18 @@ mod catalog;
 mod database;
 #[allow(dead_code)]
 mod entity;
+mod pwa;
 mod sync;
 
 use alg_trainers_migration::Migrator;
 use chrono::Utc;
 use rand::{distributions::Alphanumeric, Rng};
 use rocket::{
-    http::{Cookie, CookieJar, Header, Status},
+    http::{ContentType, Cookie, CookieJar, Header, Status},
     request::{self, FromRequest, Request},
     response::Redirect,
     serde::json::Json,
+    tokio::sync::OnceCell,
     Responder, State,
 };
 use sea_orm::{
@@ -24,7 +26,7 @@ use std::{
     collections::HashMap,
     env,
     net::IpAddr,
-    sync::Mutex,
+    sync::{Arc, Mutex},
     time::{Duration, Instant},
 };
 
@@ -39,6 +41,8 @@ struct AppState {
     wca_client_secret: String,
     wca_redirect_url: String,
     cookie_secure: bool,
+    service_worker_js: Arc<String>,
+    offline_bundle_cache: Arc<OnceCell<Arc<String>>>,
 }
 
 struct RateLimiter {
@@ -103,6 +107,15 @@ struct CachedTrainers(Json<Vec<serde_json::Value>>, Header<'static>);
 
 #[derive(Responder)]
 struct CachedTrainer(Json<catalog::TrainerBundle>, Header<'static>);
+
+#[derive(Responder)]
+struct OfflineTrainersBundle(String, ContentType, Header<'static>);
+
+#[derive(Responder)]
+struct ServiceWorkerScript(String, ContentType, Header<'static>, Header<'static>);
+
+#[derive(Responder)]
+struct ManifestResponse(String, ContentType, Header<'static>);
 
 #[derive(Responder)]
 struct PrivateMe(Json<MeResponse>, Header<'static>);
@@ -366,6 +379,67 @@ async fn trainer(
         .ok_or(Status::NotFound)
 }
 
+#[rocket::get("/api/offline/trainers")]
+async fn offline_trainers(
+    state: &State<AppState>,
+    _rate_limit: ApiRateLimit,
+) -> Result<OfflineTrainersBundle, Status> {
+    let payload = state
+        .offline_bundle_cache
+        .get_or_try_init(|| async {
+            let bundles = catalog::load_all(&state.db).await.map_err(|error| {
+                tracing::error!(%error, "failed to load offline trainers bundle");
+                Status::InternalServerError
+            })?;
+            let json = serde_json::to_string(&bundles).map_err(|error| {
+                tracing::error!(%error, "failed to serialize offline trainers bundle");
+                Status::InternalServerError
+            })?;
+            Ok::<Arc<String>, Status>(Arc::new(json))
+        })
+        .await?;
+    Ok(OfflineTrainersBundle(
+        payload.as_ref().clone(),
+        ContentType::JSON,
+        Header::new(
+            "Cache-Control",
+            "public, max-age=3600, stale-while-revalidate=86400",
+        ),
+    ))
+}
+
+#[rocket::get("/sw.js")]
+fn service_worker(state: &State<AppState>) -> ServiceWorkerScript {
+    ServiceWorkerScript(
+        state.service_worker_js.as_ref().clone(),
+        ContentType::JavaScript,
+        Header::new("Cache-Control", "no-cache, no-store, must-revalidate"),
+        Header::new("Service-Worker-Allowed", "/"),
+    )
+}
+
+#[rocket::get("/manifest.json")]
+async fn manifest() -> Result<ManifestResponse, Status> {
+    let content = rocket::tokio::fs::read_to_string("manifest.json")
+        .await
+        .map_err(|_| Status::NotFound)?;
+    Ok(ManifestResponse(
+        content,
+        ContentType::new("application", "manifest+json"),
+        Header::new("Cache-Control", "no-cache"),
+    ))
+}
+
+#[rocket::get("/icon.png")]
+async fn icon_png() -> Option<rocket::fs::NamedFile> {
+    rocket::fs::NamedFile::open("icon.png").await.ok()
+}
+
+#[rocket::get("/mobile.png")]
+async fn mobile_png() -> Option<rocket::fs::NamedFile> {
+    rocket::fs::NamedFile::open("mobile.png").await.ok()
+}
+
 #[rocket::get("/api/sync?<before_datetime>&<before_id>")]
 async fn sync_get(
     cookies: &CookieJar<'_>,
@@ -479,13 +553,13 @@ async fn rocket() -> _ {
         .expect("Unable to connect to PostgreSQL");
     let migrate_only = env_bool("DATABASE_MIGRATE_ONLY").unwrap_or(false);
     let run_migrations = migrate_only || env_bool("DATABASE_RUN_MIGRATIONS").unwrap_or(true);
+    let catalog_root = env::var("CATALOG_ROOT")
+        .map(std::path::PathBuf::from)
+        .unwrap_or_else(|_| "static".into());
     if run_migrations {
         Migrator::up(&db, None)
             .await
             .expect("Database migrations failed");
-        let catalog_root = env::var("CATALOG_ROOT")
-            .map(std::path::PathBuf::from)
-            .unwrap_or_else(|_| "static".into());
         catalog::seed(&db, &catalog_root)
             .await
             .expect("Unable to seed trainer catalog");
@@ -493,6 +567,22 @@ async fn rocket() -> _ {
     if migrate_only {
         std::process::exit(0);
     }
+
+    let trainer_ids: Vec<String> = catalog::list(&db)
+        .await
+        .expect("Unable to list trainers for PWA service worker")
+        .into_iter()
+        .map(|trainer| trainer.trainer_id)
+        .collect();
+    let pwa_version_override = env::var("PWA_VERSION").ok();
+    let pwa_assets = pwa::build_pwa_assets(
+        std::path::Path::new("frontend/dist"),
+        std::path::Path::new("style"),
+        &catalog_root,
+        &trainer_ids,
+        pwa_version_override.as_deref(),
+    );
+    tracing::info!(pwa_version = %pwa_assets.version, trainers = trainer_ids.len(), "prepared PWA service worker");
 
     let secret_key = env::var("ROCKET_SECRET_KEY").expect("ROCKET_SECRET_KEY must be configured");
     if secret_key == DEFAULT_SECRET_KEY
@@ -522,6 +612,8 @@ async fn rocket() -> _ {
         wca_client_secret: env::var("WCA_CLIENT_SECRET").unwrap_or_default(),
         wca_redirect_url,
         cookie_secure,
+        service_worker_js: Arc::new(pwa_assets.service_worker_js),
+        offline_bundle_cache: Arc::new(OnceCell::new()),
     };
     let rate_limiter = RateLimiter {
         buckets: Mutex::new(HashMap::new()),
@@ -531,12 +623,17 @@ async fn rocket() -> _ {
         "/",
         rocket::routes![
             index,
+            service_worker,
+            manifest,
+            icon_png,
+            mobile_png,
             me,
             wca_login,
             wca_callback,
             logout,
             trainers,
             trainer,
+            offline_trainers,
             sync_get,
             sync_put,
             catch_all

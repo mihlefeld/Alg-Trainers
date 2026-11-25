@@ -1,5 +1,6 @@
 mod cube_schemes;
 mod cube_settings;
+mod pwa;
 
 use gloo_net::http::Request;
 use gloo_timers::callback::{Interval, Timeout};
@@ -223,6 +224,32 @@ export async function importStorageText(text) {
     tx.onerror = () => reject(tx.error);
   });
 }
+export async function metadataGet(key) {
+  const db = await openStorage();
+  return await new Promise((resolve, reject) => {
+    const request = db.transaction("metadata", "readonly").objectStore("metadata").get(key);
+    request.onsuccess = () => resolve(request.result ?? null);
+    request.onerror = () => reject(request.error);
+  });
+}
+export async function metadataPut(key, value) {
+  const db = await openStorage();
+  await new Promise((resolve, reject) => {
+    const tx = db.transaction("metadata", "readwrite");
+    tx.objectStore("metadata").put(value, key);
+    tx.oncomplete = resolve;
+    tx.onerror = () => reject(tx.error);
+  });
+}
+export async function metadataDelete(key) {
+  const db = await openStorage();
+  await new Promise((resolve, reject) => {
+    const tx = db.transaction("metadata", "readwrite");
+    tx.objectStore("metadata").delete(key);
+    tx.oncomplete = resolve;
+    tx.onerror = () => reject(tx.error);
+  });
+}
 "#)]
 extern "C" {
     #[wasm_bindgen(catch)]
@@ -233,6 +260,12 @@ extern "C" {
     fn storageAll(store_name: &str) -> Result<js_sys::Promise, JsValue>;
     #[wasm_bindgen(catch)]
     fn storageClearDirtyIfUnchanged(expected: &JsValue) -> Result<js_sys::Promise, JsValue>;
+    #[wasm_bindgen(catch)]
+    fn metadataGet(key: &str) -> Result<js_sys::Promise, JsValue>;
+    #[wasm_bindgen(catch)]
+    fn metadataPut(key: &str, value: &str) -> Result<js_sys::Promise, JsValue>;
+    #[wasm_bindgen(catch)]
+    fn metadataDelete(key: &str) -> Result<js_sys::Promise, JsValue>;
     #[wasm_bindgen(catch)]
     fn prefersLightTheme() -> Result<bool, JsValue>;
     #[wasm_bindgen(catch)]
@@ -324,12 +357,54 @@ enum Route {
     NotFound,
 }
 
-#[derive(Clone, Debug, Default, Deserialize, PartialEq)]
+#[derive(Clone, Debug, Default, Deserialize, Serialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
 struct MeResponse {
     authenticated: bool,
     email: Option<String>,
     wca_id: Option<String>,
+}
+
+const CACHED_ACCOUNT_KEY: &str = "cachedAccount";
+
+async fn load_cached_account() -> Option<MeResponse> {
+    let promise = metadataGet(CACHED_ACCOUNT_KEY).ok()?;
+    let value = JsFuture::from(promise).await.ok()?;
+    let text = value.as_string()?;
+    serde_json::from_str::<MeResponse>(&text)
+        .ok()
+        .filter(|account| account.authenticated)
+}
+
+async fn save_cached_account(account: &MeResponse) {
+    if account.authenticated {
+        if let Ok(serialized) = serde_json::to_string(account) {
+            if let Ok(promise) = metadataPut(CACHED_ACCOUNT_KEY, &serialized) {
+                let _ = JsFuture::from(promise).await;
+            }
+        }
+    } else {
+        clear_cached_account().await;
+    }
+}
+
+async fn clear_cached_account() {
+    if let Ok(promise) = metadataDelete(CACHED_ACCOUNT_KEY) {
+        let _ = JsFuture::from(promise).await;
+    }
+}
+
+async fn fetch_account_status() -> (MeResponse, bool) {
+    match Request::get("/api/me").send().await {
+        Ok(response) if response.ok() => match response.json::<MeResponse>().await {
+            Ok(value) => {
+                save_cached_account(&value).await;
+                (value, false)
+            }
+            Err(_) => (load_cached_account().await.unwrap_or_default(), true),
+        },
+        _ => (load_cached_account().await.unwrap_or_default(), true),
+    }
 }
 
 #[derive(Clone, Debug, Deserialize, PartialEq)]
@@ -763,9 +838,12 @@ fn save_custom_algs(selection_key: &str, custom_algs: &BTreeMap<String, Vec<User
 fn app() -> Html {
     start_sync_engine();
     html! {
-        <BrowserRouter>
-            <Switch<Route> render={switch} />
-        </BrowserRouter>
+        <>
+            <pwa::UpdatePrompt />
+            <BrowserRouter>
+                <Switch<Route> render={switch} />
+            </BrowserRouter>
+        </>
     }
 }
 
@@ -935,10 +1013,12 @@ fn alg_sheet_page() -> Html {
 fn home() -> Html {
     let trainers = use_state(Vec::<TrainerSummary>::new);
     let me = use_state(MeResponse::default);
+    let offline = use_state(|| !pwa::isNavigatorOnline());
     let error = use_state(|| None::<String>);
     {
         let trainers = trainers.clone();
         let me = me.clone();
+        let offline = offline.clone();
         let error = error.clone();
         use_effect_with((), move |_| {
             spawn_local(async move {
@@ -964,11 +1044,9 @@ fn home() -> Html {
                 }
             });
             spawn_local(async move {
-                if let Ok(response) = Request::get("/api/me").send().await {
-                    if let Ok(value) = response.json::<MeResponse>().await {
-                        me.set(value);
-                    }
-                }
+                let (account, is_offline) = fetch_account_status().await;
+                me.set(account);
+                offline.set(is_offline);
             });
             || ()
         });
@@ -989,15 +1067,26 @@ fn home() -> Html {
             <div class="colFlex pad"><h3>{"Welcome to ALLG-Trainer"}</h3></div>
             <div class="rowFlex pad" style="justify-content: center;">
                 if me.authenticated {
-                    <span class="borderedContainer pad">{format!("Signed in as {}", me.email.as_deref().unwrap_or("WCA user"))}</span>
-                    <button class="abutton" onclick={Callback::from(|_| {
-                        spawn_local(async move {
-                            let _ = Request::post("/api/auth/logout").send().await;
-                            if let Some(window) = web_sys::window() {
-                                let _ = window.location().reload();
-                            }
-                        });
-                    })}>{"Sign out"}</button>
+                    <span class="borderedContainer pad">
+                        {if *offline {
+                            format!("Signed in as {} (offline)", me.email.as_deref().unwrap_or("WCA user"))
+                        } else {
+                            format!("Signed in as {}", me.email.as_deref().unwrap_or("WCA user"))
+                        }}
+                    </span>
+                    if !*offline {
+                        <button class="abutton" onclick={Callback::from(|_| {
+                            spawn_local(async move {
+                                let _ = Request::post("/api/auth/logout").send().await;
+                                clear_cached_account().await;
+                                if let Some(window) = web_sys::window() {
+                                    let _ = window.location().reload();
+                                }
+                            });
+                        })}>{"Sign out"}</button>
+                    }
+                } else if *offline {
+                    <span class="borderedContainer pad">{"Offline mode"}</span>
                 } else {
                     <a class="abutton" href="/api/auth/wca">{"Sign in with the WCA"}</a>
                 }
@@ -1122,29 +1211,35 @@ fn last_sync_label() -> String {
 #[function_component(AccountSettings)]
 fn account_settings() -> Html {
     let account = use_state(MeResponse::default);
+    let offline = use_state(|| !pwa::isNavigatorOnline());
     let syncing = use_state(|| false);
     let sync_time = use_state(last_sync_label);
     let error = use_state(|| None::<String>);
 
     {
         let account = account.clone();
+        let offline = offline.clone();
         let sync_time = sync_time.clone();
-        let error = error.clone();
         use_effect_with((), move |_| {
             let account_request = account.clone();
-            let request_error = error.clone();
+            let offline_request = offline.clone();
             spawn_local(async move {
-                match Request::get("/api/me").send().await {
-                    Ok(response) if response.ok() => match response.json::<MeResponse>().await {
-                        Ok(value) => account_request.set(value),
-                        Err(_) => request_error.set(Some("Unable to load account.".to_owned())),
-                    },
-                    _ => request_error.set(Some("Unable to load account.".to_owned())),
-                }
+                let (value, is_offline) = fetch_account_status().await;
+                account_request.set(value);
+                offline_request.set(is_offline);
             });
             let sync_time_listener = sync_time.clone();
+            let account_online = account.clone();
+            let offline_online = offline.clone();
             let listener = Closure::<dyn FnMut(web_sys::Event)>::new(move |_| {
                 sync_time_listener.set(last_sync_label());
+                offline_online.set(false);
+                let account_online = account_online.clone();
+                spawn_local(async move {
+                    if let Some(cached) = load_cached_account().await {
+                        account_online.set(cached);
+                    }
+                });
             });
             let window = web_sys::window();
             if let Some(window) = window.as_ref() {
@@ -1167,10 +1262,12 @@ fn account_settings() -> Html {
     let force_sync = {
         let syncing = syncing.clone();
         let sync_time = sync_time.clone();
+        let offline = offline.clone();
         let error = error.clone();
         Callback::from(move |_| {
             let syncing = syncing.clone();
             let sync_time = sync_time.clone();
+            let offline = offline.clone();
             let error = error.clone();
             syncing.set(true);
             error.set(None);
@@ -1179,7 +1276,10 @@ fn account_settings() -> Html {
                 sync_now(true).await;
                 let after = last_sync_label();
                 if before == after {
-                    error.set(Some("Sync did not complete. Please try again.".to_owned()));
+                    offline.set(!pwa::isNavigatorOnline());
+                    error.set(Some("Sync did not complete. Please try again when online.".to_owned()));
+                } else {
+                    offline.set(false);
                 }
                 sync_time.set(after);
                 syncing.set(false);
@@ -1194,7 +1294,10 @@ fn account_settings() -> Html {
             let error = error.clone();
             spawn_local(async move {
                 match Request::post("/api/auth/logout").send().await {
-                    Ok(response) if response.ok() => account.set(MeResponse::default()),
+                    Ok(response) if response.ok() => {
+                        clear_cached_account().await;
+                        account.set(MeResponse::default());
+                    }
                     _ => error.set(Some("Unable to sign out.".to_owned())),
                 }
             });
@@ -1210,6 +1313,11 @@ fn account_settings() -> Html {
                         <b>{account.wca_id.as_deref().unwrap_or("WCA user")}</b>
                         <span>{account.email.as_deref().unwrap_or("")}</span>
                     </div>
+                    if *offline {
+                        <div class="settingsEntry">
+                            <span>{"Offline — progress is saved locally and will sync when back online."}</span>
+                        </div>
+                    }
                     <div class="settingsEntry accountSync">
                         <div class="colFlex">
                             <b>{"Last sync"}</b>
@@ -1221,15 +1329,21 @@ fn account_settings() -> Html {
                     </div>
                     <div class="settingsEntry">
                         <div></div>
-                        <button class="abutton" onclick={logout}>{"Sign out"}</button>
+                        <button class="abutton" disabled={*offline} onclick={logout}>{"Sign out"}</button>
                     </div>
                 } else {
                     <div class="settingsEntry accountLogin">
                         <div class="colFlex">
-                            <b>{"Not signed in"}</b>
-                            <span>{"Sign in to sync settings and results."}</span>
+                            <b>{if *offline { "Offline" } else { "Not signed in" }}</b>
+                            <span>{if *offline {
+                                "Progress is saved locally on this device."
+                            } else {
+                                "Sign in to sync settings and results."
+                            }}</span>
                         </div>
-                        <a class="abutton" href="/api/auth/wca">{"Sign in with WCA"}</a>
+                        if !*offline {
+                            <a class="abutton" href="/api/auth/wca">{"Sign in with WCA"}</a>
+                        }
                     </div>
                 }
                 if let Some(message) = error.as_ref() {
@@ -4666,6 +4780,8 @@ thread_local! {
     static SYNC_STARTED: RefCell<bool> = RefCell::new(false);
     static SYNC_INTERVAL: RefCell<Option<Interval>> = const { RefCell::new(None) };
     static SYNC_DEBOUNCE: RefCell<Option<Timeout>> = const { RefCell::new(None) };
+    static SYNC_IN_FLIGHT: RefCell<bool> = RefCell::new(false);
+    static SYNC_PENDING: RefCell<Option<bool>> = const { RefCell::new(None) };
     static LAST_SYNC: RefCell<f64> = RefCell::new(0.0);
     static LAST_SYNC_COMPLETED: RefCell<Option<f64>> = const { RefCell::new(None) };
 }
@@ -4708,6 +4824,33 @@ fn start_sync_engine() {
                 closure.as_ref().unchecked_ref(),
             );
             closure.forget();
+
+            let online_closure = Closure::<dyn FnMut()>::new(|| {
+                spawn_local(async move {
+                    sync_now(true).await;
+                });
+            });
+            let _ = window.add_event_listener_with_callback(
+                "online",
+                online_closure.as_ref().unchecked_ref(),
+            );
+            online_closure.forget();
+
+            if let Some(document) = window.document() {
+                let visibility_document = document.clone();
+                let visibility_closure = Closure::<dyn FnMut()>::new(move || {
+                    if !visibility_document.hidden() {
+                        spawn_local(async move {
+                            sync_now(false).await;
+                        });
+                    }
+                });
+                let _ = document.add_event_listener_with_callback(
+                    "visibilitychange",
+                    visibility_closure.as_ref().unchecked_ref(),
+                );
+                visibility_closure.forget();
+            }
         }
     });
 }
@@ -4722,18 +4865,52 @@ fn record_sync_completed() {
 }
 
 async fn sync_now(force: bool) {
+    let already_running = SYNC_IN_FLIGHT.with(|in_flight| {
+        if *in_flight.borrow() {
+            SYNC_PENDING.with(|pending| {
+                let mut pending = pending.borrow_mut();
+                *pending = Some(pending.unwrap_or(false) || force);
+            });
+            true
+        } else {
+            *in_flight.borrow_mut() = true;
+            false
+        }
+    });
+    if already_running {
+        return;
+    }
+
+    let mut current_force = force;
+    loop {
+        sync_once(current_force).await;
+        let next = SYNC_PENDING.with(|pending| pending.borrow_mut().take());
+        match next {
+            Some(next_force) => current_force = next_force,
+            None => break,
+        }
+    }
+
+    SYNC_IN_FLIGHT.with(|in_flight| *in_flight.borrow_mut() = false);
+}
+
+async fn sync_once(force: bool) {
     let now = Date::now();
     let too_soon = !force && LAST_SYNC.with(|last| now - *last.borrow() < 10_000.0);
     if too_soon {
         return;
     }
     LAST_SYNC.with(|last| *last.borrow_mut() = now);
-    let Ok(me) = Request::get("/api/me").send().await else {
+    let Ok(me_response) = Request::get("/api/me").send().await else {
         return;
     };
-    let Ok(me) = me.json::<MeResponse>().await else {
+    if !me_response.ok() {
+        return;
+    }
+    let Ok(me) = me_response.json::<MeResponse>().await else {
         return;
     };
+    save_cached_account(&me).await;
     if !me.authenticated {
         return;
     }
@@ -4896,6 +5073,7 @@ async fn sync_now(force: bool) {
             let _ = JsFuture::from(promise).await;
         }
     }
+    let _ = pull_remote().await;
     record_sync_completed();
 }
 

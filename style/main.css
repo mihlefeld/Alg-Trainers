@@ -544,3 +544,35 @@ background: var(--primaryTextHover);
     border-bottom-width: 0.2em;
     border-bottom-style: solid;
 }
+
+.pwaUpdateBanner {
+    position: fixed;
+    bottom: 1em;
+    right: 1em;
+    z-index: 10000;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75em;
+    max-width: min(92vw, 32em);
+    padding: 0.75em 1em;
+    border-color: var(--primary);
+    box-shadow: 0 0.4em 1.4em rgba(0, 0, 0, 0.45);
+}
+
+.pwaUpdateText {
+    display: flex;
+    flex-direction: column;
+    gap: 0.15em;
+}
+
+.pwaUpdateActions {
+    align-items: center;
+    gap: 0.4em;
+}
+
+.pwaUpdatePrimary {
+    background-color: var(--primaryBG);
+    color: var(--primaryText);
+}
