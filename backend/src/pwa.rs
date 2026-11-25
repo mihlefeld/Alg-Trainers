@@ -4,6 +4,7 @@ use std::{
 };
 
 const SW_SCHEMA_VERSION: &str = "sw-v1";
+pub const FRONTEND_VERSION: &str = env!("FRONTEND_CARGO_VERSION");
 
 pub struct PwaAssets {
     pub version: String,
@@ -82,12 +83,13 @@ pub fn build_pwa_assets(
     trainer_ids: &[String],
     version_override: Option<&str>,
 ) -> PwaAssets {
+    let version_tag = version_override
+        .filter(|v| !v.is_empty())
+        .unwrap_or(FRONTEND_VERSION);
     let mut hasher = Fnv1a128::new();
     hasher.update(SW_SCHEMA_VERSION.as_bytes());
-    if let Some(override_val) = version_override.filter(|v| !v.is_empty()) {
-        hasher.update(b"|override:");
-        hasher.update(override_val.as_bytes());
-    }
+    hasher.update(b"|version:");
+    hasher.update(version_tag.as_bytes());
 
     let mut precache_urls = vec![
         "/".to_owned(),
@@ -152,10 +154,7 @@ pub fn build_pwa_assets(
     }
 
     let content_hash = hasher.finish_hex();
-    let version = match version_override.filter(|v| !v.is_empty()) {
-        Some(tag) => format!("{tag}-{}", &content_hash[..12]),
-        None => content_hash[..16].to_owned(),
-    };
+    let version = format!("{version_tag}-{}", &content_hash[..12]);
 
     let precache_json = serde_json::to_string(&precache_urls).unwrap_or_else(|_| "[]".to_owned());
     let version_json = serde_json::to_string(&version).unwrap_or_else(|_| "\"v1\"".to_owned());
@@ -354,9 +353,11 @@ mod tests {
         let static_dir = root.join("static");
         let trainers = vec!["3x3-PLL-Trainer".to_owned(), "2x2-EG-Trainer".to_owned()];
 
+        let default_v = build_pwa_assets(&dist, &style, &static_dir, &trainers, None);
         let v1 = build_pwa_assets(&dist, &style, &static_dir, &trainers, Some("v1"));
         let v2 = build_pwa_assets(&dist, &style, &static_dir, &trainers, Some("v2"));
 
+        assert!(default_v.version.starts_with(&format!("{FRONTEND_VERSION}-")));
         assert_ne!(v1.version, v2.version);
         assert!(v1.service_worker_js.contains("/catalog/3x3-PLL-Trainer/icon.png"));
         assert!(v1.service_worker_js.contains("/catalog/2x2-EG-Trainer/icon.png"));

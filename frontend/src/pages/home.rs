@@ -100,7 +100,7 @@ pub fn home() -> Html {
                     <div class="borderedContainer pad">{message}</div>
                 }
             </div>
-            <span class="version" style="text-align: center;">{"v2.0.0"}</span>
+            <span class="version" style="text-align: center;">{crate::APP_VERSION}</span>
         </main>
     }
 }

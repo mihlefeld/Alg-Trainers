@@ -173,7 +173,7 @@ pub fn presets_panel(props: &PresetsPanelProps) -> Html {
                     Callback::from(move |_| open_dialog.emit(Dialog::Credits))
                 }}>{"Credits"}</button>
             </div>
-            <span class="version">{"v2.0.0"}</span>
+            <span class="version">{crate::APP_VERSION}</span>
         </div>
     }
 }
