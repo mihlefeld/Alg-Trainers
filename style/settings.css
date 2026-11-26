@@ -21,13 +21,8 @@ input[type=text]:focus {
 #settings > .dialogDiv {
     width: min(80em, 95vw);
     height: 95vh;
-}
-
-details.settingsDetails:open {
-    display: flex;
-    flex-direction: column;
-    gap: 0.2em;
-    transition: max-height 400ms ease-out;
+    position: relative;
+    z-index: -2;
 }
 
 details.settingsDetails details.settingsDetails {
@@ -42,6 +37,23 @@ summary.settingsSummary {
     background: var(--secondary);
     color: var(--secondaryText);
     border-radius: var(--borderRadius);
+    width: 8em;
+    position: relative;
+    left: 0.2em;
+    top: 0.4em;
+}
+
+details.settingsDetails:open > summary {
+    background: var(--accent);
+    text: var(--accentText);
+}
+
+details.settingsDetails > div {
+    position: absolute;
+    left: 10em;
+    top: calc(2.2rem + 0.6em);
+    width: calc(100% - 10.3em);
+    height: calc(100% - 2.2rem - 0.7em);
 }
 
 summary.settingsSummary:hover {
@@ -145,6 +157,11 @@ dialog#settings .accountSection span {
     gap: 0.2em;
 }
 
+.plusMinus > .abutton {
+    padding: 0em !important;
+    min-height: unset;
+}
+
 .cubeSchemeEntry, .cubeTrainerEntry {
     align-items: center;
 }
@@ -155,9 +172,20 @@ dialog#settings .accountSection span {
     gap: 0.2em;
 }
 
+.settingsSidebar {
+  position: absolute;
+  width: 9.2em;
+  height: calc(100% - 2.2rem - 0.9em);
+  background: var(--background);
+  top: calc(2.2rem + 0.6em);
+  z-index: -1;
+  border-radius: var(--borderRadius);
+}
+
 dialog#settings .cubeSchemeActions button {
     width: auto;
     padding: 0.1em 0.4em;
+    flex-grow: 1;
 }
 
 dialog#settings select {
@@ -181,7 +209,6 @@ dialog#settings input:disabled {
 }
 
 .cubeTrainerList {
-    max-height: 18em;
     overflow-y: auto;
     display: flex;
     flex-direction: column;
@@ -189,7 +216,7 @@ dialog#settings input:disabled {
 }
 
 .cubeTrainerGroup {
-    border: 1px solid var(--secondary);
+    border: var(--borderWidth) solid var(--secondary);
     border-radius: var(--borderRadius);
     padding: 0.3em;
 }
@@ -204,6 +231,8 @@ dialog#settings input:disabled {
     cursor: pointer;
     margin: -0.3em;
     padding: 0.6em;
+    background: var(--background);
+    border-radius: var(--borderRadius);
 }
 
 .cubeTrainerGroup[open] > .cubePuzzleSummary {
@@ -219,7 +248,8 @@ dialog#settings .cubePuzzleSummary span {
 }
 
 .cubePuzzleEntry {
-    background-color: var(--backgroundDarker);
+    color: var(--secondaryText);
+    background: var(--secondary);
 }
 
 dialog#settings .cubeTrainerEntry span {

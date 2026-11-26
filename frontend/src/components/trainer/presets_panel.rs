@@ -159,7 +159,7 @@ pub fn presets_panel(props: &PresetsPanelProps) -> Html {
                             })
                         }}
                     />
-                    <button class="abutton" onclick={on_add_new}>{"Add"}</button>
+                    <button class="abutton" style="padding: 0em;" onclick={on_add_new}>{"Add"}</button>
                 </div>
             </div>
             <div style="width:100%; display:flex; justify-content:space-between; align-items:end;">

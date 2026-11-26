@@ -90,7 +90,7 @@ body {
     --secondaryText: var(--text);
     --primary: #658320;
     --primaryText: var(--text);
-    --primaryTextHover: var(--primary);
+    --primaryTextHover: var(--text);
     --accent: #abdf32;
     --accentHover: var(--accent);
     --accentText: var(--background);
@@ -244,6 +244,7 @@ html {
     box-shadow: 0px 0px 5px var(--primaryBGHover);
     background-color: var(--primaryBGHover);
     border-color: var(--primaryBGHover);
+    color: var(--primaryText);
 }
 
 .abutton:disabled {

@@ -370,6 +370,7 @@ pub fn settings_dialog(props: &SettingsDialogProps) -> Html {
                     </div>
                 </div>
             </SettingsSection>
+            <div class="settingsSidebar"> </div>
         </ModalDialog>
     }
 }
