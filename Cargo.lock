@@ -48,7 +48,7 @@ dependencies = [
 
 [[package]]
 name = "alg-trainers-frontend"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "base64 0.22.1",
  "gloo-net 0.6.0",

@@ -25,7 +25,6 @@ struct CaseCardProps {
 
 #[function_component(CaseCard)]
 fn case_card(props: &CaseCardProps) -> Html {
-    let hint_timeout = use_mut_ref(|| None::<Timeout>);
     let case = &props.case;
 
     let onclick = {
