@@ -2,10 +2,23 @@ use crate::components::case_image::CaseImage;
 use crate::components::modal::ModalDialog;
 use crate::logic::algs::{display_algs, hidden_algs};
 use crate::models::{DisplayAlg, TrainerCase, UserAlgState};
+#[cfg(target_arch = "wasm32")]
+use crate::services::storage::isFirefoxAndroid;
 use std::collections::BTreeMap;
 use std::rc::Rc;
 use web_sys::{DragEvent, Element, HtmlTextAreaElement, PointerEvent};
 use yew::prelude::*;
+
+fn firefox_android_touch_drag() -> bool {
+    #[cfg(target_arch = "wasm32")]
+    {
+        isFirefoxAndroid().unwrap_or(false)
+    }
+    #[cfg(not(target_arch = "wasm32"))]
+    {
+        false
+    }
+}
 
 #[derive(Properties, PartialEq)]
 struct AlgEditorRowProps {
@@ -83,6 +96,7 @@ pub fn hint_dialog(props: &HintDialogProps) -> Html {
     let dragged_alg = use_state(String::new);
     let drag_over_alg = use_state(String::new);
     let show_hidden = use_state(|| false);
+    let firefox_android_touch_drag = firefox_android_touch_drag();
 
     {
         let alg_editor = alg_editor.clone();
@@ -211,8 +225,13 @@ pub fn hint_dialog(props: &HintDialogProps) -> Html {
                                 }))}
                                 ondrop={(!item.hidden).then(|| Callback::from(move |event: DragEvent| {
                                     event.prevent_default();
-                                    if !dragged_alg_drop.is_empty() && dragged_alg_drop.as_str() != drop_id.as_str() {
-                                        on_reorder_drop.emit((dragged_alg_drop.to_string(), drop_id.clone()));
+                                    let from = event
+                                        .data_transfer()
+                                        .and_then(|transfer| transfer.get_data("text/plain").ok())
+                                        .filter(|id| !id.is_empty())
+                                        .unwrap_or_else(|| dragged_alg_drop.to_string());
+                                    if !from.is_empty() && from != drop_id.as_str() {
+                                        on_reorder_drop.emit((from, drop_id.clone()));
                                     }
                                     dragged_alg_drop.set(String::new());
                                     drag_over_alg_drop.set(String::new());
@@ -221,7 +240,11 @@ pub fn hint_dialog(props: &HintDialogProps) -> Html {
                                 if !item.hidden {
                                     <button
                                         type="button"
-                                        class="material-symbols-outlined algHandle"
+                                        class={classes!(
+                                            "material-symbols-outlined",
+                                            "algHandle",
+                                            firefox_android_touch_drag.then_some("algTouchDrag")
+                                        )}
                                         draggable="true"
                                         title="Drag to reorder"
                                         aria-label="Drag to reorder"
@@ -229,6 +252,9 @@ pub fn hint_dialog(props: &HintDialogProps) -> Html {
                                             let dragged_alg_pointer_down = dragged_alg_pointer_down.clone();
                                             let drag_id = drag_id.clone();
                                             move |event: PointerEvent| {
+                                                if !firefox_android_touch_drag {
+                                                    return;
+                                                }
                                                 if event.pointer_type() != "touch"
                                                     && event.pointer_type() != "pen"
                                                 {
@@ -245,6 +271,9 @@ pub fn hint_dialog(props: &HintDialogProps) -> Html {
                                             let dragged_alg_pointer_move = dragged_alg_pointer_move.clone();
                                             let drag_over_alg_pointer_move = drag_over_alg_pointer_move.clone();
                                             move |event: PointerEvent| {
+                                                if !firefox_android_touch_drag {
+                                                    return;
+                                                }
                                                 if dragged_alg_pointer_move.is_empty()
                                                     || (event.pointer_type() != "touch"
                                                         && event.pointer_type() != "pen")
@@ -281,6 +310,9 @@ pub fn hint_dialog(props: &HintDialogProps) -> Html {
                                             let drag_over_alg_pointer_up = drag_over_alg_pointer_up.clone();
                                             let on_reorder_pointer = on_reorder_pointer.clone();
                                             move |event: PointerEvent| {
+                                                if !firefox_android_touch_drag {
+                                                    return;
+                                                }
                                                 if event.pointer_type() != "touch"
                                                     && event.pointer_type() != "pen"
                                                 {
@@ -326,7 +358,11 @@ pub fn hint_dialog(props: &HintDialogProps) -> Html {
                                         ondragstart={Callback::from({
                                             let dragged_alg_start = dragged_alg_start.clone();
                                             let drag_id = drag_id.clone();
-                                            move |_| {
+                                            move |event: DragEvent| {
+                                                if let Some(transfer) = event.data_transfer() {
+                                                    let _ = transfer.set_data("text/plain", &drag_id);
+                                                    transfer.set_drop_effect("move");
+                                                }
                                                 dragged_alg_start.set(drag_id.clone());
                                             }
                                         })}

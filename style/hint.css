@@ -228,6 +228,9 @@ textarea:enabled {
     cursor: grab;
     -webkit-user-select: none;
     user-select: none;
+}
+
+.algHandle.algTouchDrag {
     touch-action: none;
 }
 

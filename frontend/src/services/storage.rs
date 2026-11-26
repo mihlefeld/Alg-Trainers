@@ -111,6 +111,10 @@ export function isMobileLayout() {
   return window.matchMedia("(max-width: 700px)").matches ||
     window.matchMedia("(pointer: coarse)").matches;
 }
+export function isFirefoxAndroid() {
+  if (!navigator.userAgent) return false;
+  return /Android/i.test(navigator.userAgent) && /Firefox/i.test(navigator.userAgent);
+}
 export function colorInputStyle(value, background) {
   if (!CSS.supports("color", value) || !CSS.supports("color", background)) {
     throw new Error("Please enter a valid CSS color.");
@@ -268,6 +272,8 @@ extern "C" {
     pub fn prefersLightTheme() -> Result<bool, JsValue>;
     #[wasm_bindgen(catch)]
     pub fn isMobileLayout() -> Result<bool, JsValue>;
+    #[wasm_bindgen(catch)]
+    pub fn isFirefoxAndroid() -> Result<bool, JsValue>;
     #[wasm_bindgen(catch)]
     pub fn colorInputStyle(value: &str, background: &str) -> Result<String, JsValue>;
     pub fn downloadText(filename: &str, text: &str);
