@@ -21,6 +21,7 @@ input[type=text]:focus {
 #settings > .dialogDiv {
     width: min(80em, 95vw);
     height: 95vh;
+    position: relative;
 }
 
 details.settingsDetails:open {
@@ -42,6 +43,20 @@ summary.settingsSummary {
     background: var(--secondary);
     color: var(--secondaryText);
     border-radius: var(--borderRadius);
+    width: 8em;
+}
+
+details.settingsDetails:open > summary {
+    background: var(--accent);
+    text: var(--accentText);
+}
+
+details.settingsDetails  > div {
+  position: absolute;
+  left: 9.2em;
+  top: 3.3em;
+  width: calc(100% - 9.5em);
+  height: calc(100% - 3.5em);
 }
 
 summary.settingsSummary:hover {
@@ -181,7 +196,6 @@ dialog#settings input:disabled {
 }
 
 .cubeTrainerList {
-    max-height: 18em;
     overflow-y: auto;
     display: flex;
     flex-direction: column;

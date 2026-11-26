@@ -1,3 +1,29 @@
 [build]
 target = "frontend/index.html"
 dist = "frontend/dist"
+
+[watch]
+watch = ["frontend", "style"]
+ignore = ["frontend/dist"]
+
+[serve]
+addresses = ["127.0.0.1"]
+port = 8080
+
+[[proxy]]
+backend = "http://127.0.0.1:8000/api"
+
+[[proxy]]
+backend = "http://127.0.0.1:8000/catalog"
+
+[[proxy]]
+backend = "http://127.0.0.1:8000/style"
+
+[[proxy]]
+backend = "http://127.0.0.1:8000/manifest.json"
+
+[[proxy]]
+backend = "http://127.0.0.1:8000/icon.png"
+
+[[proxy]]
+backend = "http://127.0.0.1:8000/mobile.png"

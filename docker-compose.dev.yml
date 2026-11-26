@@ -1,0 +1,4 @@
+services:
+  alg-trainers-server:
+    volumes:
+      - ./style:/app/style:ro

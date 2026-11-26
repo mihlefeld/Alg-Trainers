@@ -1,5 +1,24 @@
 # ALLG Trainer
 
+## Local frontend development
+
+For live frontend editing against the Docker backend (PostgreSQL + Rocket API):
+
+```bash
+./dev.sh
+```
+
+This ensures the Docker backend is running on `http://127.0.0.1:8000` (with
+`style/` bind-mounted via `docker-compose.dev.yml` so CSS edits apply
+immediately), waits for `/api/trainers` to respond, and launches `trunk serve`
+on `http://127.0.0.1:8080` with `/api`, `/catalog`, `/style`, and icon/manifest
+requests proxied to the backend.
+
+- Pass `--build` to rebuild the Docker backend image first (`./dev.sh --build`).
+- Pass `--open` to open the browser automatically (`./dev.sh --open`).
+- If the Docker backend is already running on port `8000`, `trunk serve` from
+  the repository root also uses the proxy settings in `Trunk.toml` directly.
+
 ## Docker deployment
 
 1. Copy `.env.example` to `.env` and set the WCA OAuth application credentials.
