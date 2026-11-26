@@ -179,7 +179,7 @@ pub fn compute_case_stats(case_stats: &[&StoredResult]) -> CaseStatsSummary {
         counts[index] += 1;
     }
     let max_count = counts.iter().copied().max().unwrap_or(1).max(1);
-    let point_width = 280.0;
+    let point_width = 240.0;
     let plot_max = if raw_max > 0.0 { raw_max } else { 1.0 };
     let to_polyline = |values: &[f64]| {
         values
@@ -187,9 +187,9 @@ pub fn compute_case_stats(case_stats: &[&StoredResult]) -> CaseStatsSummary {
             .enumerate()
             .map(|(index, time)| {
                 let x = if times.len() > 1 {
-                    index as f64 * point_width / (times.len() - 1) as f64
+                    30.0 + index as f64 * point_width / (times.len() - 1) as f64
                 } else {
-                    point_width / 2.0
+                    150.0
                 };
                 format!("{x:.1},{:.1}", 120.0 - (*time / plot_max * 100.0))
             })

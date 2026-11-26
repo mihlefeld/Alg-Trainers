@@ -55,6 +55,98 @@ textarea:enabled {
     overflow-x: hidden;
 }
 
+#caseTimeDetails .dialogDiv {
+    box-sizing: border-box;
+    height: min(60em, 95vh);
+    width: min(45em, 95vw);
+    overflow-y: auto;
+    overflow-x: hidden;
+}
+
+.statsDialogContent {
+    box-sizing: border-box;
+    display: flex;
+    flex: 1 1 auto;
+    flex-direction: column;
+    gap: 0.5em;
+    width: 100%;
+    min-height: 0;
+}
+
+.statsDialogHeader {
+    flex-shrink: 0;
+}
+
+.statsDialogHeader h2 {
+    margin: 0.15em 0 0.35em;
+}
+
+.statsSummary {
+    display: flex;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 0.35em 1em;
+}
+
+.statsVisualizations {
+    display: flex;
+    flex-direction: column;
+    flex-shrink: 0;
+    gap: 0.4em;
+    width: 100%;
+    min-width: 0;
+}
+
+.statsVisualizations svg {
+    display: block;
+    box-sizing: border-box;
+    width: 100%;
+    height: min(11em, 25vh);
+    min-height: 7em;
+    background: var(--background);
+}
+
+.statsTimes {
+    flex: 1 1 auto;
+    width: 100%;
+    min-width: 0;
+    min-height: 5em;
+    overflow-y: auto;
+}
+
+.statsTimeEntry {
+    display: block;
+    width: 100%;
+    box-sizing: border-box;
+    border: 0;
+    background: transparent;
+    color: inherit;
+    font: inherit;
+    text-align: left;
+    padding: 0.15em 0;
+    cursor: pointer;
+    overflow-wrap: anywhere;
+}
+
+@media (max-width: 700px) {
+    #caseTimeDetails .dialogDiv {
+        height: 95vh;
+        width: 95vw;
+    }
+}
+
+@media (max-width: 480px) {
+    .statsSummary {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .statsVisualizations svg {
+        height: min(9em, 22vh);
+        min-height: 6em;
+    }
+}
+
 #hintWindow .closeButton,
 #hintWindow .hintCaseHeader,
 #hintWindow .hintCaseImage,

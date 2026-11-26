@@ -133,7 +133,7 @@ pub fn settings_dialog(props: &SettingsDialogProps) -> Html {
                         let checked = settings
                             .get(key)
                             .and_then(serde_json::Value::as_bool)
-                            .unwrap_or(key == "enableHoldDelay" || key == "weightedChoice");
+                            .unwrap_or(key == "enableHoldDelay" || key == "weightedChoiceTime");
                         let next = settings.clone();
                         let on_update = on_update.clone();
                         html! {

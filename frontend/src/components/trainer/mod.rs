@@ -128,6 +128,7 @@ pub fn loaded_trainer(props: &LoadedTrainerProps) -> Html {
                     results={ctrl.results}
                     cases_by_id={ctrl.cases_by_id}
                     on_close={ctrl.on_close_dialog.clone()}
+                    on_delete_result={ctrl.on_delete_result}
                 />
             }
 

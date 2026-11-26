@@ -18,6 +18,10 @@ use wasm_bindgen_futures::spawn_local;
 use web_sys::KeyboardEvent;
 use yew::prelude::*;
 
+fn confirm_destructive_action(message: &str) -> bool {
+    web_sys::window().is_some_and(|window| window.confirm_with_message(message).unwrap_or(false))
+}
+
 pub struct TrainerController {
     pub bundle: Rc<TrainerBundle>,
     pub cases_by_id: Rc<BTreeMap<String, TrainerCase>>,
@@ -73,6 +77,7 @@ pub struct TrainerController {
     pub on_reorder_alg: Callback<(String, String)>,
     pub on_open_stats: Callback<String>,
     pub on_clear_results: Callback<()>,
+    pub on_delete_result: Callback<String>,
     pub on_bookmark_last_case: Callback<()>,
     pub on_remove_last_case: Callback<()>,
     pub on_remove_last_time: Callback<()>,
@@ -588,6 +593,9 @@ pub fn use_trainer_controller(bundle: Rc<TrainerBundle>) -> TrainerController {
         let stored_results = stored_results.clone();
         let times_key = times_storage_key.clone();
         Callback::from(move |_| {
+            if !confirm_destructive_action("Delete the last time?") {
+                return;
+            }
             let mut next = (*stored_results).clone();
             let deleted_ids = next.pop().map(|result| vec![result.id]).unwrap_or_default();
             stored_results.set(next.clone());
@@ -602,6 +610,9 @@ pub fn use_trainer_controller(bundle: Rc<TrainerBundle>) -> TrainerController {
         let stored_results = stored_results.clone();
         let times_key = times_storage_key.clone();
         Callback::from(move |_| {
+            if !confirm_destructive_action("Delete all times?") {
+                return;
+            }
             let deleted_ids = (*stored_results)
                 .iter()
                 .map(|result| result.id.clone())
@@ -614,11 +625,29 @@ pub fn use_trainer_controller(bundle: Rc<TrainerBundle>) -> TrainerController {
         })
     };
 
+    let on_delete_result = {
+        let stored_results = stored_results.clone();
+        let times_key = times_storage_key.clone();
+        Callback::from(move |result_id: String| {
+            let mut next = (*stored_results).clone();
+            next.retain(|result| result.id != result_id);
+            stored_results.set(next.clone());
+            let key = times_key.clone();
+            spawn_local(async move {
+                put_stored_results(key, next, vec![result_id]).await;
+            });
+        })
+    };
+
     let on_remove_last_case = {
         let last_case = last_case.clone();
         let on_toggle_case = on_toggle_case.clone();
         Callback::from(move |_| {
             if let Some(case) = last_case.as_ref() {
+                let message = format!("Unselect the last case ({})?", case.name);
+                if !confirm_destructive_action(&message) {
+                    return;
+                }
                 on_toggle_case.emit(case.case_id.clone());
             }
         })
@@ -630,6 +659,15 @@ pub fn use_trainer_controller(bundle: Rc<TrainerBundle>) -> TrainerController {
         let selection_key = selection_storage_key.clone();
         Callback::from(move |_| {
             if let Some(case) = last_case.as_ref() {
+                let is_bookmarked = presets
+                    .get("Bookmarks")
+                    .is_some_and(|preset| preset.sel_cases.contains(&case.case_id));
+                if is_bookmarked {
+                    let message = format!("Remove the bookmark for ({})?", case.name);
+                    if !confirm_destructive_action(&message) {
+                        return;
+                    }
+                }
                 let next = selection::toggle_bookmark(&presets, &case.case_id);
                 presets.set(next.clone());
                 save_presets(&selection_key, next);
@@ -987,6 +1025,7 @@ pub fn use_trainer_controller(bundle: Rc<TrainerBundle>) -> TrainerController {
         on_reorder_alg,
         on_open_stats,
         on_clear_results,
+        on_delete_result,
         on_bookmark_last_case,
         on_remove_last_case,
         on_remove_last_time,
