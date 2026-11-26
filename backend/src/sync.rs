@@ -293,6 +293,9 @@ async fn save_in_transaction(
         .await?;
     }
 
+    let user_algs = latest_by_key(incoming.user_algs, |a| a.alg_id.clone(), |a| a.updated_at);
+    let results = latest_by_key(incoming.results, |r| r.id, |r| r.updated_at);
+
     for selection in incoming.selections {
         let payload = serde_json::json!({
             "trainer_id": selection.trainer_id,
@@ -315,8 +318,8 @@ async fn save_in_transaction(
         .await?;
     }
 
-    if !incoming.user_algs.is_empty() {
-        let user_algs = serde_json::to_value(&incoming.user_algs)
+    if !user_algs.is_empty() {
+        let user_algs = serde_json::to_value(&user_algs)
             .map_err(|error| DbErr::Custom(error.to_string()))?;
         db.execute(Statement::from_sql_and_values(
             DatabaseBackend::Postgres,
@@ -339,8 +342,8 @@ async fn save_in_transaction(
         .await?;
     }
 
-    if !incoming.results.is_empty() {
-        let results = serde_json::to_value(&incoming.results)
+    if !results.is_empty() {
+        let results = serde_json::to_value(&results)
             .map_err(|error| DbErr::Custom(error.to_string()))?;
         db.execute(Statement::from_sql_and_values(
             DatabaseBackend::Postgres,
@@ -370,6 +373,29 @@ async fn save_in_transaction(
     ))
     .await?;
     Ok(())
+}
+
+/// A single upsert statement cannot touch the same row twice, so keep only the
+/// newest entry per key (the last one wins on ties).
+fn latest_by_key<T, K: std::hash::Hash + Eq>(
+    items: Vec<T>,
+    key: impl Fn(&T) -> K,
+    updated_at: impl Fn(&T) -> DateTime<Utc>,
+) -> Vec<T> {
+    let mut latest: std::collections::HashMap<K, T> = std::collections::HashMap::new();
+    for item in items {
+        match latest.entry(key(&item)) {
+            std::collections::hash_map::Entry::Occupied(mut entry) => {
+                if updated_at(entry.get()) <= updated_at(&item) {
+                    entry.insert(item);
+                }
+            }
+            std::collections::hash_map::Entry::Vacant(entry) => {
+                entry.insert(item);
+            }
+        }
+    }
+    latest.into_values().collect()
 }
 
 #[derive(Debug)]
