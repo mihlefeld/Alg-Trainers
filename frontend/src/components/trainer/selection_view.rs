@@ -43,41 +43,12 @@ fn case_card(props: &CaseCardProps) -> Html {
         })
     };
 
-    let onpointerdown = {
-        let hint_timeout = hint_timeout.clone();
-        let on_open_hint = props.on_open_hint.clone();
-        let case = case.clone();
-        Callback::from(move |event: PointerEvent| {
-            if event.pointer_type() != "touch" {
-                return;
-            }
-            let on_open_hint = on_open_hint.clone();
-            let case = case.clone();
-            *hint_timeout.borrow_mut() = Some(Timeout::new(600, move || {
-                on_open_hint.emit(case);
-            }));
-        })
-    };
-
-    let onpointerup = {
-        let hint_timeout = hint_timeout.clone();
-        Callback::from(move |event: PointerEvent| {
-            if event.pointer_type() == "touch" {
-                if let Some(timeout) = hint_timeout.borrow_mut().take() {
-                    timeout.cancel();
-                }
-            }
-        })
-    };
-
     html! {
         <div
             id={format!("itemTd{}", case.case_id)}
             class={classes!("borderedContainer", "caseItem", if props.selected { "itemSel" } else { "itemUnsel" })}
             {onclick}
             oncontextmenu={open_hint_mouse}
-            {onpointerdown}
-            {onpointerup}
         >
             if props.include_name {
                 <span class="caseSpan">{&case.name}</span>

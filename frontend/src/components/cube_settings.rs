@@ -269,6 +269,7 @@ pub fn cube_settings(props: &Props) -> Html {
                         </summary>
                         <div class="colFlex">
                             <label class="settingsEntry cubeTrainerEntry cubePuzzleEntry">
+                            <span>{"Puzzle scheme"}</span>
                             <select aria-label={format!("{puzzle} puzzle scheme")} value={puzzle_value.clone()} onchange={Callback::from(move |event: Event| {
                                 let mut next = next.clone();
                                 let value = event.target_unchecked_into::<HtmlSelectElement>().value();
