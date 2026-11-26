@@ -102,11 +102,6 @@ pub fn practice_view(props: &PracticeViewProps) -> Html {
         let cb = props.on_remove_last_time.clone();
         Callback::from(move |_| cb.emit(()))
     };
-    let on_timer_click = {
-        let finish = props.timer.finish.clone();
-        Callback::from(move |_| finish.emit(()))
-    };
-
     html! {
         <div id="practiceLayout" class="colFlex" style="display:flex;">
             <div id="casesBox" class="borderedContainer pad rowFlex center">
@@ -153,7 +148,6 @@ pub fn practice_view(props: &PracticeViewProps) -> Html {
                 <div
                     id="timerDiv"
                     class="borderedContainer"
-                    onclick={on_timer_click}
                     onpointerdown={props.timer.on_pointer_down.clone()}
                     onpointerup={props.timer.on_pointer_up.clone()}
                     onpointermove={Callback::from(|event: PointerEvent| event.prevent_default())}

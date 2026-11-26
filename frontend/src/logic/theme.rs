@@ -1,3 +1,5 @@
+#[cfg(target_arch = "wasm32")]
+use crate::services::storage::isMobileLayout;
 use crate::services::storage::{colorInputStyle, prefersLightTheme};
 use base64::{engine::general_purpose::STANDARD, Engine};
 use std::collections::BTreeMap;
@@ -8,6 +10,25 @@ pub fn set_body_background(value: &str) {
         .and_then(|document| document.body())
     {
         let _ = body.style().set_property("background", value);
+    }
+}
+
+pub fn default_base_size() -> f64 {
+    #[cfg(target_arch = "wasm32")]
+    {
+        default_base_size_for_mobile(isMobileLayout().unwrap_or(false))
+    }
+    #[cfg(not(target_arch = "wasm32"))]
+    {
+        1.0
+    }
+}
+
+fn default_base_size_for_mobile(is_mobile: bool) -> f64 {
+    if is_mobile {
+        0.7
+    } else {
+        1.0
     }
 }
 
@@ -24,7 +45,7 @@ pub fn apply_settings(settings: &serde_json::Value) {
     let base_size = settings
         .get("baseSize")
         .and_then(serde_json::Value::as_f64)
-        .unwrap_or(1.0);
+        .unwrap_or_else(default_base_size);
     let style = body.style();
     let _ = style.set_property("font-size", &format!("{base_size}em"));
     let colors = settings
@@ -180,6 +201,7 @@ pub fn adjust_size_setting(
         .unwrap_or(match key {
             "timerSize" => 5.0,
             "scrambleSize" => 2.0,
+            "baseSize" => default_base_size(),
             _ => 1.0,
         });
     next[key] = serde_json::json!((current + amount).max(0.5));
@@ -227,6 +249,12 @@ pub fn update_scramble_override(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn mobile_default_base_size_is_three_steps_smaller() {
+        assert_eq!(default_base_size_for_mobile(false), 1.0);
+        assert_eq!(default_base_size_for_mobile(true), 0.7);
+    }
 
     #[test]
     fn recoloring_does_not_replace_new_colors_twice() {

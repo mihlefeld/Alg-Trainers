@@ -118,6 +118,9 @@ pub fn use_trainer_timer(
         let stopped_timeout = stopped_timeout.clone();
         let settings = settings.clone();
         Callback::from(move |clear_stopped: bool| {
+            if *stopped {
+                return;
+            }
             if hold_timeout.borrow().is_none() && !*ready {
                 if clear_stopped {
                     stopped.set(false);
@@ -134,8 +137,12 @@ pub fn use_trainer_timer(
                 } else {
                     0
                 };
-                let ready = ready.clone();
-                *hold_timeout.borrow_mut() = Some(Timeout::new(delay, move || ready.set(true)));
+                if delay == 0 {
+                    ready.set(true);
+                } else {
+                    let ready = ready.clone();
+                    *hold_timeout.borrow_mut() = Some(Timeout::new(delay, move || ready.set(true)));
+                }
             }
         })
     };
@@ -195,6 +202,12 @@ pub fn use_trainer_timer(
         let finish = finish.clone();
         let start_hold = start_hold.clone();
         Callback::from(move |event: PointerEvent| {
+            if event.pointer_type() == "mouse" {
+                if is_running {
+                    finish.emit(());
+                }
+                return;
+            }
             if event.pointer_type() != "touch" && event.pointer_type() != "pen" {
                 return;
             }
@@ -214,7 +227,7 @@ pub fn use_trainer_timer(
                 return;
             }
             event.prevent_default();
-            release.emit(true);
+            release.emit(false);
         })
     };
 
@@ -239,5 +252,32 @@ pub fn use_trainer_timer(
         on_pointer_down,
         on_pointer_up,
         on_pointer_cancel,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::TrainerTimer;
+    use yew::Callback;
+
+    #[test]
+    fn stopped_timer_displays_completed_time() {
+        let timer = TrainerTimer {
+            running: false,
+            ready: false,
+            stopped: true,
+            elapsed_ms: 12_340,
+            start_hold: Callback::noop(),
+            release: Callback::noop(),
+            finish: Callback::noop(),
+            abort: Callback::noop(),
+            cancel_hold: Callback::noop(),
+            on_pointer_down: Callback::noop(),
+            on_pointer_up: Callback::noop(),
+            on_pointer_cancel: Callback::noop(),
+        };
+
+        assert_eq!(timer.display_text(), "12.34");
+        assert_eq!(timer.color(), "#850000");
     }
 }

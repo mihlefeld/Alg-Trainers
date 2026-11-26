@@ -188,6 +188,21 @@ textarea:enabled {
     width: 100%;
 }
 
+.algItem {
+    transition: opacity 0.12s ease, transform 0.12s ease, box-shadow 0.12s ease;
+}
+
+.algItem.algDragging {
+    opacity: 0.45;
+    transform: scale(0.98);
+    outline: 0.12em dashed var(--secondaryText);
+}
+
+.algItem.algDragOver {
+    border-color: var(--accent);
+    box-shadow: 0 -0.15em 0 var(--accent);
+}
+
 .algText {
     flex: 1;
     min-width: 0;
@@ -211,6 +226,9 @@ textarea:enabled {
 
 .algHandle {
     cursor: grab;
+    -webkit-user-select: none;
+    user-select: none;
+    touch-action: none;
 }
 
 .algHandle:active {

@@ -56,7 +56,7 @@ services:
       COOKIE_SECURE: ${COOKIE_SECURE:-}
       PWA_VERSION: ${PWA_VERSION:-}
     ports:
-      - "127.0.0.1:${ALG_TRAINERS_PORT:-8000}:8000"
+      - "${ALG_TRAINERS_PORT:-8000}:8000"
 
 volumes:
   psql-data:

@@ -106,6 +106,11 @@ export async function storageClearDirtyIfUnchanged(expected) {
 export function prefersLightTheme() {
   return window.matchMedia && window.matchMedia("(prefers-color-scheme: light)").matches;
 }
+export function isMobileLayout() {
+  if (!window.matchMedia) return false;
+  return window.matchMedia("(max-width: 700px)").matches ||
+    window.matchMedia("(pointer: coarse)").matches;
+}
 export function colorInputStyle(value, background) {
   if (!CSS.supports("color", value) || !CSS.supports("color", background)) {
     throw new Error("Please enter a valid CSS color.");
@@ -261,6 +266,8 @@ extern "C" {
     pub fn metadataDelete(key: &str) -> Result<js_sys::Promise, JsValue>;
     #[wasm_bindgen(catch)]
     pub fn prefersLightTheme() -> Result<bool, JsValue>;
+    #[wasm_bindgen(catch)]
+    pub fn isMobileLayout() -> Result<bool, JsValue>;
     #[wasm_bindgen(catch)]
     pub fn colorInputStyle(value: &str, background: &str) -> Result<String, JsValue>;
     pub fn downloadText(filename: &str, text: &str);

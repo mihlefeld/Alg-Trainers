@@ -4,7 +4,7 @@ use crate::logic::algs::{display_algs, hidden_algs};
 use crate::models::{DisplayAlg, TrainerCase, UserAlgState};
 use std::collections::BTreeMap;
 use std::rc::Rc;
-use web_sys::{DragEvent, HtmlTextAreaElement};
+use web_sys::{DragEvent, Element, HtmlTextAreaElement, PointerEvent};
 use yew::prelude::*;
 
 #[derive(Properties, PartialEq)]
@@ -81,6 +81,7 @@ pub struct HintDialogProps {
 pub fn hint_dialog(props: &HintDialogProps) -> Html {
     let alg_editor = use_state(|| None::<(Option<String>, String)>);
     let dragged_alg = use_state(String::new);
+    let drag_over_alg = use_state(String::new);
     let show_hidden = use_state(|| false);
 
     {
@@ -150,30 +151,193 @@ pub fn hint_dialog(props: &HintDialogProps) -> Html {
                         let editing = alg_editor.as_ref().is_some_and(|(id, _)| id.as_deref() == Some(item.alg_id.as_str()));
                         let dragged_alg_start = dragged_alg.clone();
                         let dragged_alg_drop = dragged_alg.clone();
-                        let on_reorder_alg = props.on_reorder_alg.clone();
+                        let dragged_alg_end = dragged_alg.clone();
+                        let dragged_alg_pointer_down = dragged_alg.clone();
+                        let dragged_alg_pointer_move = dragged_alg.clone();
+                        let dragged_alg_pointer_up = dragged_alg.clone();
+                        let dragged_alg_pointer_cancel = dragged_alg.clone();
+                        let drag_over_alg_enter = drag_over_alg.clone();
+                        let drag_over_alg_over = drag_over_alg.clone();
+                        let drag_over_alg_leave = drag_over_alg.clone();
+                        let drag_over_alg_drop = drag_over_alg.clone();
+                        let drag_over_alg_pointer_move = drag_over_alg.clone();
+                        let drag_over_alg_pointer_up = drag_over_alg.clone();
+                        let drag_over_alg_pointer_cancel = drag_over_alg.clone();
+                        let on_reorder_drop = props.on_reorder_alg.clone();
+                        let on_reorder_pointer = props.on_reorder_alg.clone();
                         let on_hide_alg = props.on_hide_alg.clone();
                         let on_delete_alg = props.on_delete_alg.clone();
                         let alg_editor = alg_editor.clone();
                         let drag_id = item.alg_id.clone();
                         let drop_id = item.alg_id.clone();
+                        let dragging = !dragged_alg.is_empty()
+                            && dragged_alg.as_str() == item.alg_id.as_str();
+                        let drag_over = !drag_over_alg.is_empty()
+                            && drag_over_alg.as_str() == item.alg_id.as_str();
                         html! {
                             <div
-                                class={classes!("algItem", "borderedContainer", item.hidden.then_some("algHidden"))}
-                                ondragover={(!item.hidden).then(|| Callback::from(|event: DragEvent| event.prevent_default()))}
+                                data-alg-id={drop_id.clone()}
+                                class={classes!(
+                                    "algItem",
+                                    "borderedContainer",
+                                    item.hidden.then_some("algHidden"),
+                                    dragging.then_some("algDragging"),
+                                    drag_over.then_some("algDragOver")
+                                )}
+                                ondragenter={(!item.hidden).then(|| Callback::from({
+                                    let drag_over_alg_enter = drag_over_alg_enter.clone();
+                                    let drop_id = drop_id.clone();
+                                    move |event: DragEvent| {
+                                        event.prevent_default();
+                                        drag_over_alg_enter.set(drop_id.clone());
+                                    }
+                                }))}
+                                ondragover={(!item.hidden).then(|| Callback::from({
+                                    let drag_over_alg_over = drag_over_alg_over.clone();
+                                    let drop_id = drop_id.clone();
+                                    move |event: DragEvent| {
+                                        event.prevent_default();
+                                        drag_over_alg_over.set(drop_id.clone());
+                                    }
+                                }))}
+                                ondragleave={(!item.hidden).then(|| Callback::from({
+                                    let drag_over_alg_leave = drag_over_alg_leave.clone();
+                                    let drop_id = drop_id.clone();
+                                    move |_| {
+                                        if drag_over_alg_leave.as_str() == drop_id.as_str() {
+                                            drag_over_alg_leave.set(String::new());
+                                        }
+                                    }
+                                }))}
                                 ondrop={(!item.hidden).then(|| Callback::from(move |event: DragEvent| {
                                     event.prevent_default();
                                     if !dragged_alg_drop.is_empty() && dragged_alg_drop.as_str() != drop_id.as_str() {
-                                        on_reorder_alg.emit((dragged_alg_drop.to_string(), drop_id.clone()));
+                                        on_reorder_drop.emit((dragged_alg_drop.to_string(), drop_id.clone()));
                                     }
+                                    dragged_alg_drop.set(String::new());
+                                    drag_over_alg_drop.set(String::new());
                                 }))}
                             >
                                 if !item.hidden {
                                     <button
+                                        type="button"
                                         class="material-symbols-outlined algHandle"
                                         draggable="true"
                                         title="Drag to reorder"
                                         aria-label="Drag to reorder"
-                                        ondragstart={Callback::from(move |_| dragged_alg_start.set(drag_id.clone()))}
+                                        onpointerdown={Callback::from({
+                                            let dragged_alg_pointer_down = dragged_alg_pointer_down.clone();
+                                            let drag_id = drag_id.clone();
+                                            move |event: PointerEvent| {
+                                                if event.pointer_type() != "touch"
+                                                    && event.pointer_type() != "pen"
+                                                {
+                                                    return;
+                                                }
+                                                event.prevent_default();
+                                                let handle = event
+                                                    .target_unchecked_into::<Element>();
+                                                let _ = handle.set_pointer_capture(event.pointer_id());
+                                                dragged_alg_pointer_down.set(drag_id.clone());
+                                            }
+                                        })}
+                                        onpointermove={Callback::from({
+                                            let dragged_alg_pointer_move = dragged_alg_pointer_move.clone();
+                                            let drag_over_alg_pointer_move = drag_over_alg_pointer_move.clone();
+                                            move |event: PointerEvent| {
+                                                if dragged_alg_pointer_move.is_empty()
+                                                    || (event.pointer_type() != "touch"
+                                                        && event.pointer_type() != "pen")
+                                                {
+                                                    return;
+                                                }
+                                                event.prevent_default();
+                                                let Some(document) = web_sys::window()
+                                                    .and_then(|window| window.document())
+                                                else {
+                                                    return;
+                                                };
+                                                let target = document
+                                                    .element_from_point(
+                                                        event.client_x() as f32,
+                                                        event.client_y() as f32,
+                                                    )
+                                                    .and_then(|element| {
+                                                        element
+                                                            .closest(".algItem:not(.algHidden)")
+                                                            .ok()
+                                                            .flatten()
+                                                    });
+                                                let target_id = target
+                                                    .and_then(|element| {
+                                                        element.get_attribute("data-alg-id")
+                                                    })
+                                                    .unwrap_or_default();
+                                                drag_over_alg_pointer_move.set(target_id);
+                                            }
+                                        })}
+                                        onpointerup={Callback::from({
+                                            let dragged_alg_pointer_up = dragged_alg_pointer_up.clone();
+                                            let drag_over_alg_pointer_up = drag_over_alg_pointer_up.clone();
+                                            let on_reorder_pointer = on_reorder_pointer.clone();
+                                            move |event: PointerEvent| {
+                                                if event.pointer_type() != "touch"
+                                                    && event.pointer_type() != "pen"
+                                                {
+                                                    return;
+                                                }
+                                                event.prevent_default();
+                                                let from = dragged_alg_pointer_up.to_string();
+                                                let to = web_sys::window()
+                                                    .and_then(|window| window.document())
+                                                    .and_then(|document| {
+                                                        document.element_from_point(
+                                                            event.client_x() as f32,
+                                                            event.client_y() as f32,
+                                                        )
+                                                    })
+                                                    .and_then(|element| {
+                                                        element
+                                                            .closest(".algItem:not(.algHidden)")
+                                                            .ok()
+                                                            .flatten()
+                                                    })
+                                                    .and_then(|element| {
+                                                        element.get_attribute("data-alg-id")
+                                                    })
+                                                    .unwrap_or_else(|| {
+                                                        drag_over_alg_pointer_up.to_string()
+                                                    });
+                                                if !from.is_empty() && !to.is_empty() && from != to {
+                                                    on_reorder_pointer.emit((from, to));
+                                                }
+                                                dragged_alg_pointer_up.set(String::new());
+                                                drag_over_alg_pointer_up.set(String::new());
+                                            }
+                                        })}
+                                        onpointercancel={Callback::from({
+                                            let dragged_alg_pointer_cancel = dragged_alg_pointer_cancel.clone();
+                                            let drag_over_alg_pointer_cancel = drag_over_alg_pointer_cancel.clone();
+                                            move |_| {
+                                                dragged_alg_pointer_cancel.set(String::new());
+                                                drag_over_alg_pointer_cancel.set(String::new());
+                                            }
+                                        })}
+                                        ondragstart={Callback::from({
+                                            let dragged_alg_start = dragged_alg_start.clone();
+                                            let drag_id = drag_id.clone();
+                                            move |_| {
+                                                dragged_alg_start.set(drag_id.clone());
+                                            }
+                                        })}
+                                        ondragend={Callback::from({
+                                            let dragged_alg_end = dragged_alg_end.clone();
+                                            let drag_over_alg_leave = drag_over_alg_leave.clone();
+                                            move |_| {
+                                                dragged_alg_end.set(String::new());
+                                                drag_over_alg_leave.set(String::new());
+                                            }
+                                        })}
                                     >
                                         {"drag_indicator"}
                                     </button>

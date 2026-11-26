@@ -1,3 +1,4 @@
+use crate::components::modal::take_modal_history_pop;
 use crate::components::trainer::timer::{use_trainer_timer, TrainerTimer};
 use crate::logic::{algs, cube_schemes, results, scramble, search, selection, theme};
 use crate::models::{
@@ -20,6 +21,10 @@ use yew::prelude::*;
 
 fn confirm_destructive_action(message: &str) -> bool {
     web_sys::window().is_some_and(|window| window.confirm_with_message(message).unwrap_or(false))
+}
+
+fn last_solve_deletion_message(case_name: &str, result_time: &str) -> String {
+    format!("Delete the last solve?\n\nCase: {case_name}\nResult time: {result_time}")
 }
 
 pub struct TrainerController {
@@ -295,7 +300,18 @@ pub fn use_trainer_controller(bundle: Rc<TrainerBundle>) -> TrainerController {
             });
             set_from_location();
             let on_pop = set_from_location.clone();
-            let listener = Closure::wrap(Box::new(move || on_pop()) as Box<dyn Fn()>);
+            let listener = Closure::wrap(Box::new(move || {
+                if take_modal_history_pop()
+                    || web_sys::window()
+                        .and_then(|window| window.document())
+                        .and_then(|document| document.query_selector("dialog[open]").ok())
+                        .flatten()
+                        .is_some()
+                {
+                    return;
+                }
+                on_pop();
+            }) as Box<dyn Fn()>);
             let window = web_sys::window();
             if let Some(window) = window.as_ref() {
                 let _ = window.add_event_listener_with_callback(
@@ -592,8 +608,22 @@ pub fn use_trainer_controller(bundle: Rc<TrainerBundle>) -> TrainerController {
     let on_remove_last_time = {
         let stored_results = stored_results.clone();
         let times_key = times_storage_key.clone();
+        let cases_by_id = cases_by_id.clone();
         Callback::from(move |_| {
-            if !confirm_destructive_action("Delete the last time?") {
+            let Some(last_result) = (*stored_results).last() else {
+                return;
+            };
+            let case_name = cases_by_id
+                .get(&last_result.case)
+                .map(|case| case.name.as_str())
+                .unwrap_or(last_result.case.as_str());
+            let result_time = if last_result.time.is_empty() {
+                results::format_time(last_result.ms)
+            } else {
+                last_result.time.clone()
+            };
+            let message = last_solve_deletion_message(case_name, &result_time);
+            if !confirm_destructive_action(&message) {
                 return;
             }
             let mut next = (*stored_results).clone();
@@ -1035,5 +1065,18 @@ pub fn use_trainer_controller(bundle: Rc<TrainerBundle>) -> TrainerController {
         on_search_cells_change,
         on_search_color_change,
         on_search_all_angles_change,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::last_solve_deletion_message;
+
+    #[test]
+    fn last_solve_deletion_message_identifies_the_solve() {
+        assert_eq!(
+            last_solve_deletion_message("T Perm", "12.34"),
+            "Delete the last solve?\n\nCase: T Perm\nResult time: 12.34"
+        );
     }
 }
