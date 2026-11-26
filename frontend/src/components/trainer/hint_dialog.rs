@@ -1,6 +1,6 @@
 use crate::components::case_image::CaseImage;
 use crate::components::modal::ModalDialog;
-use crate::logic::algs::display_algs;
+use crate::logic::algs::{display_algs, hidden_algs};
 use crate::models::{DisplayAlg, TrainerCase, UserAlgState};
 use std::collections::BTreeMap;
 use std::rc::Rc;
@@ -81,9 +81,11 @@ pub struct HintDialogProps {
 pub fn hint_dialog(props: &HintDialogProps) -> Html {
     let alg_editor = use_state(|| None::<(Option<String>, String)>);
     let dragged_alg = use_state(String::new);
+    let show_hidden = use_state(|| false);
 
     {
         let alg_editor = alg_editor.clone();
+        let show_hidden = show_hidden.clone();
         let case_id = props
             .case
             .as_ref()
@@ -91,6 +93,7 @@ pub fn hint_dialog(props: &HintDialogProps) -> Html {
             .unwrap_or_default();
         use_effect_with(case_id, move |_| {
             alg_editor.set(None);
+            show_hidden.set(false);
             || ()
         });
     }
@@ -137,7 +140,13 @@ pub fn hint_dialog(props: &HintDialogProps) -> Html {
                 </div>
                 <div class="borderedContainer rowFlex center pad hintCaseSetup">{case.setup.as_deref().unwrap_or("")}</div>
                 <div class="borderedContainer grow colFlex algList">
-                    {for display_algs(case, &props.custom_algs).into_iter().map(|item| {
+                    {for {
+                        let mut items = display_algs(case, &props.custom_algs);
+                        if *show_hidden {
+                            items.extend(hidden_algs(case, &props.custom_algs));
+                        }
+                        items
+                    }.into_iter().map(|item| {
                         let editing = alg_editor.as_ref().is_some_and(|(id, _)| id.as_deref() == Some(item.alg_id.as_str()));
                         let dragged_alg_start = dragged_alg.clone();
                         let dragged_alg_drop = dragged_alg.clone();
@@ -149,25 +158,36 @@ pub fn hint_dialog(props: &HintDialogProps) -> Html {
                         let drop_id = item.alg_id.clone();
                         html! {
                             <div
-                                class="algItem borderedContainer"
-                                ondragover={Callback::from(|event: DragEvent| event.prevent_default())}
-                                ondrop={Callback::from(move |event: DragEvent| {
+                                class={classes!("algItem", "borderedContainer", item.hidden.then_some("algHidden"))}
+                                ondragover={(!item.hidden).then(|| Callback::from(|event: DragEvent| event.prevent_default()))}
+                                ondrop={(!item.hidden).then(|| Callback::from(move |event: DragEvent| {
                                     event.prevent_default();
                                     if !dragged_alg_drop.is_empty() && dragged_alg_drop.as_str() != drop_id.as_str() {
                                         on_reorder_alg.emit((dragged_alg_drop.to_string(), drop_id.clone()));
                                     }
-                                })}
+                                }))}
                             >
-                                <button
-                                    class="material-symbols-outlined algHandle"
-                                    draggable="true"
-                                    title="Drag to reorder"
-                                    aria-label="Drag to reorder"
-                                    ondragstart={Callback::from(move |_| dragged_alg_start.set(drag_id.clone()))}
-                                >
-                                    {"drag_indicator"}
-                                </button>
-                                if editing {
+                                if !item.hidden {
+                                    <button
+                                        class="material-symbols-outlined algHandle"
+                                        draggable="true"
+                                        title="Drag to reorder"
+                                        aria-label="Drag to reorder"
+                                        ondragstart={Callback::from(move |_| dragged_alg_start.set(drag_id.clone()))}
+                                    >
+                                        {"drag_indicator"}
+                                    </button>
+                                }
+                                if item.hidden {
+                                    <span class="algText">{&item.alg}</span>
+                                    <button
+                                        class="material-symbols-outlined algAction"
+                                        title="Unhide algorithm"
+                                        onclick={Callback::from(move |_| on_hide_alg.emit(item.clone()))}
+                                    >
+                                        {"visibility"}
+                                    </button>
+                                } else if editing {
                                     <AlgEditorRow
                                         value={alg_editor.as_ref().map(|(_, value)| value.clone()).unwrap_or_default()}
                                         save_title="Save algorithm"
@@ -208,6 +228,13 @@ pub fn hint_dialog(props: &HintDialogProps) -> Html {
                                         >
                                             {"close"}
                                         </button>
+                                        <button
+                                            class="material-symbols-outlined algAction"
+                                            title="Hide algorithm"
+                                            onclick={Callback::from(move |_| on_hide_alg.emit(item.clone()))}
+                                        >
+                                            {"visibility_off"}
+                                        </button>
                                     } else {
                                         <button
                                             class="material-symbols-outlined algAction"
@@ -237,16 +264,28 @@ pub fn hint_dialog(props: &HintDialogProps) -> Html {
                             />
                         </div>
                     } else {
-                        <button
-                            class="material-symbols-outlined abutton algAddButton"
-                            title="Add algorithm"
-                            onclick={{
-                                let alg_editor = alg_editor.clone();
-                                Callback::from(move |_| alg_editor.set(Some((None, String::new()))))
-                            }}
-                        >
-                            {"add"}
-                        </button>
+                        <div class="rowFlex algAddRow">
+                            <button
+                                class="material-symbols-outlined abutton algAddButton"
+                                title="Add algorithm"
+                                onclick={{
+                                    let alg_editor = alg_editor.clone();
+                                    Callback::from(move |_| alg_editor.set(Some((None, String::new()))))
+                                }}
+                            >
+                                {"add"}
+                            </button>
+                            <button
+                                class="material-symbols-outlined abutton algVisibilityButton"
+                                title={if *show_hidden { "Hide hidden algorithms" } else { "Show hidden algorithms" }}
+                                onclick={{
+                                    let show_hidden = show_hidden.clone();
+                                    Callback::from(move |_| show_hidden.set(!*show_hidden))
+                                }}
+                            >
+                                {if *show_hidden { "visibility_off" } else { "visibility" }}
+                            </button>
+                        </div>
                     }
                 </div>
             }

@@ -59,6 +59,7 @@ pub struct DisplayAlg {
     pub alg: String,
     pub position: i32,
     pub user: bool,
+    pub hidden: bool,
 }
 
 #[derive(Clone, Debug, Deserialize, PartialEq)]

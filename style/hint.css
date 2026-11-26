@@ -49,8 +49,8 @@ textarea:enabled {
 
 #hintWindow .dialogDiv {
     box-sizing: border-box;
-    height: min(39em, 90vh);
-    max-height: 90vh;
+    height: min(60em, 95vh);
+    width: min(45em, 95vw);
     overflow-y: auto;
     overflow-x: hidden;
 }
@@ -141,6 +141,16 @@ textarea:enabled {
     align-items: stretch;
 }
 
+.algHidden {
+    opacity: 0.8;
+}
+
+.algAddRow {
+    align-self: stretch;
+    gap: 0.2em;
+    width: 100%;
+}
+
 .algAddButton {
     align-self: stretch;
     box-sizing: border-box;
@@ -150,11 +160,26 @@ textarea:enabled {
     flex-shrink: 0;
     min-height: 1.8rem;
     padding: 0.1em;
-    width: 100%;
+    flex: 1;
 }
 
 .algAddButton:hover {
     background-color: var(--secondaryHover);
     border-color: var(--secondaryHover);
     box-shadow: 0 0 4px var(--secondary);
+}
+
+.algVisibilityButton {
+    box-sizing: border-box;
+    background-color: var(--secondary);
+    border-color: var(--secondary);
+    color: var(--secondaryText);
+    flex: 0 0 1.8rem;
+    min-height: 1.8rem;
+    padding: 0.1em;
+}
+
+.algVisibilityButton:hover {
+    background-color: var(--secondaryHover);
+    border-color: var(--secondaryHover);
 }

@@ -72,6 +72,7 @@ pub fn display_algs(
                     .map(|item| item.position)
                     .unwrap_or(alg.position),
                 user: false,
+                hidden: false,
             })
         })
         .collect::<Vec<_>>();
@@ -91,6 +92,57 @@ pub fn display_algs(
                 alg: item.alg.clone(),
                 position: item.position,
                 user: true,
+                hidden: false,
+            }),
+    );
+    result.sort_by_key(|item| item.position);
+    result
+}
+
+pub fn hidden_algs(
+    case: &TrainerCase,
+    custom_algs: &BTreeMap<String, Vec<UserAlgState>>,
+) -> Vec<DisplayAlg> {
+    let overrides = custom_algs.get(&case.case_id).cloned().unwrap_or_default();
+    let builtin_ids = case
+        .algs
+        .iter()
+        .map(|alg| alg.alg_id.as_str())
+        .collect::<BTreeSet<_>>();
+    let mut result = Vec::new();
+
+    for alg in &case.algs {
+        if overrides
+            .iter()
+            .any(|item| item.alg_id == alg.alg_id && item.hidden && !item.deleted)
+        {
+            let override_item = overrides.iter().find(|item| item.alg_id == alg.alg_id);
+            result.push(DisplayAlg {
+                alg_id: alg.alg_id.clone(),
+                alg: override_item
+                    .map(|item| item.alg.clone())
+                    .unwrap_or_else(|| alg.alg.clone()),
+                position: override_item
+                    .map(|item| item.position)
+                    .unwrap_or(alg.position),
+                user: false,
+                hidden: true,
+            });
+        }
+    }
+
+    result.extend(
+        overrides
+            .iter()
+            .filter(|item| {
+                item.hidden && !item.deleted && !builtin_ids.contains(item.alg_id.as_str())
+            })
+            .map(|item| DisplayAlg {
+                alg_id: item.alg_id.clone(),
+                alg: item.alg.clone(),
+                position: item.position,
+                user: true,
+                hidden: true,
             }),
     );
     result.sort_by_key(|item| item.position);
@@ -166,7 +218,7 @@ pub fn hide_alg(
     let mut next = custom_algs.clone();
     let current = next.entry(case_id.to_owned()).or_default();
     if let Some(existing) = current.iter_mut().find(|alg| alg.alg_id == item.alg_id) {
-        existing.hidden = true;
+        existing.hidden = !item.hidden;
     } else {
         current.push(UserAlgState {
             alg_id: item.alg_id,
@@ -338,5 +390,14 @@ mod tests {
         let remaining = display_algs(&case, &custom);
         assert_eq!(remaining.len(), 1);
         assert_eq!(remaining[0].alg_id, "builtin:2");
+
+        let hidden = hidden_algs(&case, &custom);
+        assert_eq!(hidden.len(), 1);
+        assert_eq!(hidden[0].alg_id, "builtin:1");
+        assert!(hidden[0].hidden);
+
+        let unhidden = hide_alg(&custom, &case.case_id, hidden[0].clone());
+        assert_eq!(display_algs(&case, &unhidden).len(), 2);
+        assert!(hidden_algs(&case, &unhidden).is_empty());
     }
 }
