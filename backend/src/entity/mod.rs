@@ -12,3 +12,4 @@ pub mod sync_revision;
 pub mod trainer;
 pub mod user;
 pub mod user_alg;
+pub mod user_selection;

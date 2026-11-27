@@ -1,3 +1,6 @@
+pub use alg_trainers_shared::{
+    TrainerAlg, TrainerAlgset, TrainerBundle, TrainerCase, TrainerGroup, TrainerSummary,
+};
 use sea_orm::{
     ColumnTrait, ConnectionTrait, DatabaseBackend, DatabaseConnection, DatabaseTransaction, DbErr,
     EntityTrait, PaginatorTrait, QueryFilter, QueryOrder, Statement, TransactionTrait,
@@ -8,38 +11,6 @@ use std::{collections::BTreeMap, fs, path::Path};
 use crate::entity;
 
 pub type CatalogError = Box<dyn std::error::Error + Send + Sync>;
-
-#[derive(Clone, Debug, Deserialize, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct TrainerSummary {
-    pub trainer_id: String,
-    pub puzzle: String,
-    pub method: String,
-    pub name: String,
-    pub order: i32,
-    pub max_algs_per_row: i32,
-    pub selection_key: String,
-    pub times_key: String,
-}
-
-#[derive(Clone, Debug, Deserialize, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct TrainerCase {
-    pub case_id: String,
-    pub name: String,
-    pub setup: Option<String>,
-    pub image_svg: Option<String>,
-    pub algs: Vec<TrainerAlg>,
-    pub scrambles: Vec<String>,
-}
-
-#[derive(Clone, Debug, Deserialize, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct TrainerAlg {
-    pub alg_id: String,
-    pub alg: String,
-    pub position: i32,
-}
 
 #[derive(Clone, Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -67,64 +38,94 @@ fn read_trainer_metadata(root: &Path, trainer_id: &str) -> Option<TrainerMetadat
     read_json(root.join(trainer_id).join("metadata.json")).ok()
 }
 
-async fn update_max_algs_per_row(
+fn read_u_move_cycles(root: &Path, trainer_id: &str) -> Vec<Vec<usize>> {
+    fs::read(root.join(trainer_id).join("u_move.json"))
+        .ok()
+        .and_then(|value| serde_json::from_slice(&value).ok())
+        .unwrap_or_default()
+}
+
+fn resolve_storage_keys(trainer_id: &str, metadata: Option<&TrainerMetadata>) -> (String, String) {
+    (
+        metadata
+            .and_then(|value| value.selection_array_key.clone())
+            .unwrap_or_else(|| format!("{trainer_id}Selection")),
+        metadata
+            .and_then(|value| value.times_array_key.clone())
+            .unwrap_or_else(|| format!("{trainer_id}Times")),
+    )
+}
+
+async fn update_catalog_metadata(
     db: &DatabaseConnection,
     root: &Path,
     index: &serde_json::Map<String, serde_json::Value>,
 ) -> Result<(), CatalogError> {
+    let transaction = db.begin().await?;
     for entries in index.values() {
         let entries: Vec<IndexEntry> = serde_json::from_value(entries.clone())?;
         for entry in entries {
-            let max_algs_per_row = read_trainer_metadata(root, &entry.location)
-                .map(|metadata| metadata.max_algs_per_row)
+            let metadata = read_trainer_metadata(root, &entry.location);
+            let max_algs_per_row = metadata
+                .as_ref()
+                .map(|value| value.max_algs_per_row)
                 .unwrap_or(8);
-            entity::trainer::Entity::update_many()
-                .col_expr(
-                    entity::trainer::Column::MaxAlgsPerRow,
-                    sea_orm::sea_query::Expr::value(max_algs_per_row),
-                )
-                .filter(entity::trainer::Column::TrainerId.eq(entry.location))
-                .exec(db)
-                .await?;
+            let pre_rotations = metadata
+                .as_ref()
+                .map(|value| value.pre_rotations.clone())
+                .unwrap_or_default();
+            let post_rotations = normalize_option_alias_text(
+                metadata
+                    .as_ref()
+                    .map(|value| value.post_rotations.clone())
+                    .unwrap_or_default(),
+                &pre_rotations,
+                "preRotations",
+            );
+            let pre_moves = metadata
+                .as_ref()
+                .map(|value| value.pre_moves.clone())
+                .unwrap_or_default();
+            let post_moves = normalize_option_alias_text(
+                metadata
+                    .as_ref()
+                    .map(|value| value.post_moves.clone())
+                    .unwrap_or_default(),
+                &pre_moves,
+                "preMoves",
+            );
+            let (selection_key, times_key) =
+                resolve_storage_keys(&entry.location, metadata.as_ref());
+            let u_move_cycles = read_u_move_cycles(root, &entry.location);
+            execute(
+                &transaction,
+                "UPDATE trainers
+                 SET max_algs_per_row = $1,
+                     pre_rotations = $2,
+                     post_rotations = $3,
+                     pre_moves = $4,
+                     post_moves = $5,
+                     selection_key = $6,
+                     times_key = $7,
+                     u_move_cycles = $8
+                 WHERE trainer_id = $9",
+                vec![
+                    max_algs_per_row.into(),
+                    serde_json::to_value(pre_rotations)?.into(),
+                    serde_json::to_value(post_rotations)?.into(),
+                    serde_json::to_value(pre_moves)?.into(),
+                    serde_json::to_value(post_moves)?.into(),
+                    selection_key.into(),
+                    times_key.into(),
+                    serde_json::to_value(u_move_cycles)?.into(),
+                    entry.location.into(),
+                ],
+            )
+            .await?;
         }
     }
+    transaction.commit().await?;
     Ok(())
-}
-
-#[derive(Clone, Debug, Deserialize, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct TrainerGroup {
-    pub name: String,
-    pub cases: Vec<String>,
-}
-
-#[derive(Clone, Debug, Deserialize, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct TrainerAlgset {
-    pub name: String,
-    pub groups: Vec<String>,
-    pub selected: bool,
-}
-
-#[derive(Clone, Debug, Deserialize, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct TrainerBundle {
-    pub trainer_id: String,
-    pub title: String,
-    pub puzzle: String,
-    pub method: String,
-    pub cases: Vec<TrainerCase>,
-    pub groups: Vec<TrainerGroup>,
-    pub algsets: Vec<TrainerAlgset>,
-    pub pre_rotations: Vec<String>,
-    pub post_rotations: Vec<String>,
-    pub pre_moves: Vec<String>,
-    pub post_moves: Vec<String>,
-    pub max_algs_per_row: i32,
-    #[serde(default)]
-    pub u_move_cycles: Vec<Vec<usize>>,
-    pub selection_key: String,
-    pub times_key: String,
 }
 
 #[derive(Clone, Deserialize, Serialize)]
@@ -147,19 +148,25 @@ fn read_json<T: serde::de::DeserializeOwned>(path: impl AsRef<Path>) -> Result<T
     Ok(serde_json::from_slice(&fs::read(path)?)?)
 }
 
-fn storage_keys(trainer_id: &str) -> (String, String) {
-    let root = std::env::var("CATALOG_ROOT").unwrap_or_else(|_| "static".to_owned());
-    let metadata = read_trainer_metadata(Path::new(&root), trainer_id);
+fn trainer_storage_keys(trainer: &entity::trainer::Model) -> (String, String) {
     (
-        metadata
-            .as_ref()
-            .and_then(|value| value.selection_array_key.clone())
-            .unwrap_or_else(|| format!("{trainer_id}Selection")),
-        metadata
-            .as_ref()
-            .and_then(|value| value.times_array_key.clone())
-            .unwrap_or_else(|| format!("{trainer_id}Times")),
+        trainer
+            .selection_key
+            .clone()
+            .unwrap_or_else(|| format!("{}Selection", trainer.trainer_id)),
+        trainer
+            .times_key
+            .clone()
+            .unwrap_or_else(|| format!("{}Times", trainer.trainer_id)),
     )
+}
+
+fn json_string_vec(value: serde_json::Value) -> Vec<String> {
+    serde_json::from_value(value).unwrap_or_default()
+}
+
+fn json_u_move_cycles(value: serde_json::Value) -> Vec<Vec<usize>> {
+    serde_json::from_value(value).unwrap_or_default()
 }
 
 pub async fn seed(db: &DatabaseConnection, root: &Path) -> Result<(), CatalogError> {
@@ -175,7 +182,7 @@ pub async fn seed(db: &DatabaseConnection, root: &Path) -> Result<(), CatalogErr
     {
         let existing = entity::trainer::Entity::find().count(db).await?;
         if existing >= expected as u64 {
-            update_max_algs_per_row(db, root, &index).await?;
+            update_catalog_metadata(db, root, &index).await?;
             return Ok(());
         }
     }
@@ -216,29 +223,40 @@ async fn seed_trainer(
         .as_ref()
         .map(|value| value.pre_rotations.clone())
         .unwrap_or_default();
-    let post_rotations = metadata
-        .as_ref()
-        .map(|value| value.post_rotations.clone())
-        .unwrap_or_default();
+    let post_rotations = normalize_option_alias_text(
+        metadata
+            .as_ref()
+            .map(|value| value.post_rotations.clone())
+            .unwrap_or_default(),
+        &pre_rotations,
+        "preRotations",
+    );
     let pre_moves = metadata
         .as_ref()
         .map(|value| value.pre_moves.clone())
         .unwrap_or_default();
-    let post_moves = metadata
-        .as_ref()
-        .map(|value| value.post_moves.clone())
-        .unwrap_or_default();
+    let post_moves = normalize_option_alias_text(
+        metadata
+            .as_ref()
+            .map(|value| value.post_moves.clone())
+            .unwrap_or_default(),
+        &pre_moves,
+        "preMoves",
+    );
+    let (selection_key, times_key) = resolve_storage_keys(&entry.location, metadata.as_ref());
+    let u_move_cycles = read_u_move_cycles(root, &entry.location);
     let icon_path = format!("/catalog/{}/icon.png", entry.location);
 
     execute(
         db,
-        "INSERT INTO trainers (trainer_id, puzzle, method, name, \"order\", icon_path, title, pre_rotations, post_rotations, pre_moves, post_moves, selected_algsets, max_algs_per_row)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
+        "INSERT INTO trainers (trainer_id, puzzle, method, name, \"order\", icon_path, title, pre_rotations, post_rotations, pre_moves, post_moves, selected_algsets, max_algs_per_row, selection_key, times_key, u_move_cycles)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16)
          ON CONFLICT (trainer_id) DO UPDATE SET puzzle=EXCLUDED.puzzle, method=EXCLUDED.method,
          name=EXCLUDED.name, \"order\"=EXCLUDED.\"order\", icon_path=EXCLUDED.icon_path, title=EXCLUDED.title,
          pre_rotations=EXCLUDED.pre_rotations, post_rotations=EXCLUDED.post_rotations,
          pre_moves=EXCLUDED.pre_moves, post_moves=EXCLUDED.post_moves, selected_algsets=EXCLUDED.selected_algsets,
-         max_algs_per_row=EXCLUDED.max_algs_per_row",
+         max_algs_per_row=EXCLUDED.max_algs_per_row, selection_key=EXCLUDED.selection_key,
+         times_key=EXCLUDED.times_key, u_move_cycles=EXCLUDED.u_move_cycles",
         vec![
             entry.location.clone().into(),
             puzzle.into(),
@@ -253,6 +271,9 @@ async fn seed_trainer(
             serde_json::to_value(post_moves)?.into(),
             read_json::<serde_json::Value>(directory.join("selected_algsets.json"))?.into(),
             max_algs_per_row.into(),
+            selection_key.into(),
+            times_key.into(),
+            serde_json::to_value(u_move_cycles)?.into(),
         ],
     )
     .await?;
@@ -452,10 +473,9 @@ pub async fn list(db: &DatabaseConnection) -> Result<Vec<TrainerSummary>, DbErr>
     Ok(trainers
         .into_iter()
         .map(|trainer| {
-            let trainer_id = trainer.trainer_id;
-            let (selection_key, times_key) = storage_keys(&trainer_id);
+            let (selection_key, times_key) = trainer_storage_keys(&trainer);
             TrainerSummary {
-                trainer_id,
+                trainer_id: trainer.trainer_id,
                 puzzle: trainer.puzzle,
                 method: trainer.method,
                 name: trainer.name,
@@ -484,36 +504,20 @@ pub async fn load(
         return Ok(None);
     };
     let selected_algsets = trainer.selected_algsets.clone();
-    let root = std::env::var("CATALOG_ROOT").unwrap_or_else(|_| "static".to_owned());
-    let metadata = read_trainer_metadata(Path::new(&root), trainer_id);
-    let pre_rotations = metadata
-        .as_ref()
-        .map(|value| value.pre_rotations.clone())
-        .unwrap_or_default();
+    let (selection_key, times_key) = trainer_storage_keys(&trainer);
+    let pre_rotations = json_string_vec(trainer.pre_rotations);
     let post_rotations = normalize_option_alias_text(
-        metadata
-            .as_ref()
-            .map(|value| value.post_rotations.clone())
-            .unwrap_or_default(),
+        json_string_vec(trainer.post_rotations),
         &pre_rotations,
         "preRotations",
     );
-    let pre_moves = metadata
-        .as_ref()
-        .map(|value| value.pre_moves.clone())
-        .unwrap_or_default();
+    let pre_moves = json_string_vec(trainer.pre_moves);
     let post_moves = normalize_option_alias_text(
-        metadata
-            .as_ref()
-            .map(|value| value.post_moves.clone())
-            .unwrap_or_default(),
+        json_string_vec(trainer.post_moves),
         &pre_moves,
         "preMoves",
     );
-    let u_move_cycles = fs::read(Path::new(&root).join(trainer_id).join("u_move.json"))
-        .ok()
-        .and_then(|value| serde_json::from_slice(&value).ok())
-        .unwrap_or_default();
+    let u_move_cycles = json_u_move_cycles(trainer.u_move_cycles);
 
     let case_models = entity::case::Entity::find()
         .filter(entity::case::Column::TrainerId.eq(trainer_id))
@@ -619,8 +623,8 @@ pub async fn load(
         .collect::<Result<Vec<_>, _>>()?;
 
     let bundle = TrainerBundle {
-        selection_key: storage_keys(trainer_id).0,
-        times_key: storage_keys(trainer_id).1,
+        selection_key,
+        times_key,
         trainer_id: trainer.trainer_id,
         title: trainer.title.ok_or("trainer title is missing")?,
         puzzle: trainer.puzzle,
@@ -748,40 +752,24 @@ pub async fn load_all(db: &DatabaseConnection) -> Result<Vec<TrainerBundle>, Cat
             .push((row.try_get("", "name")?, row.try_get::<Vec<String>>("", "groups")?));
     }
 
-    let root = std::env::var("CATALOG_ROOT").unwrap_or_else(|_| "static".to_owned());
     let mut bundles = Vec::with_capacity(trainers.len());
     for trainer in trainers {
+        let (selection_key, times_key) = trainer_storage_keys(&trainer);
         let trainer_id = trainer.trainer_id;
         let selected_algsets = trainer.selected_algsets;
-        let metadata = read_trainer_metadata(Path::new(&root), &trainer_id);
-        let pre_rotations = metadata
-            .as_ref()
-            .map(|value| value.pre_rotations.clone())
-            .unwrap_or_default();
+        let pre_rotations = json_string_vec(trainer.pre_rotations);
         let post_rotations = normalize_option_alias_text(
-            metadata
-                .as_ref()
-                .map(|value| value.post_rotations.clone())
-                .unwrap_or_default(),
+            json_string_vec(trainer.post_rotations),
             &pre_rotations,
             "preRotations",
         );
-        let pre_moves = metadata
-            .as_ref()
-            .map(|value| value.pre_moves.clone())
-            .unwrap_or_default();
+        let pre_moves = json_string_vec(trainer.pre_moves);
         let post_moves = normalize_option_alias_text(
-            metadata
-                .as_ref()
-                .map(|value| value.post_moves.clone())
-                .unwrap_or_default(),
+            json_string_vec(trainer.post_moves),
             &pre_moves,
             "preMoves",
         );
-        let u_move_cycles = fs::read(Path::new(&root).join(&trainer_id).join("u_move.json"))
-            .ok()
-            .and_then(|value| serde_json::from_slice(&value).ok())
-            .unwrap_or_default();
+        let u_move_cycles = json_u_move_cycles(trainer.u_move_cycles);
         let algsets = algsets_by_trainer
             .remove(&trainer_id)
             .unwrap_or_default()
@@ -795,7 +783,6 @@ pub async fn load_all(db: &DatabaseConnection) -> Result<Vec<TrainerBundle>, Cat
                 groups,
             })
             .collect();
-        let (selection_key, times_key) = storage_keys(&trainer_id);
         bundles.push(TrainerBundle {
             selection_key,
             times_key,

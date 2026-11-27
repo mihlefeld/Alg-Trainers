@@ -18,6 +18,9 @@ pub struct Model {
     pub post_moves: Json,
     pub selected_algsets: Json,
     pub max_algs_per_row: i32,
+    pub selection_key: Option<String>,
+    pub times_key: Option<String>,
+    pub u_move_cycles: Json,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]

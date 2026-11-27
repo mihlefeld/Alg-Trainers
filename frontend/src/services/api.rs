@@ -4,6 +4,7 @@ use gloo_net::http::Request;
 use wasm_bindgen_futures::JsFuture;
 
 const CACHED_ACCOUNT_KEY: &str = "cachedAccount";
+const SYNC_CURSOR_KEY: &str = "syncCursor";
 
 pub async fn load_cached_account() -> Option<MeResponse> {
     let promise = metadataGet(CACHED_ACCOUNT_KEY).ok()?;
@@ -49,6 +50,9 @@ pub async fn logout() -> bool {
     match Request::post("/api/auth/logout").send().await {
         Ok(response) if response.ok() => {
             clear_cached_account().await;
+            if let Ok(promise) = metadataDelete(SYNC_CURSOR_KEY) {
+                let _ = JsFuture::from(promise).await;
+            }
             true
         }
         _ => false,

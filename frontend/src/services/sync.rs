@@ -1,21 +1,153 @@
 use crate::logic::{algs, results};
 use crate::models::{
-    MeResponse, ResultSync, SelectionSync, SettingsSync, SyncBundle, TrainerSummary, UserAlgState,
-    UserAlgSync,
+    MeResponse, ResultSync, SelectionSync, SettingsSync, StoredResult, SyncBundle, TrainerSummary,
+    UserAlgState, UserAlgSync,
 };
 use crate::services::api::save_cached_account;
 use crate::services::storage::{
-    get_stored, put_stored, storageAll, storageClearDirtyIfUnchanged, SETTINGS_KEY,
+    get_stored, metadataGet, metadataPut, put_stored, put_stored_if_clean, storageAll,
+    storageClearDirtyIfUnchanged, SETTINGS_KEY,
 };
 use gloo_net::http::Request;
 use gloo_timers::callback::{Interval, Timeout};
 use js_sys::Date;
+use serde::{Deserialize, Serialize};
 use std::cell::RefCell;
 use std::collections::{BTreeMap, BTreeSet};
 use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::{spawn_local, JsFuture};
 
-pub const SYNC_RESULT_BATCH_SIZE: usize = 10_000;
+pub const SYNC_RESULT_BATCH_SIZE: usize = 2_000;
+const SYNC_CURSOR_KEY: &str = "syncCursor";
+const PUSH_WATERMARK_OVERLAP_MS: f64 = 5_000.0;
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum SyncOutcome {
+    Synced,
+    InProgress,
+    Throttled,
+    Unauthenticated,
+    Offline,
+    RateLimited,
+    PayloadRejected(u16),
+    ServerError(u16),
+    HttpError(u16),
+    StorageError(&'static str),
+    DecodeError(&'static str),
+}
+
+impl SyncOutcome {
+    pub fn from_http_status(status: u16) -> Self {
+        match status {
+            401 | 403 => Self::Unauthenticated,
+            413 | 422 => Self::PayloadRejected(status),
+            429 => Self::RateLimited,
+            500..=599 => Self::ServerError(status),
+            other => Self::HttpError(other),
+        }
+    }
+
+    pub fn user_message(&self) -> Option<String> {
+        match self {
+            Self::Synced | Self::Throttled => None,
+            Self::InProgress => Some("A sync is already in progress.".to_owned()),
+            Self::Unauthenticated => {
+                Some("Your session expired. Please sign in again.".to_owned())
+            }
+            Self::Offline => {
+                Some("Unable to reach the server. Please try again when online.".to_owned())
+            }
+            Self::RateLimited => {
+                Some("Too many sync requests. Please wait a moment and try again.".to_owned())
+            }
+            Self::PayloadRejected(status) => Some(format!(
+                "Sync data was rejected by the server (HTTP {status})."
+            )),
+            Self::ServerError(status) => Some(format!(
+                "Server error during sync (HTTP {status}). Please try again later."
+            )),
+            Self::HttpError(status) => Some(format!("Sync failed with HTTP {status}.")),
+            Self::StorageError(detail) => Some(format!("Local browser storage error ({detail}).")),
+            Self::DecodeError(detail) => {
+                Some(format!("Unexpected response from server ({detail})."))
+            }
+        }
+    }
+}
+
+#[derive(Clone, Debug, Default, Deserialize, Serialize)]
+struct SyncCursorState {
+    account: String,
+    #[serde(default)]
+    pull_cursor: Option<String>,
+    #[serde(default)]
+    last_push_at: Option<String>,
+}
+
+async fn load_sync_cursor(account: &str) -> SyncCursorState {
+    let stored = match metadataGet(SYNC_CURSOR_KEY) {
+        Ok(promise) => JsFuture::from(promise)
+            .await
+            .ok()
+            .and_then(|value| value.as_string())
+            .and_then(|text| serde_json::from_str::<SyncCursorState>(&text).ok()),
+        Err(_) => None,
+    };
+    match stored {
+        Some(state) if state.account == account => state,
+        _ => SyncCursorState {
+            account: account.to_owned(),
+            pull_cursor: None,
+            last_push_at: None,
+        },
+    }
+}
+
+async fn save_sync_cursor(state: &SyncCursorState) {
+    if let Ok(serialized) = serde_json::to_string(state) {
+        if let Ok(promise) = metadataPut(SYNC_CURSOR_KEY, &serialized) {
+            let _ = JsFuture::from(promise).await;
+        }
+    }
+}
+
+pub fn filter_changed_results(
+    items: Vec<StoredResult>,
+    last_push_at: Option<&str>,
+) -> Vec<StoredResult> {
+    let Some(cutoff) = last_push_at else {
+        return items;
+    };
+    items
+        .into_iter()
+        .filter(|item| match item.updated_at.as_deref() {
+            None => true,
+            Some(ts) => ts >= cutoff,
+        })
+        .collect()
+}
+
+pub fn merge_custom_algs(
+    mut existing: BTreeMap<String, Vec<UserAlgState>>,
+    incoming: BTreeMap<String, Vec<UserAlgState>>,
+) -> BTreeMap<String, Vec<UserAlgState>> {
+    for (case_id, incoming_items) in incoming {
+        let entry = existing.entry(case_id).or_default();
+        for item in incoming_items {
+            if let Some(slot) = entry.iter_mut().find(|cur| cur.alg_id == item.alg_id) {
+                *slot = item;
+            } else {
+                entry.push(item);
+            }
+        }
+        entry.sort_by(|left, right| {
+            left.position
+                .cmp(&right.position)
+                .then_with(|| left.alg_id.cmp(&right.alg_id))
+        });
+    }
+    existing
+}
 
 thread_local! {
     static SYNC_STARTED: RefCell<bool> = const { RefCell::new(false) };
@@ -135,7 +267,7 @@ fn record_sync_completed() {
     }
 }
 
-pub async fn sync_now(force: bool) {
+pub async fn sync_now(force: bool) -> SyncOutcome {
     let already_running = SYNC_IN_FLIGHT.with(|in_flight| {
         if *in_flight.borrow() {
             SYNC_PENDING.with(|pending| {
@@ -149,12 +281,13 @@ pub async fn sync_now(force: bool) {
         }
     });
     if already_running {
-        return;
+        return SyncOutcome::InProgress;
     }
 
     let mut current_force = force;
+    let mut outcome;
     loop {
-        sync_once(current_force).await;
+        outcome = sync_once(current_force).await;
         let next = SYNC_PENDING.with(|pending| pending.borrow_mut().take());
         match next {
             Some(next_force) => current_force = next_force,
@@ -163,89 +296,103 @@ pub async fn sync_now(force: bool) {
     }
 
     SYNC_IN_FLIGHT.with(|in_flight| *in_flight.borrow_mut() = false);
+    outcome
 }
 
-async fn sync_once(force: bool) {
+async fn sync_once(force: bool) -> SyncOutcome {
     let now = Date::now();
     let too_soon = !force && LAST_SYNC.with(|last| now - *last.borrow() < 10_000.0);
     if too_soon {
-        return;
+        return SyncOutcome::Throttled;
     }
     LAST_SYNC.with(|last| *last.borrow_mut() = now);
-    let Ok(me_response) = Request::get("/api/me").send().await else {
-        return;
+    let me_response = match Request::get("/api/me").send().await {
+        Ok(response) => response,
+        Err(_) => return SyncOutcome::Offline,
     };
     if !me_response.ok() {
-        return;
+        return SyncOutcome::from_http_status(me_response.status());
     }
     let Ok(me) = me_response.json::<MeResponse>().await else {
-        return;
+        return SyncOutcome::DecodeError("account status");
     };
     save_cached_account(&me).await;
     if !me.authenticated {
-        return;
+        return SyncOutcome::Unauthenticated;
     }
+    let account_email = me.email.as_deref().unwrap_or("");
+    let push_started_ms = Date::now();
+    let push_started_iso = Date::new(&JsValue::from_f64(push_started_ms))
+        .to_iso_string()
+        .as_string()
+        .unwrap_or_default();
+    let push_watermark_iso =
+        Date::new(&JsValue::from_f64((push_started_ms - PUSH_WATERMARK_OVERLAP_MS).max(0.0)))
+            .to_iso_string()
+            .as_string()
+            .unwrap_or_else(|| push_started_iso.clone());
+
     let Ok(promise) = storageAll("dirty") else {
-        return;
+        return SyncOutcome::StorageError("read dirty keys");
     };
     let Ok(dirty_value) = JsFuture::from(promise).await else {
-        return;
+        return SyncOutcome::StorageError("read dirty keys");
     };
     let Ok(mut dirty) = serde_wasm_bindgen::from_value::<BTreeMap<String, f64>>(dirty_value) else {
-        return;
+        return SyncOutcome::StorageError("decode dirty keys");
     };
     if dirty.is_empty() {
         if !normalize_legacy_results_in_storage().await {
-            if pull_remote().await {
+            let outcome = pull_remote(account_email).await;
+            if outcome == SyncOutcome::Synced {
                 record_sync_completed();
             }
-            return;
+            return outcome;
         }
         let Ok(promise) = storageAll("dirty") else {
-            return;
+            return SyncOutcome::StorageError("refresh dirty keys");
         };
         let Ok(dirty_value) = JsFuture::from(promise).await else {
-            return;
+            return SyncOutcome::StorageError("refresh dirty keys");
         };
         let Ok(refreshed) = serde_wasm_bindgen::from_value::<BTreeMap<String, f64>>(dirty_value)
         else {
-            return;
+            return SyncOutcome::StorageError("decode dirty keys");
         };
         dirty = refreshed;
         if dirty.is_empty() {
-            if pull_remote().await {
+            let outcome = pull_remote(account_email).await;
+            if outcome == SyncOutcome::Synced {
                 record_sync_completed();
             }
-            return;
+            return outcome;
         }
     }
     let trainers = match Request::get("/api/trainers").send().await {
         Ok(response) if response.ok() => match response.json::<Vec<TrainerSummary>>().await {
             Ok(trainers) if !trainers.is_empty() => trainers,
-            _ => return,
+            _ => return SyncOutcome::DecodeError("trainer catalog"),
         },
-        _ => return,
+        Ok(response) => return SyncOutcome::from_http_status(response.status()),
+        Err(_) => return SyncOutcome::Offline,
     };
     let Ok(promise) = storageAll("data") else {
-        return;
+        return SyncOutcome::StorageError("read local data");
     };
     let Ok(data_value) = JsFuture::from(promise).await else {
-        return;
+        return SyncOutcome::StorageError("read local data");
     };
     let Ok(data) = serde_wasm_bindgen::from_value::<BTreeMap<String, String>>(data_value) else {
-        return;
+        return SyncOutcome::StorageError("decode local data");
     };
+    let mut cursor_state = load_sync_cursor(account_email).await;
     let mut bundle = SyncBundle::default();
+    let mut pushed_selection_trainers = BTreeSet::new();
     for key in dirty.keys() {
         let updated_at = Date::new(&JsValue::from_f64(*dirty.get(key).unwrap_or(&0.0)))
             .to_iso_string()
             .as_string()
-            .unwrap_or_else(|| {
-                Date::new_0()
-                    .to_iso_string()
-                    .as_string()
-                    .unwrap_or_default()
-            });
+            .unwrap_or_else(|| push_started_iso.clone());
         let Some(value) = data.get(key) else {
             continue;
         };
@@ -261,17 +408,38 @@ async fn sync_once(force: bool) {
                 || format!("{}Presets", trainer.selection_key) == *key
                 || format!("{}Algsets", trainer.selection_key) == *key
         }) {
-            let cases = get_stored(&trainer.selection_key)
-                .await
-                .and_then(|value| serde_json::from_str::<serde_json::Value>(&value).ok())
+            if !pushed_selection_trainers.insert(trainer.trainer_id.clone()) {
+                continue;
+            }
+            let preset_key = format!("{}Presets", trainer.selection_key);
+            let algset_key = format!("{}Algsets", trainer.selection_key);
+            let latest_ts = [
+                dirty.get(&trainer.selection_key).copied(),
+                dirty.get(&preset_key).copied(),
+                dirty.get(&algset_key).copied(),
+            ]
+            .into_iter()
+            .flatten()
+            .fold(0.0_f64, f64::max);
+            let selection_updated_at = if latest_ts > 0.0 {
+                Date::new(&JsValue::from_f64(latest_ts))
+                    .to_iso_string()
+                    .as_string()
+                    .unwrap_or_else(|| updated_at.clone())
+            } else {
+                updated_at.clone()
+            };
+            let cases = data
+                .get(&trainer.selection_key)
+                .and_then(|value| serde_json::from_str::<serde_json::Value>(value).ok())
                 .unwrap_or_else(|| serde_json::json!([]));
-            let presets = get_stored(&format!("{}Presets", trainer.selection_key))
-                .await
-                .and_then(|value| serde_json::from_str::<serde_json::Value>(&value).ok())
+            let presets = data
+                .get(&preset_key)
+                .and_then(|value| serde_json::from_str::<serde_json::Value>(value).ok())
                 .unwrap_or_else(|| serde_json::json!({}));
-            let algsets = get_stored(&format!("{}Algsets", trainer.selection_key))
-                .await
-                .and_then(|value| serde_json::from_str::<serde_json::Value>(&value).ok())
+            let algsets = data
+                .get(&algset_key)
+                .and_then(|value| serde_json::from_str::<serde_json::Value>(value).ok())
                 .unwrap_or_else(|| serde_json::json!({}));
             bundle.selections.push(SelectionSync {
                 trainer_id: trainer.trainer_id.clone(),
@@ -280,7 +448,7 @@ async fn sync_once(force: bool) {
                     "presets": presets,
                     "algsets": algsets
                 }),
-                updated_at: updated_at.clone(),
+                updated_at: selection_updated_at,
             });
         } else if let Some(trainer) = trainers
             .iter()
@@ -311,41 +479,56 @@ async fn sync_once(force: bool) {
                     )
                     .await;
                 }
+                let to_push =
+                    filter_changed_results(parsed_results, cursor_state.last_push_at.as_deref());
                 bundle
                     .results
-                    .extend(parsed_results.into_iter().map(|result| ResultSync {
+                    .extend(to_push.into_iter().map(|result| ResultSync {
                         id: result.id,
                         datetime: result.datetime,
                         result_ms: result.ms,
                         trainer_id: trainer.trainer_id.clone(),
                         case_id: result.case,
-                        updated_at: updated_at.clone(),
+                        updated_at: result.updated_at.unwrap_or_else(|| updated_at.clone()),
                         deleted: result.deleted,
                     }));
             }
         }
     }
-    for batch in split_sync_batches(bundle) {
-        let Ok(response) = Request::put("/api/sync")
-            .header("Content-Type", "application/json")
-            .body(serde_json::to_string(&batch).unwrap_or_default())
-            .unwrap()
-            .send()
-            .await
-        else {
-            return;
-        };
-        if !response.ok() {
-            return;
+    let has_payload = bundle.settings.is_some()
+        || !bundle.selections.is_empty()
+        || !bundle.user_algs.is_empty()
+        || !bundle.results.is_empty();
+    if has_payload {
+        for batch in split_sync_batches(bundle) {
+            let response = match Request::put("/api/sync")
+                .header("Content-Type", "application/json")
+                .body(serde_json::to_string(&batch).unwrap_or_default())
+                .unwrap()
+                .send()
+                .await
+            {
+                Ok(response) => response,
+                Err(_) => return SyncOutcome::Offline,
+            };
+            if !response.ok() {
+                return SyncOutcome::from_http_status(response.status());
+            }
         }
     }
-    if let Ok(expected) = serde_wasm_bindgen::to_value(&dirty) {
+    cursor_state.last_push_at = Some(push_watermark_iso);
+    save_sync_cursor(&cursor_state).await;
+    let serializer = serde_wasm_bindgen::Serializer::new().serialize_maps_as_objects(true);
+    if let Ok(expected) = dirty.serialize(&serializer) {
         if let Ok(promise) = storageClearDirtyIfUnchanged(&expected) {
             let _ = JsFuture::from(promise).await;
         }
     }
-    let _ = pull_remote().await;
-    record_sync_completed();
+    let outcome = pull_remote(account_email).await;
+    if outcome == SyncOutcome::Synced {
+        record_sync_completed();
+    }
+    outcome
 }
 
 async fn normalize_legacy_results_in_storage() -> bool {
@@ -374,29 +557,32 @@ async fn normalize_legacy_results_in_storage() -> bool {
     changed
 }
 
-async fn pull_remote() -> bool {
-    let dirty = match storageAll("dirty") {
-        Ok(promise) => match JsFuture::from(promise).await {
-            Ok(value) => {
-                serde_wasm_bindgen::from_value::<BTreeMap<String, f64>>(value).unwrap_or_default()
-            }
-            Err(_) => BTreeMap::new(),
-        },
-        Err(_) => BTreeMap::new(),
-    };
+async fn pull_remote(account_email: &str) -> SyncOutcome {
+    let mut cursor_state = load_sync_cursor(account_email).await;
+    let since = cursor_state.pull_cursor.clone();
     let trainers = match Request::get("/api/trainers").send().await {
         Ok(response) if response.ok() => match response.json::<Vec<TrainerSummary>>().await {
             Ok(trainers) if !trainers.is_empty() => trainers,
-            _ => return false,
+            _ => return SyncOutcome::DecodeError("trainer catalog"),
         },
-        _ => return false,
+        Ok(response) => return SyncOutcome::from_http_status(response.status()),
+        Err(_) => return SyncOutcome::Offline,
     };
-    let Ok(response) = Request::get("/api/sync").send().await else {
-        return false;
+    let initial_url = match since.as_deref() {
+        Some(since) => format!("/api/sync?since={}", js_sys::encode_uri_component(since)),
+        None => "/api/sync".to_owned(),
     };
+    let response = match Request::get(&initial_url).send().await {
+        Ok(response) => response,
+        Err(_) => return SyncOutcome::Offline,
+    };
+    if !response.ok() {
+        return SyncOutcome::from_http_status(response.status());
+    }
     let Ok(mut bundle) = response.json::<SyncBundle>().await else {
-        return false;
+        return SyncOutcome::DecodeError("sync bundle");
     };
+    let server_time = bundle.server_time.clone();
     let mut seen_cursors = BTreeMap::<String, ()>::new();
     loop {
         let Some(cursor) = bundle.next_results.take() else {
@@ -404,28 +590,39 @@ async fn pull_remote() -> bool {
         };
         let cursor_key = format!("{}|{}", cursor.datetime, cursor.id);
         if seen_cursors.insert(cursor_key, ()).is_some() {
-            return false;
+            return SyncOutcome::DecodeError("pagination cursor loop");
         }
-        let url = format!(
-            "/api/sync?before_datetime={}&before_id={}",
-            js_sys::encode_uri_component(&cursor.datetime),
-            js_sys::encode_uri_component(&cursor.id)
-        );
-        let Ok(response) = Request::get(&url).send().await else {
-            return false;
+        let url = match since.as_deref() {
+            Some(since) => format!(
+                "/api/sync?since={}&before_datetime={}&before_id={}",
+                js_sys::encode_uri_component(since),
+                js_sys::encode_uri_component(&cursor.datetime),
+                js_sys::encode_uri_component(&cursor.id)
+            ),
+            None => format!(
+                "/api/sync?before_datetime={}&before_id={}",
+                js_sys::encode_uri_component(&cursor.datetime),
+                js_sys::encode_uri_component(&cursor.id)
+            ),
         };
+        let response = match Request::get(&url).send().await {
+            Ok(response) => response,
+            Err(_) => return SyncOutcome::Offline,
+        };
+        if !response.ok() {
+            return SyncOutcome::from_http_status(response.status());
+        }
         let Ok(page) = response.json::<SyncBundle>().await else {
-            return false;
+            return SyncOutcome::DecodeError("sync page");
         };
         bundle.results.extend(page.results);
         bundle.next_results = page.next_results;
     }
-    let mut imported = Vec::new();
+    let mut all_clean = true;
     if let Some(settings) = bundle.settings {
         let key = SETTINGS_KEY.to_owned();
-        if !dirty.contains_key(&key) {
-            put_stored(key.clone(), settings.settings_json.to_string()).await;
-            imported.push(key);
+        if !put_stored_if_clean(key, settings.settings_json.to_string()).await {
+            all_clean = false;
         }
     }
     for selection in bundle.selections {
@@ -441,22 +638,19 @@ async fn pull_remote() -> bool {
             .unwrap_or_else(|| selection.selection_json.clone());
         let presets = selection.selection_json.get("presets").cloned();
         let algsets = selection.selection_json.get("algsets").cloned();
-        if !dirty.contains_key(&key) {
-            put_stored(key.clone(), cases.to_string()).await;
-            imported.push(key.clone());
+        if !put_stored_if_clean(key.clone(), cases.to_string()).await {
+            all_clean = false;
         }
         let preset_key = format!("{key}Presets");
         if let Some(presets) = presets {
-            if !dirty.contains_key(&preset_key) {
-                put_stored(preset_key.clone(), presets.to_string()).await;
-                imported.push(preset_key);
+            if !put_stored_if_clean(preset_key, presets.to_string()).await {
+                all_clean = false;
             }
         }
         let algset_key = format!("{key}Algsets");
         if let Some(algsets) = algsets {
-            if !dirty.contains_key(&algset_key) {
-                put_stored(algset_key.clone(), algsets.to_string()).await;
-                imported.push(algset_key);
+            if !put_stored_if_clean(algset_key, algsets.to_string()).await {
+                all_clean = false;
             }
         }
     }
@@ -498,13 +692,33 @@ async fn pull_remote() -> bool {
             .extend(values);
     }
     for (key, case_algs) in remote_algs {
-        if !dirty.contains_key(&key) {
-            put_stored(
-                key.clone(),
-                serde_json::Value::Object(algs::custom_algs_payload(&case_algs)).to_string(),
-            )
-            .await;
-            imported.push(key);
+        let merged_algs = if since.is_some() {
+            let existing = get_stored(&key)
+                .await
+                .and_then(|value| {
+                    serde_json::from_str::<BTreeMap<String, serde_json::Value>>(&value).ok()
+                })
+                .map(|parsed| {
+                    parsed
+                        .into_iter()
+                        .map(|(case_id, value)| {
+                            let items = algs::parse_custom_algs(&value, &case_id);
+                            (case_id, items)
+                        })
+                        .collect()
+                })
+                .unwrap_or_default();
+            merge_custom_algs(existing, case_algs)
+        } else {
+            case_algs
+        };
+        if !put_stored_if_clean(
+            key,
+            serde_json::Value::Object(algs::custom_algs_payload(&merged_algs)).to_string(),
+        )
+        .await
+        {
+            all_clean = false;
         }
     }
     let mut remote_results = BTreeMap::<String, Vec<ResultSync>>::new();
@@ -521,40 +735,27 @@ async fn pull_remote() -> bool {
             .push(result);
     }
     for (key, items) in remote_results {
-        if !dirty.contains_key(&key) {
-            let mut merged = get_stored(&key)
-                .await
-                .and_then(|value| {
-                    results::parse_stored_results(&key, &value).map(|(parsed, _)| parsed)
-                })
-                .unwrap_or_default();
-            for result in items {
-                merged = results::merge_remote_result(merged, result);
-            }
-            put_stored(
-                key.clone(),
-                serde_json::to_string(&merged).unwrap_or_else(|_| "[]".to_owned()),
-            )
-            .await;
-            imported.push(key);
+        let existing = get_stored(&key)
+            .await
+            .and_then(|value| results::parse_stored_results(&key, &value).map(|(parsed, _)| parsed))
+            .unwrap_or_default();
+        let merged = results::merge_remote_results(existing, items);
+        if !put_stored_if_clean(
+            key,
+            serde_json::to_string(&merged).unwrap_or_else(|_| "[]".to_owned()),
+        )
+        .await
+        {
+            all_clean = false;
         }
     }
-    if !imported.is_empty() {
-        let imported = imported.into_iter().collect::<BTreeSet<_>>();
-        if let Ok(promise) = storageAll("dirty") {
-            if let Ok(value) = JsFuture::from(promise).await {
-                let mut current = serde_wasm_bindgen::from_value::<BTreeMap<String, f64>>(value)
-                    .unwrap_or_default();
-                current.retain(|key, _| imported.contains(key));
-                if let Ok(expected) = serde_wasm_bindgen::to_value(&current) {
-                    if let Ok(promise) = storageClearDirtyIfUnchanged(&expected) {
-                        let _ = JsFuture::from(promise).await;
-                    }
-                }
-            }
+    if all_clean {
+        if let Some(server_time) = server_time {
+            cursor_state.pull_cursor = Some(server_time);
+            save_sync_cursor(&cursor_state).await;
         }
     }
-    true
+    SyncOutcome::Synced
 }
 
 #[cfg(test)]
@@ -580,5 +781,85 @@ mod tests {
         assert_eq!(batches.len(), 2);
         assert_eq!(batches[0].results.len(), SYNC_RESULT_BATCH_SIZE);
         assert_eq!(batches[1].results.len(), 1);
+    }
+
+    #[test]
+    fn incremental_push_skips_results_unchanged_since_last_push() {
+        let items = vec![
+            StoredResult {
+                id: "old".to_owned(),
+                datetime: "2026-01-01T00:00:00Z".to_owned(),
+                ms: 1000,
+                case: "1".to_owned(),
+                time: "1.00".to_owned(),
+                deleted: false,
+                updated_at: Some("2026-01-01T00:00:00Z".to_owned()),
+            },
+            StoredResult {
+                id: "new".to_owned(),
+                datetime: "2026-01-02T00:00:00Z".to_owned(),
+                ms: 1200,
+                case: "1".to_owned(),
+                time: "1.20".to_owned(),
+                deleted: false,
+                updated_at: Some("2026-01-03T00:00:00Z".to_owned()),
+            },
+            StoredResult {
+                id: "legacy".to_owned(),
+                datetime: "2026-01-01T00:00:01Z".to_owned(),
+                ms: 1500,
+                case: "1".to_owned(),
+                time: "1.50".to_owned(),
+                deleted: false,
+                updated_at: None,
+            },
+        ];
+
+        let filtered = filter_changed_results(items, Some("2026-01-02T00:00:00Z"));
+        assert_eq!(
+            filtered.iter().map(|r| r.id.as_str()).collect::<Vec<_>>(),
+            vec!["new", "legacy"]
+        );
+    }
+
+    #[test]
+    fn incremental_pull_merges_custom_algs_without_dropping_untouched_cases() {
+        let mut existing = BTreeMap::new();
+        existing.insert(
+            "case-1".to_owned(),
+            vec![UserAlgState {
+                alg_id: "user:1".to_owned(),
+                alg: "R U R'".to_owned(),
+                position: 0,
+                hidden: false,
+                deleted: false,
+            }],
+        );
+        existing.insert(
+            "case-2".to_owned(),
+            vec![UserAlgState {
+                alg_id: "user:2".to_owned(),
+                alg: "F R U R' U' F'".to_owned(),
+                position: 0,
+                hidden: false,
+                deleted: false,
+            }],
+        );
+
+        let mut incoming = BTreeMap::new();
+        incoming.insert(
+            "case-1".to_owned(),
+            vec![UserAlgState {
+                alg_id: "user:1".to_owned(),
+                alg: "R U2 R'".to_owned(),
+                position: 0,
+                hidden: false,
+                deleted: false,
+            }],
+        );
+
+        let merged = merge_custom_algs(existing, incoming);
+        assert_eq!(merged["case-1"][0].alg, "R U2 R'");
+        assert_eq!(merged["case-2"][0].alg, "F R U R' U' F'");
     }
 }

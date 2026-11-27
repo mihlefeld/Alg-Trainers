@@ -1,6 +1,6 @@
 use crate::logic::{algs, cube_schemes, results};
 use crate::models::{SelectionPreset, StoredResult, TrainerCase, UserAlgState};
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::{BTreeMap, BTreeSet, HashMap};
 use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::{spawn_local, JsFuture};
 
@@ -78,6 +78,22 @@ export async function storagePut(key, value) {
   });
   window.dispatchEvent(new CustomEvent("alg-trainers-change", { detail: { key, value } }));
 }
+export async function storagePutIfClean(key, value) {
+  const db = await openStorage();
+  return await new Promise((resolve, reject) => {
+    const tx = db.transaction(["data", "dirty"], "readwrite");
+    const dirtyReq = tx.objectStore("dirty").get(key);
+    let written = false;
+    dirtyReq.onsuccess = () => {
+      if (dirtyReq.result === undefined) {
+        tx.objectStore("data").put(value, key);
+        written = true;
+      }
+    };
+    tx.oncomplete = () => resolve(written);
+    tx.onerror = () => reject(tx.error);
+  });
+}
 export async function storageAll(storeName) {
   const db = await openStorage();
   return await new Promise((resolve, reject) => {
@@ -90,10 +106,11 @@ export async function storageAll(storeName) {
 }
 export async function storageClearDirtyIfUnchanged(expected) {
   const db = await openStorage();
+  const entries = expected instanceof Map ? Array.from(expected.entries()) : Object.entries(expected);
   await new Promise((resolve, reject) => {
     const tx = db.transaction("dirty", "readwrite");
     const store = tx.objectStore("dirty");
-    for (const [key, timestamp] of Object.entries(expected)) {
+    for (const [key, timestamp] of entries) {
       const request = store.get(key);
       request.onsuccess = () => {
         if (request.result === timestamp) store.delete(key);
@@ -187,11 +204,12 @@ export async function importStorageText(text) {
   }
   const db = await openStorage();
   await new Promise((resolve, reject) => {
-    const tx = db.transaction(["data", "dirty"], "readwrite");
+    const tx = db.transaction(["data", "dirty", "metadata"], "readwrite");
     const data = tx.objectStore("data");
     try {
       data.clear();
       tx.objectStore("dirty").clear();
+      tx.objectStore("metadata").delete("syncCursor");
       for (const [key, value] of Object.entries(values)) {
         if (typeof value !== "string") throw new Error("Invalid trainer backup value");
         let stored = value;
@@ -259,6 +277,8 @@ extern "C" {
     #[wasm_bindgen(catch)]
     pub fn storagePut(key: &str, value: &str) -> Result<js_sys::Promise, JsValue>;
     #[wasm_bindgen(catch)]
+    pub fn storagePutIfClean(key: &str, value: &str) -> Result<js_sys::Promise, JsValue>;
+    #[wasm_bindgen(catch)]
     pub fn storageAll(store_name: &str) -> Result<js_sys::Promise, JsValue>;
     #[wasm_bindgen(catch)]
     pub fn storageClearDirtyIfUnchanged(expected: &JsValue) -> Result<js_sys::Promise, JsValue>;
@@ -319,31 +339,54 @@ pub async fn put_stored(key: String, value: String) {
     }
 }
 
+pub async fn put_stored_if_clean(key: String, value: String) -> bool {
+    let result = match storagePutIfClean(&key, &value) {
+        Ok(promise) => JsFuture::from(promise).await,
+        Err(error) => Err(error),
+    };
+    match result {
+        Ok(written) => written.as_bool().unwrap_or(false),
+        Err(error) => {
+            web_sys::console::error_1(&error);
+            false
+        }
+    }
+}
+
 pub async fn put_stored_results(
     key: String,
     incoming: Vec<StoredResult>,
     deleted_ids: Vec<String>,
 ) {
-    let mut merged = get_stored(&key)
+    let existing = get_stored(&key)
         .await
         .and_then(|value| results::parse_stored_results(&key, &value).map(|(items, _)| items))
         .unwrap_or_default();
+    let now = js_sys::Date::new_0()
+        .to_iso_string()
+        .as_string()
+        .unwrap_or_default();
     let deleted_ids = deleted_ids.into_iter().collect::<BTreeSet<_>>();
-    for result in &mut merged {
-        if deleted_ids.contains(&result.id) {
-            result.deleted = true;
-        }
-    }
+    let mut by_id: HashMap<String, StoredResult> = existing
+        .into_iter()
+        .map(|mut result| {
+            if deleted_ids.contains(&result.id) && !result.deleted {
+                result.deleted = true;
+                result.updated_at = Some(now.clone());
+            }
+            (result.id.clone(), result)
+        })
+        .collect();
     for mut result in incoming {
         if deleted_ids.contains(&result.id) {
             result.deleted = true;
+            result.updated_at = Some(now.clone());
+        } else if result.updated_at.is_none() {
+            result.updated_at = Some(now.clone());
         }
-        if let Some(existing) = merged.iter_mut().find(|existing| existing.id == result.id) {
-            *existing = result;
-        } else {
-            merged.push(result);
-        }
+        by_id.insert(result.id.clone(), result);
     }
+    let mut merged: Vec<StoredResult> = by_id.into_values().collect();
     merged.sort_by(results::compare_results);
     put_stored(
         key,

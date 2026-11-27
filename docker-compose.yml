@@ -23,6 +23,7 @@ services:
         condition: service_healthy
     environment:
       DATABASE_URL: postgres://alg_trainers:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set}@psql:5432/alg_trainers
+      DATABASE_APP_PASSWORD: ${POSTGRES_APP_PASSWORD:-${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set}}
       DATABASE_MIGRATE_ONLY: "true"
       CATALOG_ROOT: /app/static
       FORCE_CATALOG_SEED: ${FORCE_CATALOG_SEED:-}
@@ -39,7 +40,7 @@ services:
       ROCKET_ADDRESS: 0.0.0.0
       ROCKET_PORT: 8000
       ROCKET_SECRET_KEY: ${ROCKET_SECRET_KEY:?ROCKET_SECRET_KEY must be set}
-      DATABASE_URL: postgres://alg_trainers:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set}@psql:5432/alg_trainers
+      DATABASE_URL: postgres://alg_trainers_app:${POSTGRES_APP_PASSWORD:-${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set}}@psql:5432/alg_trainers
       DATABASE_RUN_MIGRATIONS: "false"
       DATABASE_MAX_CONNECTIONS: ${DATABASE_MAX_CONNECTIONS:-20}
       DATABASE_MIN_CONNECTIONS: ${DATABASE_MIN_CONNECTIONS:-2}

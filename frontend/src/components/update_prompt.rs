@@ -10,8 +10,10 @@ pub fn update_prompt() -> Html {
 
     {
         let update_available = update_available.clone();
+        let dismissed = dismissed.clone();
         use_effect_with((), move |_| {
             let callback = Closure::<dyn FnMut()>::new(move || {
+                dismissed.set(false);
                 update_available.set(true);
             });
             initPwa(&callback);

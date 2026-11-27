@@ -1,13 +1,18 @@
-use chrono::{DateTime, Duration, Utc};
+use chrono::{DateTime, Utc};
 use sea_orm::{
-    ColumnTrait, Condition, ConnectionTrait, DatabaseBackend, DatabaseConnection,
-    DatabaseTransaction, DbErr, EntityTrait, QueryFilter, QueryOrder, QuerySelect, Statement,
-    TransactionTrait,
+    ColumnTrait, Condition, ConnectionTrait, DatabaseBackend, DbErr, EntityTrait, QueryFilter,
+    QueryOrder, QuerySelect, Statement,
 };
-use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
-use crate::entity;
+use crate::{database::UserTx, entity};
+
+pub type SyncBundle = alg_trainers_shared::SyncBundle<Uuid, DateTime<Utc>>;
+pub type SettingsSync = alg_trainers_shared::SettingsSync<DateTime<Utc>>;
+pub type SelectionSync = alg_trainers_shared::SelectionSync<DateTime<Utc>>;
+pub type UserAlgSync = alg_trainers_shared::UserAlgSync<DateTime<Utc>>;
+pub type ResultSync = alg_trainers_shared::ResultSync<Uuid, DateTime<Utc>>;
+pub type ResultCursor = alg_trainers_shared::ResultCursor<Uuid, DateTime<Utc>>;
 
 const MAX_SELECTIONS: usize = 100;
 const MAX_USER_ALGS: usize = 10_000;
@@ -16,64 +21,21 @@ const MAX_IDENTIFIER_LENGTH: usize = 256;
 const MAX_ALG_LENGTH: usize = 16 * 1024;
 const MAX_JSON_BYTES: usize = 256 * 1024;
 const RESULTS_PAGE_SIZE: u64 = 1_000;
+/// Safety overlap subtracted from `since` on incremental pulls so writes from
+/// concurrent transactions (bounded by the 5s `statement_timeout`) that commit
+/// after a pull's `NOW()` are never permanently skipped.
+const SYNC_WATERMARK_OVERLAP_SECS: i64 = 6;
 
-#[derive(Clone, Debug, Default, Deserialize, Serialize)]
-pub struct SyncBundle {
-    pub settings: Option<SettingsSync>,
-    pub selections: Vec<SelectionSync>,
-    pub user_algs: Vec<UserAlgSync>,
-    pub results: Vec<ResultSync>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub next_results: Option<ResultCursor>,
-}
+#[derive(Debug)]
+pub struct ValidatedSyncBundle(SyncBundle);
 
-#[derive(Clone, Debug, Deserialize, Serialize)]
-pub struct SettingsSync {
-    pub settings_json: serde_json::Value,
-    pub updated_at: DateTime<Utc>,
-}
+impl TryFrom<SyncBundle> for ValidatedSyncBundle {
+    type Error = ValidationError;
 
-#[derive(Clone, Debug, Deserialize, Serialize)]
-pub struct SelectionSync {
-    pub trainer_id: String,
-    #[serde(default)]
-    pub selection_json: serde_json::Value,
-    pub updated_at: DateTime<Utc>,
-}
-
-#[derive(Clone, Debug, Deserialize, Serialize)]
-pub struct UserAlgSync {
-    pub trainer_id: String,
-    pub case_id: String,
-    pub alg_id: String,
-    pub alg: String,
-    pub position: i32,
-    pub hidden: bool,
-    pub deleted: bool,
-    pub updated_at: DateTime<Utc>,
-}
-
-#[derive(Clone, Debug, Deserialize, Serialize)]
-pub struct ResultSync {
-    pub id: Uuid,
-    pub datetime: DateTime<Utc>,
-    pub result_ms: i64,
-    pub trainer_id: String,
-    pub case_id: String,
-    pub updated_at: DateTime<Utc>,
-    pub deleted: bool,
-}
-
-#[derive(Clone, Debug, Deserialize, Serialize)]
-pub struct ResultCursor {
-    pub datetime: DateTime<Utc>,
-    pub id: Uuid,
-}
-
-#[derive(Deserialize)]
-struct SelectionPayload {
-    trainer_id: String,
-    selection_json: serde_json::Value,
+    fn try_from(bundle: SyncBundle) -> Result<Self, Self::Error> {
+        validate_bundle(&bundle)?;
+        Ok(Self(bundle))
+    }
 }
 
 #[derive(Debug)]
@@ -93,41 +55,39 @@ impl std::fmt::Display for ValidationError {
 
 impl std::error::Error for ValidationError {}
 
-impl SyncBundle {
-    pub fn validate(&self) -> Result<(), ValidationError> {
-        if self.selections.len() > MAX_SELECTIONS {
-            return Err(ValidationError::TooMany("selections"));
-        }
-        if self.user_algs.len() > MAX_USER_ALGS {
-            return Err(ValidationError::TooMany("custom algorithms"));
-        }
-        if self.results.len() > MAX_RESULTS {
-            return Err(ValidationError::TooMany("results"));
-        }
-        if let Some(settings) = &self.settings {
-            validate_json(&settings.settings_json, "settings")?;
-        }
-        for selection in &self.selections {
-            validate_identifier(&selection.trainer_id, "trainer_id")?;
-            validate_json(&selection.selection_json, "selection")?;
-        }
-        for alg in &self.user_algs {
-            validate_identifier(&alg.trainer_id, "trainer_id")?;
-            validate_identifier(&alg.case_id, "case_id")?;
-            validate_identifier(&alg.alg_id, "alg_id")?;
-            if alg.alg.len() > MAX_ALG_LENGTH || alg.position < 0 {
-                return Err(ValidationError::InvalidField("algorithm"));
-            }
-        }
-        for result in &self.results {
-            validate_identifier(&result.trainer_id, "trainer_id")?;
-            validate_identifier(&result.case_id, "case_id")?;
-            if !(0..=86_400_000).contains(&result.result_ms) {
-                return Err(ValidationError::InvalidField("result_ms"));
-            }
-        }
-        Ok(())
+fn validate_bundle(bundle: &SyncBundle) -> Result<(), ValidationError> {
+    if bundle.selections.len() > MAX_SELECTIONS {
+        return Err(ValidationError::TooMany("selections"));
     }
+    if bundle.user_algs.len() > MAX_USER_ALGS {
+        return Err(ValidationError::TooMany("custom algorithms"));
+    }
+    if bundle.results.len() > MAX_RESULTS {
+        return Err(ValidationError::TooMany("results"));
+    }
+    if let Some(settings) = &bundle.settings {
+        validate_json(&settings.settings_json, "settings")?;
+    }
+    for selection in &bundle.selections {
+        validate_identifier(&selection.trainer_id, "trainer_id")?;
+        validate_json(&selection.selection_json, "selection")?;
+    }
+    for alg in &bundle.user_algs {
+        validate_identifier(&alg.trainer_id, "trainer_id")?;
+        validate_identifier(&alg.case_id, "case_id")?;
+        validate_identifier(&alg.alg_id, "alg_id")?;
+        if alg.alg.len() > MAX_ALG_LENGTH || alg.position < 0 {
+            return Err(ValidationError::InvalidField("algorithm"));
+        }
+    }
+    for result in &bundle.results {
+        validate_identifier(&result.trainer_id, "trainer_id")?;
+        validate_identifier(&result.case_id, "case_id")?;
+        if !(0..=86_400_000).contains(&result.result_ms) {
+            return Err(ValidationError::InvalidField("result_ms"));
+        }
+    }
+    Ok(())
 }
 
 fn validate_identifier(value: &str, field: &'static str) -> Result<(), ValidationError> {
@@ -148,63 +108,84 @@ fn validate_json(value: &serde_json::Value, field: &'static str) -> Result<(), V
     Ok(())
 }
 
-pub async fn load(db: &DatabaseConnection, user_id: Uuid) -> Result<SyncBundle, DbErr> {
-    load_page(db, user_id, None).await
-}
-
 pub async fn load_page(
-    db: &DatabaseConnection,
-    user_id: Uuid,
+    tx: &UserTx,
+    since: Option<DateTime<Utc>>,
     cursor: Option<ResultCursor>,
 ) -> Result<SyncBundle, DbErr> {
-    let settings_model = entity::setting::Entity::find_by_id(user_id).one(db).await?;
-    let settings = settings_model.map(|model| SettingsSync {
-        settings_json: model.settings_json,
-        updated_at: model.updated_at,
-    });
+    let user_id = tx.user_id().0;
+    let db = tx.conn();
 
-    let selection_models = entity::sync_revision::Entity::find()
-        .filter(entity::sync_revision::Column::UserId.eq(user_id))
-        .filter(entity::sync_revision::Column::Kind.eq("selection"))
-        .order_by_asc(entity::sync_revision::Column::EntityId)
-        .all(db)
-        .await?;
-    let selections = selection_models
-        .into_iter()
-        .map(|model| {
-            let payload: SelectionPayload = serde_json::from_value(model.payload)
-                .map_err(|error| DbErr::Custom(format!("invalid selection payload: {error}")))?;
-            Ok(SelectionSync {
-                trainer_id: payload.trainer_id,
-                selection_json: payload.selection_json,
+    let server_time = tx.now();
+    let effective_since = since.map(|ts| ts - chrono::Duration::seconds(SYNC_WATERMARK_OVERLAP_SECS));
+    let is_first_page = cursor.is_none();
+
+    let (settings, selections, user_algs) = if is_first_page {
+        let mut settings_query = entity::setting::Entity::find_by_id(user_id);
+        if let Some(since) = effective_since {
+            settings_query =
+                settings_query.filter(entity::setting::Column::ServerUpdatedAt.gte(since));
+        }
+        let settings = settings_query
+            .one(db)
+            .await?
+            .map(|model| SettingsSync {
+                settings_json: model.settings_json,
+                updated_at: model.updated_at,
+            });
+
+        let mut selection_query = entity::user_selection::Entity::find()
+            .filter(entity::user_selection::Column::UserId.eq(user_id));
+        if let Some(since) = effective_since {
+            selection_query =
+                selection_query.filter(entity::user_selection::Column::ServerUpdatedAt.gte(since));
+        }
+        let selections = selection_query
+            .order_by_asc(entity::user_selection::Column::TrainerId)
+            .all(db)
+            .await?
+            .into_iter()
+            .map(|model| SelectionSync {
+                trainer_id: model.trainer_id,
+                selection_json: model.selection_json,
                 updated_at: model.updated_at,
             })
-        })
-        .collect::<Result<Vec<_>, DbErr>>()?;
+            .collect();
 
-    let alg_models = entity::user_alg::Entity::find()
-        .filter(entity::user_alg::Column::UserId.eq(user_id))
-        .order_by_asc(entity::user_alg::Column::TrainerId)
-        .order_by_asc(entity::user_alg::Column::CaseId)
-        .order_by_asc(entity::user_alg::Column::Position)
-        .all(db)
-        .await?;
-    let user_algs = alg_models
-        .into_iter()
-        .map(|model| UserAlgSync {
-            trainer_id: model.trainer_id,
-            case_id: model.case_id,
-            alg_id: model.alg_id,
-            alg: model.alg,
-            position: model.position,
-            hidden: model.hidden,
-            deleted: model.deleted,
-            updated_at: model.updated_at,
-        })
-        .collect();
+        let mut alg_query = entity::user_alg::Entity::find()
+            .filter(entity::user_alg::Column::UserId.eq(user_id));
+        if let Some(since) = effective_since {
+            alg_query = alg_query.filter(entity::user_alg::Column::ServerUpdatedAt.gte(since));
+        }
+        let user_algs = alg_query
+            .order_by_asc(entity::user_alg::Column::TrainerId)
+            .order_by_asc(entity::user_alg::Column::CaseId)
+            .order_by_asc(entity::user_alg::Column::Position)
+            .all(db)
+            .await?
+            .into_iter()
+            .map(|model| UserAlgSync {
+                trainer_id: model.trainer_id,
+                case_id: model.case_id,
+                alg_id: model.alg_id,
+                alg: model.alg,
+                position: model.position,
+                hidden: model.hidden,
+                deleted: model.deleted,
+                updated_at: model.updated_at,
+            })
+            .collect();
+
+        (settings, selections, user_algs)
+    } else {
+        (None, Vec::new(), Vec::new())
+    };
 
     let mut result_query =
         entity::result::Entity::find().filter(entity::result::Column::UserId.eq(user_id));
+    if let Some(since) = effective_since {
+        result_query = result_query.filter(entity::result::Column::ServerUpdatedAt.gte(since));
+    }
     if let Some(cursor) = cursor {
         result_query = result_query.filter(
             Condition::any()
@@ -215,7 +196,7 @@ pub async fn load_page(
                         .add(entity::result::Column::Id.lt(cursor.id)),
                 ),
         );
-    };
+    }
     let result_models = result_query
         .order_by_desc(entity::result::Column::Datetime)
         .order_by_desc(entity::result::Column::Id)
@@ -252,37 +233,24 @@ pub async fn load_page(
         user_algs,
         results,
         next_results,
+        server_time: Some(server_time),
     })
 }
 
-pub async fn save(
-    db: &DatabaseConnection,
-    user_id: Uuid,
-    incoming: SyncBundle,
-) -> Result<SyncBundle, SaveError> {
-    incoming.validate().map_err(SaveError::Validation)?;
-    let transaction = db.begin().await.map_err(SaveError::Database)?;
-    save_in_transaction(&transaction, user_id, incoming)
-        .await
-        .map_err(SaveError::Database)?;
-    transaction.commit().await.map_err(SaveError::Database)?;
-    load(db, user_id).await.map_err(SaveError::Database)
-}
-
-async fn save_in_transaction(
-    db: &DatabaseTransaction,
-    user_id: Uuid,
-    incoming: SyncBundle,
-) -> Result<(), DbErr> {
-    db.execute_unprepared("SET LOCAL statement_timeout = '5s'")
-        .await?;
+pub async fn save(tx: &UserTx, incoming: ValidatedSyncBundle) -> Result<SyncBundle, DbErr> {
+    let incoming = incoming.0;
+    let user_id = tx.user_id().0;
+    let db = tx.conn();
 
     if let Some(settings) = incoming.settings {
         db.execute(Statement::from_sql_and_values(
             DatabaseBackend::Postgres,
-            "INSERT INTO settings (user_id, settings_json, updated_at) VALUES ($1, $2, $3)
+            "INSERT INTO settings (user_id, settings_json, updated_at, server_updated_at)
+             VALUES ($1, $2, $3, NOW())
              ON CONFLICT (user_id) DO UPDATE
-             SET settings_json = EXCLUDED.settings_json, updated_at = EXCLUDED.updated_at
+             SET settings_json = EXCLUDED.settings_json,
+                 updated_at = EXCLUDED.updated_at,
+                 server_updated_at = NOW()
              WHERE settings.updated_at <= EXCLUDED.updated_at",
             vec![
                 user_id.into(),
@@ -293,27 +261,32 @@ async fn save_in_transaction(
         .await?;
     }
 
+    let selections = latest_by_key(
+        incoming.selections,
+        |s| s.trainer_id.clone(),
+        |s| s.updated_at,
+    );
     let user_algs = latest_by_key(incoming.user_algs, |a| a.alg_id.clone(), |a| a.updated_at);
     let results = latest_by_key(incoming.results, |r| r.id, |r| r.updated_at);
 
-    for selection in incoming.selections {
-        let payload = serde_json::json!({
-            "trainer_id": selection.trainer_id,
-            "selection_json": selection.selection_json
-        });
+    if !selections.is_empty() {
+        let selections = serde_json::to_value(&selections)
+            .map_err(|error| DbErr::Custom(error.to_string()))?;
         db.execute(Statement::from_sql_and_values(
             DatabaseBackend::Postgres,
-            "INSERT INTO sync_revisions (user_id, kind, entity_id, payload, updated_at)
-             VALUES ($1, 'selection', $2, $3, $4)
-             ON CONFLICT (user_id, kind, entity_id) DO UPDATE
-             SET payload = EXCLUDED.payload, updated_at = EXCLUDED.updated_at
-             WHERE sync_revisions.updated_at <= EXCLUDED.updated_at",
-            vec![
-                user_id.into(),
-                selection.trainer_id.into(),
-                payload.into(),
-                selection.updated_at.into(),
-            ],
+            "INSERT INTO user_selections
+                (user_id, trainer_id, selection_json, updated_at, server_updated_at)
+             SELECT $1, source.trainer_id, source.selection_json, source.updated_at, NOW()
+             FROM jsonb_to_recordset($2::jsonb) AS source(
+                trainer_id text, selection_json jsonb, updated_at timestamptz
+             )
+             ON CONFLICT (user_id, trainer_id) DO UPDATE
+             SET selection_json = EXCLUDED.selection_json,
+                 updated_at = EXCLUDED.updated_at,
+                 server_updated_at = NOW()
+             WHERE user_selections.user_id = EXCLUDED.user_id
+               AND user_selections.updated_at <= EXCLUDED.updated_at",
+            vec![user_id.into(), selections.into()],
         ))
         .await?;
     }
@@ -324,9 +297,9 @@ async fn save_in_transaction(
         db.execute(Statement::from_sql_and_values(
             DatabaseBackend::Postgres,
             "INSERT INTO user_algs
-                (user_id, trainer_id, case_id, alg_id, alg, position, hidden, deleted, updated_at)
+                (user_id, trainer_id, case_id, alg_id, alg, position, hidden, deleted, updated_at, server_updated_at)
              SELECT $1, source.trainer_id, source.case_id, source.alg_id, source.alg,
-                    source.position, source.hidden, source.deleted, source.updated_at
+                    source.position, source.hidden, source.deleted, source.updated_at, NOW()
              FROM jsonb_to_recordset($2::jsonb) AS source(
                 trainer_id text, case_id text, alg_id text, alg text, position integer,
                 hidden boolean, deleted boolean, updated_at timestamptz
@@ -334,7 +307,8 @@ async fn save_in_transaction(
              ON CONFLICT (user_id, alg_id) DO UPDATE
              SET trainer_id = EXCLUDED.trainer_id, case_id = EXCLUDED.case_id,
                  alg = EXCLUDED.alg, position = EXCLUDED.position, hidden = EXCLUDED.hidden,
-                 deleted = EXCLUDED.deleted, updated_at = EXCLUDED.updated_at
+                 deleted = EXCLUDED.deleted, updated_at = EXCLUDED.updated_at,
+                 server_updated_at = NOW()
              WHERE user_algs.user_id = EXCLUDED.user_id
                AND user_algs.updated_at <= EXCLUDED.updated_at",
             vec![user_id.into(), user_algs.into()],
@@ -348,9 +322,9 @@ async fn save_in_transaction(
         db.execute(Statement::from_sql_and_values(
             DatabaseBackend::Postgres,
             "INSERT INTO results
-                (id, user_id, datetime, result_ms, trainer_id, case_id, updated_at, deleted)
+                (id, user_id, datetime, result_ms, trainer_id, case_id, updated_at, deleted, server_updated_at)
              SELECT source.id, $1, source.datetime, source.result_ms, source.trainer_id,
-                    source.case_id, source.updated_at, source.deleted
+                    source.case_id, source.updated_at, source.deleted, NOW()
              FROM jsonb_to_recordset($2::jsonb) AS source(
                 id uuid, datetime timestamptz, result_ms bigint, trainer_id text,
                 case_id text, updated_at timestamptz, deleted boolean
@@ -358,7 +332,8 @@ async fn save_in_transaction(
              ON CONFLICT (user_id, id) DO UPDATE
              SET datetime = EXCLUDED.datetime, result_ms = EXCLUDED.result_ms,
                  trainer_id = EXCLUDED.trainer_id, case_id = EXCLUDED.case_id,
-                 updated_at = EXCLUDED.updated_at, deleted = EXCLUDED.deleted
+                 updated_at = EXCLUDED.updated_at, deleted = EXCLUDED.deleted,
+                 server_updated_at = NOW()
              WHERE results.user_id = EXCLUDED.user_id
                AND results.updated_at <= EXCLUDED.updated_at",
             vec![user_id.into(), results.into()],
@@ -366,13 +341,10 @@ async fn save_in_transaction(
         .await?;
     }
 
-    db.execute(Statement::from_sql_and_values(
-        DatabaseBackend::Postgres,
-        "DELETE FROM sync_revisions WHERE user_id = $1 AND updated_at < $2",
-        vec![user_id.into(), (Utc::now() - Duration::days(30)).into()],
-    ))
-    .await?;
-    Ok(())
+    Ok(SyncBundle {
+        server_time: Some(tx.now()),
+        ..SyncBundle::default()
+    })
 }
 
 /// A single upsert statement cannot touch the same row twice, so keep only the
@@ -398,12 +370,6 @@ fn latest_by_key<T, K: std::hash::Hash + Eq>(
     latest.into_values().collect()
 }
 
-#[derive(Debug)]
-pub enum SaveError {
-    Validation(ValidationError),
-    Database(DbErr),
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -425,7 +391,7 @@ mod tests {
             ..SyncBundle::default()
         };
         assert!(matches!(
-            bundle.validate(),
+            ValidatedSyncBundle::try_from(bundle),
             Err(ValidationError::TooMany("results"))
         ));
     }
@@ -446,7 +412,7 @@ mod tests {
             ..SyncBundle::default()
         };
         assert!(matches!(
-            bundle.validate(),
+            ValidatedSyncBundle::try_from(bundle),
             Err(ValidationError::InvalidField("algorithm"))
         ));
     }

@@ -6,7 +6,9 @@ mod pwa;
 mod sync;
 
 use alg_trainers_migration::Migrator;
+use alg_trainers_shared::MeResponse;
 use chrono::Utc;
+use database::{UserId, UserTx};
 use rand::{distributions::Alphanumeric, Rng};
 use rocket::{
     http::{ContentType, Cookie, CookieJar, Header, Status},
@@ -21,7 +23,7 @@ use sea_orm::{
     QueryFilter,
 };
 use sea_orm_migration::MigratorTrait;
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
 use std::{
     collections::HashMap,
     env,
@@ -29,6 +31,7 @@ use std::{
     sync::{Arc, Mutex},
     time::{Duration, Instant},
 };
+use uuid::Uuid;
 
 const DEFAULT_SECRET_KEY: &str = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
 
@@ -123,13 +126,6 @@ struct PrivateMe(Json<MeResponse>, Header<'static>);
 #[derive(Responder)]
 struct PrivateSync(Json<sync::SyncBundle>, Header<'static>);
 
-#[derive(Serialize)]
-struct MeResponse {
-    authenticated: bool,
-    email: Option<String>,
-    wca_id: Option<String>,
-}
-
 #[derive(Deserialize)]
 struct WcaTokenResponse {
     access_token: String,
@@ -137,6 +133,7 @@ struct WcaTokenResponse {
 
 #[derive(Deserialize)]
 struct WcaUser {
+    id: Option<i64>,
     email: Option<String>,
     wca_id: Option<String>,
 }
@@ -146,18 +143,87 @@ struct WcaMeEnvelope {
     me: WcaUser,
 }
 
-fn cookie_user(cookies: &CookieJar<'_>) -> Option<String> {
-    cookies
-        .get_private("alg_trainers_session")
-        .map(|c| c.value().to_owned())
+struct AuthenticatedUser {
+    id: UserId,
+    email: String,
+    wca_id: Option<String>,
 }
 
-async fn find_user(
+struct OptionalUser(Option<AuthenticatedUser>);
+
+async fn resolve_session_user(
+    db: &DatabaseConnection,
+    cookies: &CookieJar<'_>,
+) -> Result<Option<AuthenticatedUser>, DbErr> {
+    let Some(raw) = cookies
+        .get_private("alg_trainers_session")
+        .map(|c| c.value().to_owned())
+    else {
+        return Ok(None);
+    };
+    let user = if let Ok(user_id) = Uuid::parse_str(&raw) {
+        entity::user::Entity::find_by_id(user_id).one(db).await?
+    } else {
+        // Legacy fallback for pre-migration cookies that stored email.
+        find_user_by_email(db, &raw).await?
+    };
+    Ok(user.map(|model| AuthenticatedUser {
+        id: UserId(model.id),
+        email: model.email,
+        wca_id: model.wca_id,
+    }))
+}
+
+#[rocket::async_trait]
+impl<'r> FromRequest<'r> for OptionalUser {
+    type Error = ();
+
+    async fn from_request(request: &'r Request<'_>) -> request::Outcome<Self, Self::Error> {
+        let Some(state) = request.rocket().state::<AppState>() else {
+            return request::Outcome::Error((Status::InternalServerError, ()));
+        };
+        match resolve_session_user(&state.db, request.cookies()).await {
+            Ok(user) => request::Outcome::Success(OptionalUser(user)),
+            Err(error) => {
+                tracing::error!(%error, "failed to load authenticated user");
+                request::Outcome::Error((Status::InternalServerError, ()))
+            }
+        }
+    }
+}
+
+#[rocket::async_trait]
+impl<'r> FromRequest<'r> for AuthenticatedUser {
+    type Error = ();
+
+    async fn from_request(request: &'r Request<'_>) -> request::Outcome<Self, Self::Error> {
+        match OptionalUser::from_request(request).await {
+            request::Outcome::Success(OptionalUser(Some(user))) => request::Outcome::Success(user),
+            request::Outcome::Success(OptionalUser(None)) => {
+                request::Outcome::Error((Status::Unauthorized, ()))
+            }
+            request::Outcome::Error(error) => request::Outcome::Error(error),
+            request::Outcome::Forward(status) => request::Outcome::Forward(status),
+        }
+    }
+}
+
+async fn find_user_by_email(
     db: &DatabaseConnection,
     email: &str,
 ) -> Result<Option<entity::user::Model>, DbErr> {
     entity::user::Entity::find()
         .filter(entity::user::Column::Email.eq(email))
+        .one(db)
+        .await
+}
+
+async fn find_user_by_wca_user_id(
+    db: &DatabaseConnection,
+    wca_user_id: i64,
+) -> Result<Option<entity::user::Model>, DbErr> {
+    entity::user::Entity::find()
+        .filter(entity::user::Column::WcaUserId.eq(wca_user_id))
         .one(db)
         .await
 }
@@ -187,33 +253,19 @@ fn secure_cookie_required(redirect_url: &str, configured: Option<&str>) -> bool 
 }
 
 #[rocket::get("/api/me")]
-async fn me(
-    cookies: &CookieJar<'_>,
-    state: &State<AppState>,
-    _rate_limit: ApiRateLimit,
-) -> Result<PrivateMe, Status> {
-    let email = cookie_user(cookies);
-    let (email, wca_id) = match email {
-        Some(email) => {
-            let user = find_user(&state.db, &email).await.map_err(|error| {
-                tracing::error!(%error, "failed to load authenticated user");
-                Status::InternalServerError
-            })?;
-            match user {
-                Some(user) => (Some(user.email), user.wca_id),
-                None => (None, None),
-            }
-        }
+async fn me(user: OptionalUser, _rate_limit: ApiRateLimit) -> PrivateMe {
+    let (email, wca_id) = match user.0 {
+        Some(user) => (Some(user.email), user.wca_id),
         None => (None, None),
     };
-    Ok(PrivateMe(
+    PrivateMe(
         Json(MeResponse {
             authenticated: email.is_some(),
             email,
             wca_id,
         }),
         Header::new("Cache-Control", "no-store"),
-    ))
+    )
 }
 
 #[rocket::get("/api/auth/wca")]
@@ -291,22 +343,84 @@ async fn wca_callback(
         .map_err(|_| Status::BadGateway)?;
 
     let email = envelope.me.email.ok_or(Status::Unauthorized)?;
+    let wca_user_id = envelope.me.id;
     let wca_id = envelope.me.wca_id;
-    if let Some(user) = find_user(&app_state.db, &email).await.map_err(|error| {
-        tracing::error!(%error, "failed to look up WCA user");
-        Status::InternalServerError
-    })? {
+    let existing_user = match wca_user_id {
+        Some(id) => match find_user_by_wca_user_id(&app_state.db, id)
+            .await
+            .map_err(|error| {
+                tracing::error!(%error, "failed to look up WCA user by id");
+                Status::InternalServerError
+            })? {
+            Some(user) => Some(user),
+            None => find_user_by_email(&app_state.db, &email)
+                .await
+                .map_err(|error| {
+                    tracing::error!(%error, "failed to look up WCA user by email");
+                    Status::InternalServerError
+                })?
+                // Only link by email for legacy rows that have not yet been bound to a WCA user ID.
+                .filter(|user| user.wca_user_id.is_none()),
+        },
+        None => find_user_by_email(&app_state.db, &email)
+            .await
+            .map_err(|error| {
+                tracing::error!(%error, "failed to look up WCA user by email");
+                Status::InternalServerError
+            })?,
+    };
+    let user_id = if let Some(user) = existing_user {
+        let user_id = user.id;
+        let email_changed = user.email != email;
+        if email_changed {
+            if let Some(conflicting) = find_user_by_email(&app_state.db, &email)
+                .await
+                .map_err(|error| {
+                    tracing::error!(%error, "failed to check WCA email uniqueness");
+                    Status::InternalServerError
+                })?
+            {
+                if conflicting.id != user_id {
+                    tracing::warn!(
+                        user_id = %user_id,
+                        conflicting_user_id = %conflicting.id,
+                        "WCA email change conflicts with another account"
+                    );
+                    return Err(Status::Conflict);
+                }
+            }
+        }
         let mut active: entity::user::ActiveModel = user.into();
-        active.wca_id = Set(wca_id.clone());
+        if email_changed {
+            active.email = Set(email);
+        }
+        if let Some(id) = wca_user_id {
+            active.wca_user_id = Set(Some(id));
+        }
+        active.wca_id = Set(wca_id);
         active.update(&app_state.db).await.map_err(|error| {
             tracing::error!(%error, "failed to update WCA user");
             Status::InternalServerError
         })?;
+        user_id
     } else {
+        if find_user_by_email(&app_state.db, &email)
+            .await
+            .map_err(|error| {
+                tracing::error!(%error, "failed to check WCA email availability");
+                Status::InternalServerError
+            })?
+            .is_some()
+        {
+            tracing::warn!("WCA login email already belongs to another WCA user ID");
+            return Err(Status::Conflict);
+        }
+        let user_id = Uuid::new_v4();
         entity::user::ActiveModel {
-            id: Set(uuid::Uuid::new_v4()),
-            email: Set(email.clone()),
-            wca_id: Set(wca_id.clone()),
+            id: Set(user_id),
+            email: Set(email),
+            wca_user_id: Set(wca_user_id),
+            wca_id: Set(wca_id),
             created_at: Set(Utc::now()),
         }
         .insert(&app_state.db)
@@ -315,8 +429,9 @@ async fn wca_callback(
             tracing::error!(%error, "failed to create WCA user");
             Status::InternalServerError
         })?;
-    }
-    let mut cookie = Cookie::new("alg_trainers_session", email.clone());
+        user_id
+    };
+    let mut cookie = Cookie::new("alg_trainers_session", user_id.to_string());
     cookie.set_http_only(true);
     cookie.set_same_site(rocket::http::SameSite::Lax);
     cookie.set_secure(app_state.cookie_secure);
@@ -440,22 +555,23 @@ async fn mobile_png() -> Option<rocket::fs::NamedFile> {
     rocket::fs::NamedFile::open("mobile.png").await.ok()
 }
 
-#[rocket::get("/api/sync?<before_datetime>&<before_id>")]
+#[rocket::get("/api/sync?<since>&<before_datetime>&<before_id>")]
 async fn sync_get(
-    cookies: &CookieJar<'_>,
+    user: AuthenticatedUser,
     state: &State<AppState>,
     _rate_limit: ApiRateLimit,
+    since: Option<String>,
     before_datetime: Option<String>,
     before_id: Option<String>,
 ) -> Result<PrivateSync, Status> {
-    let email = cookie_user(cookies).ok_or(Status::Unauthorized)?;
-    let user = find_user(&state.db, &email)
-        .await
-        .map_err(|error| {
-            tracing::error!(%error, "failed to load sync user");
-            Status::InternalServerError
-        })?
-        .ok_or(Status::Unauthorized)?;
+    let since = match since {
+        Some(value) => Some(
+            chrono::DateTime::parse_from_rfc3339(&value)
+                .map_err(|_| Status::BadRequest)?
+                .with_timezone(&Utc),
+        ),
+        None => None,
+    };
     let cursor = match (before_datetime, before_id) {
         (None, None) => None,
         (Some(datetime), Some(id)) => Some(sync::ResultCursor {
@@ -466,43 +582,51 @@ async fn sync_get(
         }),
         _ => return Err(Status::BadRequest),
     };
-    sync::load_page(&state.db, user.id, cursor)
-        .await
-        .map(|bundle| PrivateSync(Json(bundle), Header::new("Cache-Control", "no-store")))
-        .map_err(|error| {
-            tracing::error!(%error, user_id = %user.id, "failed to load sync data");
-            Status::InternalServerError
-        })
+    let tx = UserTx::begin(&state.db, user.id).await.map_err(|error| {
+        tracing::error!(%error, user_id = %user.id, "failed to begin user transaction");
+        Status::InternalServerError
+    })?;
+    let bundle = sync::load_page(&tx, since, cursor).await.map_err(|error| {
+        tracing::error!(%error, user_id = %user.id, "failed to load sync data");
+        Status::InternalServerError
+    })?;
+    tx.commit().await.map_err(|error| {
+        tracing::error!(%error, user_id = %user.id, "failed to commit sync read transaction");
+        Status::InternalServerError
+    })?;
+    Ok(PrivateSync(
+        Json(bundle),
+        Header::new("Cache-Control", "no-store"),
+    ))
 }
 
 #[rocket::put("/api/sync", data = "<bundle>")]
 async fn sync_put(
-    cookies: &CookieJar<'_>,
+    user: AuthenticatedUser,
     state: &State<AppState>,
     bundle: Json<sync::SyncBundle>,
     _rate_limit: ApiRateLimit,
 ) -> Result<PrivateSync, Status> {
-    let email = cookie_user(cookies).ok_or(Status::Unauthorized)?;
-    let user = find_user(&state.db, &email)
-        .await
-        .map_err(|error| {
-            tracing::error!(%error, "failed to load sync user");
-            Status::InternalServerError
-        })?
-        .ok_or(Status::Unauthorized)?;
-    sync::save(&state.db, user.id, bundle.into_inner())
-        .await
-        .map(|bundle| PrivateSync(Json(bundle), Header::new("Cache-Control", "no-store")))
-        .map_err(|error| match error {
-            sync::SaveError::Validation(error) => {
-                tracing::warn!(%error, user_id = %user.id, "rejected invalid sync payload");
-                Status::UnprocessableEntity
-            }
-            sync::SaveError::Database(error) => {
-                tracing::error!(%error, user_id = %user.id, "failed to save sync payload");
-                Status::InternalServerError
-            }
-        })
+    let validated = sync::ValidatedSyncBundle::try_from(bundle.into_inner()).map_err(|error| {
+        tracing::warn!(%error, user_id = %user.id, "rejected invalid sync payload");
+        Status::UnprocessableEntity
+    })?;
+    let tx = UserTx::begin(&state.db, user.id).await.map_err(|error| {
+        tracing::error!(%error, user_id = %user.id, "failed to begin user transaction");
+        Status::InternalServerError
+    })?;
+    let response = sync::save(&tx, validated).await.map_err(|error| {
+        tracing::error!(%error, user_id = %user.id, "failed to save sync payload");
+        Status::InternalServerError
+    })?;
+    tx.commit().await.map_err(|error| {
+        tracing::error!(%error, user_id = %user.id, "failed to commit sync write transaction");
+        Status::InternalServerError
+    })?;
+    Ok(PrivateSync(
+        Json(response),
+        Header::new("Cache-Control", "no-store"),
+    ))
 }
 
 #[rocket::get("/")]
@@ -560,6 +684,14 @@ async fn rocket() -> _ {
         Migrator::up(&db, None)
             .await
             .expect("Database migrations failed");
+        if let Some(app_password) = env::var("DATABASE_APP_PASSWORD")
+            .ok()
+            .filter(|value| !value.is_empty())
+        {
+            database::configure_app_role_password(&db, &app_password)
+                .await
+                .expect("Unable to configure alg_trainers_app role password");
+        }
         catalog::seed(&db, &catalog_root)
             .await
             .expect("Unable to seed trainer catalog");
@@ -652,7 +784,7 @@ fn env_bool(name: &str) -> Result<bool, &'static str> {
 
 #[cfg(test)]
 mod tests {
-    use super::secure_cookie_required;
+    use super::{secure_cookie_required, MeResponse};
 
     #[test]
     fn http_callback_cannot_set_secure_oauth_cookie() {
@@ -672,5 +804,17 @@ mod tests {
             "https://trainer.example/api/auth/wca/callback",
             None
         ));
+    }
+
+    #[test]
+    fn me_response_serializes_wca_id_as_camel_case() {
+        let value = serde_json::to_value(MeResponse {
+            authenticated: true,
+            email: Some("user@example.com".to_owned()),
+            wca_id: Some("2020TEST01".to_owned()),
+        })
+        .expect("serialize MeResponse");
+        assert_eq!(value["wcaId"], "2020TEST01");
+        assert!(value.get("wca_id").is_none());
     }
 }

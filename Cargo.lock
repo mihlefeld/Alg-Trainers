@@ -50,6 +50,7 @@ dependencies = [
 name = "alg-trainers-frontend"
 version = "0.5.0"
 dependencies = [
+ "alg-trainers-shared",
  "base64 0.22.1",
  "gloo-net 0.6.0",
  "gloo-storage 0.3.0",
@@ -78,6 +79,7 @@ name = "alg-trainers-server"
 version = "0.1.0"
 dependencies = [
  "alg-trainers-migration",
+ "alg-trainers-shared",
  "base64 0.22.1",
  "chrono",
  "rand 0.8.8",
@@ -91,6 +93,14 @@ dependencies = [
  "tracing-subscriber",
  "urlencoding",
  "uuid",
+]
+
+[[package]]
+name = "alg-trainers-shared"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "serde_json",
 ]
 
 [[package]]

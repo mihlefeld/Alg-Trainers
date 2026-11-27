@@ -1,11 +1,11 @@
 use crate::components::settings_controls::SettingsSection;
 use crate::models::MeResponse;
 use crate::services::api::{fetch_account_status, load_cached_account, logout};
-use crate::services::pwa::isNavigatorOnline;
-use crate::services::sync::{last_sync_label, sync_now};
+use crate::services::pwa::{applyPwaUpdate, checkForPwaUpdate, isNavigatorOnline};
+use crate::services::sync::{last_sync_label, sync_now, SyncOutcome};
 use wasm_bindgen::closure::Closure;
 use wasm_bindgen::JsCast;
-use wasm_bindgen_futures::spawn_local;
+use wasm_bindgen_futures::{spawn_local, JsFuture};
 use yew::prelude::*;
 
 #[function_component(AccountSettings)]
@@ -15,6 +15,9 @@ pub fn account_settings() -> Html {
     let syncing = use_state(|| false);
     let sync_time = use_state(last_sync_label);
     let error = use_state(|| None::<String>);
+    let checking_updates = use_state(|| false);
+    let update_ready = use_state(|| false);
+    let update_status = use_state(|| None::<String>);
 
     {
         let account = account.clone();
@@ -60,11 +63,13 @@ pub fn account_settings() -> Html {
     }
 
     let force_sync = {
+        let account = account.clone();
         let syncing = syncing.clone();
         let sync_time = sync_time.clone();
         let offline = offline.clone();
         let error = error.clone();
         Callback::from(move |_| {
+            let account = account.clone();
             let syncing = syncing.clone();
             let sync_time = sync_time.clone();
             let offline = offline.clone();
@@ -72,19 +77,84 @@ pub fn account_settings() -> Html {
             syncing.set(true);
             error.set(None);
             spawn_local(async move {
-                let before = last_sync_label();
-                sync_now(true).await;
-                let after = last_sync_label();
-                if before == after {
-                    offline.set(!isNavigatorOnline());
-                    error.set(Some(
-                        "Sync did not complete. Please try again when online.".to_owned(),
-                    ));
-                } else {
-                    offline.set(false);
+                let outcome = sync_now(true).await;
+                match outcome {
+                    SyncOutcome::Synced | SyncOutcome::Throttled => {
+                        offline.set(false);
+                        error.set(None);
+                    }
+                    SyncOutcome::Offline => {
+                        offline.set(true);
+                        error.set(outcome.user_message());
+                    }
+                    SyncOutcome::Unauthenticated => {
+                        offline.set(false);
+                        account.set(MeResponse::default());
+                        error.set(outcome.user_message());
+                    }
+                    other => {
+                        offline.set(false);
+                        error.set(other.user_message());
+                    }
                 }
-                sync_time.set(after);
+                sync_time.set(last_sync_label());
                 syncing.set(false);
+            });
+        })
+    };
+
+    let on_check_updates = {
+        let checking_updates = checking_updates.clone();
+        let update_ready = update_ready.clone();
+        let update_status = update_status.clone();
+        Callback::from(move |_| {
+            if *update_ready {
+                if applyPwaUpdate() {
+                    update_status.set(Some("Installing update...".to_owned()));
+                } else {
+                    update_ready.set(false);
+                    update_status.set(Some("Unable to install update. Please reload.".to_owned()));
+                }
+                return;
+            }
+            let checking_updates = checking_updates.clone();
+            let update_ready = update_ready.clone();
+            let update_status = update_status.clone();
+            checking_updates.set(true);
+            update_status.set(None);
+            spawn_local(async move {
+                let status = match checkForPwaUpdate() {
+                    Ok(promise) => JsFuture::from(promise)
+                        .await
+                        .ok()
+                        .and_then(|value| value.as_string())
+                        .unwrap_or_else(|| "error".to_owned()),
+                    Err(_) => "error".to_owned(),
+                };
+                match status.as_str() {
+                    "available" => {
+                        update_ready.set(true);
+                        update_status.set(Some("Update available and ready to install.".to_owned()));
+                    }
+                    "up-to-date" => {
+                        update_ready.set(false);
+                        update_status.set(Some("You are on the latest version.".to_owned()));
+                    }
+                    "offline" => {
+                        update_status.set(Some("Offline — cannot check for updates.".to_owned()));
+                    }
+                    "unsupported" => {
+                        update_status.set(Some(
+                            "App updates are not supported in this browser.".to_owned(),
+                        ));
+                    }
+                    _ => {
+                        update_status.set(Some(
+                            "Unable to check for updates. Please try again.".to_owned(),
+                        ));
+                    }
+                }
+                checking_updates.set(false);
             });
         })
     };
@@ -127,6 +197,23 @@ pub fn account_settings() -> Html {
                             {if *syncing { "Syncing..." } else { "Sync now" }}
                         </button>
                     </div>
+                    <div class="settingsEntry accountUpdates">
+                        <div class="colFlex">
+                            <b>{"App updates"}</b>
+                            if let Some(status) = update_status.as_ref() {
+                                <span>{status}</span>
+                            }
+                        </div>
+                        <button class="abutton" disabled={*checking_updates} onclick={on_check_updates.clone()}>
+                            {if *checking_updates {
+                                "Checking..."
+                            } else if *update_ready {
+                                "Update now"
+                            } else {
+                                "Look for updates"
+                            }}
+                        </button>
+                    </div>
                     <div class="settingsEntry">
                         <div></div>
                         <button class="abutton" disabled={*offline} onclick={on_logout}>{"Sign out"}</button>
@@ -144,6 +231,23 @@ pub fn account_settings() -> Html {
                         if !*offline {
                             <a class="abutton" href="/api/auth/wca">{"Sign in with WCA"}</a>
                         }
+                    </div>
+                    <div class="settingsEntry accountUpdates">
+                        <div class="colFlex">
+                            <b>{"App updates"}</b>
+                            if let Some(status) = update_status.as_ref() {
+                                <span>{status}</span>
+                            }
+                        </div>
+                        <button class="abutton" disabled={*checking_updates} onclick={on_check_updates}>
+                            {if *checking_updates {
+                                "Checking..."
+                            } else if *update_ready {
+                                "Update now"
+                            } else {
+                                "Look for updates"
+                            }}
+                        </button>
                     </div>
                 }
                 if let Some(message) = error.as_ref() {

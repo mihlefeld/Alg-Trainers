@@ -12,6 +12,7 @@ pub struct Model {
     pub trainer_id: String,
     pub case_id: String,
     pub updated_at: DateTimeUtc,
+    pub server_updated_at: DateTimeUtc,
     pub deleted: bool,
 }
 

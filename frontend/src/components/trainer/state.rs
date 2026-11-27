@@ -253,6 +253,103 @@ pub fn use_trainer_controller(bundle: Rc<TrainerBundle>) -> TrainerController {
         });
     }
 
+    // Reload trainer state from browser storage whenever remote sync completes.
+    {
+        let trainer_id = bundle.trainer_id.clone();
+        let selection_key = selection_storage_key.clone();
+        let times_key = times_storage_key.clone();
+        let cases = bundle.cases.clone();
+        let selected = selected.clone();
+        let selected_algsets = selected_algsets.clone();
+        let stored_results = stored_results.clone();
+        let presets = presets.clone();
+        let custom_algs = custom_algs.clone();
+        use_effect_with(trainer_id, move |_| {
+            let listener = Closure::<dyn FnMut(web_sys::Event)>::new(move |_| {
+                let selection_key = selection_key.clone();
+                let times_key = times_key.clone();
+                let cases = cases.clone();
+                let selected = selected.clone();
+                let selected_algsets = selected_algsets.clone();
+                let stored_results = stored_results.clone();
+                let presets = presets.clone();
+                let custom_algs = custom_algs.clone();
+                spawn_local(async move {
+                    if let Some(value) = get_stored(&selection_key).await {
+                        if let Ok(parsed) = serde_json::from_str::<Vec<String>>(&value) {
+                            selected.set(parsed);
+                        } else if let Ok(parsed) = serde_json::from_str::<serde_json::Value>(&value)
+                        {
+                            if let Some(cases) =
+                                parsed.get("cases").and_then(serde_json::Value::as_array)
+                            {
+                                selected.set(
+                                    cases
+                                        .iter()
+                                        .filter_map(serde_json::Value::as_str)
+                                        .map(str::to_owned)
+                                        .collect(),
+                                );
+                            }
+                            if let Some(algsets) =
+                                parsed.get("algsets").and_then(serde_json::Value::as_object)
+                            {
+                                selected_algsets.set(
+                                    algsets
+                                        .iter()
+                                        .filter_map(|(name, value)| {
+                                            value.as_bool().map(|value| (name.clone(), value))
+                                        })
+                                        .collect(),
+                                );
+                            }
+                        }
+                    }
+                    if let Some(value) = get_stored(&format!("{selection_key}Algsets")).await {
+                        if let Ok(parsed) = serde_json::from_str::<BTreeMap<String, bool>>(&value) {
+                            selected_algsets.set(parsed);
+                        }
+                    }
+                    if let Some(value) = get_stored(&times_key).await {
+                        if let Some((parsed, _)) = results::parse_stored_results(&times_key, &value)
+                        {
+                            stored_results.set(
+                                parsed
+                                    .into_iter()
+                                    .filter(|result| !result.deleted)
+                                    .collect(),
+                            );
+                        }
+                    }
+                    if let Some(value) = get_stored(&format!("{selection_key}Presets")).await {
+                        if let Ok(parsed) =
+                            serde_json::from_str::<BTreeMap<String, SelectionPreset>>(&value)
+                        {
+                            presets.set(parsed);
+                        }
+                    }
+                    let loaded_algs = load_custom_algs(&selection_key, &cases).await;
+                    custom_algs.set(loaded_algs);
+                });
+            });
+            let window = web_sys::window();
+            if let Some(window) = window.as_ref() {
+                let _ = window.add_event_listener_with_callback(
+                    "alg-trainers-sync",
+                    listener.as_ref().unchecked_ref(),
+                );
+            }
+            move || {
+                if let Some(window) = window {
+                    let _ = window.remove_event_listener_with_callback(
+                        "alg-trainers-sync",
+                        listener.as_ref().unchecked_ref(),
+                    );
+                }
+            }
+        });
+    }
+
     // Sync trainer mode with browser query string (?train / ?recap) and history navigation.
     {
         let mode = mode.clone();
@@ -379,16 +476,18 @@ pub fn use_trainer_controller(bundle: Rc<TrainerBundle>) -> TrainerController {
                 last_case.set(Some(case.clone()));
                 last_scramble.set((*current_scramble).clone());
                 let mut next = (*stored_results).clone();
+                let now = Date::new_0()
+                    .to_iso_string()
+                    .as_string()
+                    .unwrap_or_default();
                 next.push(StoredResult {
                     id: results::make_uuid(),
-                    datetime: Date::new_0()
-                        .to_iso_string()
-                        .as_string()
-                        .unwrap_or_default(),
+                    datetime: now.clone(),
                     ms,
                     case: case.case_id.clone(),
                     time: results::format_time(ms),
                     deleted: false,
+                    updated_at: Some(now),
                 });
                 stored_results.set(next.clone());
                 let key = times_key.clone();

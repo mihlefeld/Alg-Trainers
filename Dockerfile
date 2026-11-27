@@ -5,11 +5,12 @@ RUN --mount=type=cache,id=alg-trainers-chef-registry,target=/usr/local/cargo/reg
     cargo install cargo-chef --version 0.1.72 --locked
 WORKDIR /app
 COPY Cargo.toml Cargo.lock* ./
+COPY shared/Cargo.toml shared/Cargo.toml
 COPY backend/Cargo.toml backend/Cargo.toml
 COPY backend/migration/Cargo.toml backend/migration/Cargo.toml
 COPY frontend/Cargo.toml frontend/Cargo.toml
-RUN mkdir -p backend/src backend/migration/src frontend/src \
-    && touch backend/src/main.rs backend/migration/src/lib.rs frontend/src/lib.rs
+RUN mkdir -p shared/src backend/src backend/migration/src frontend/src \
+    && touch shared/src/lib.rs backend/src/main.rs backend/migration/src/lib.rs frontend/src/lib.rs
 RUN cargo chef prepare --recipe-path recipe.json
 
 FROM chef AS frontend-tools
@@ -32,6 +33,7 @@ RUN --mount=type=cache,id=alg-trainers-frontend-target,target=/app/target \
       --target wasm32-unknown-unknown --package alg-trainers-frontend
 
 FROM frontend-tools AS frontend-builder
+COPY shared shared
 COPY frontend frontend
 COPY Trunk.toml Trunk.toml
 RUN --mount=type=cache,id=alg-trainers-frontend-target,target=/app/target \
@@ -45,6 +47,7 @@ RUN --mount=type=cache,id=alg-trainers-backend-target,target=/app/target \
     --mount=type=cache,id=alg-trainers-backend-registry,target=/usr/local/cargo/registry \
     --mount=type=cache,id=alg-trainers-backend-git,target=/usr/local/cargo/git \
     cargo chef cook --recipe-path recipe.json --release --package alg-trainers-server
+COPY shared shared
 COPY backend backend
 RUN --mount=type=cache,id=alg-trainers-backend-target,target=/app/target \
     --mount=type=cache,id=alg-trainers-backend-registry,target=/usr/local/cargo/registry \

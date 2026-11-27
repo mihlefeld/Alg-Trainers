@@ -14,6 +14,7 @@ pub struct Model {
     pub hidden: bool,
     pub deleted: bool,
     pub updated_at: DateTimeUtc,
+    pub server_updated_at: DateTimeUtc,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]

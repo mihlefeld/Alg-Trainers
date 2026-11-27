@@ -1,5 +1,6 @@
 use crate::models::{ResultSync, StoredResult};
 use js_sys::Math;
+use std::collections::HashMap;
 
 pub fn format_time(ms: i64) -> String {
     if ms >= 60_000 {
@@ -106,24 +107,34 @@ pub fn compare_results(left: &StoredResult, right: &StoredResult) -> std::cmp::O
         .then_with(|| left.id.cmp(&right.id))
 }
 
-pub fn merge_remote_result(mut merged: Vec<StoredResult>, result: ResultSync) -> Vec<StoredResult> {
-    if result.deleted {
-        merged.retain(|existing| existing.id != result.id);
-    } else {
-        let stored = StoredResult {
-            id: result.id,
-            datetime: result.datetime,
-            ms: result.result_ms,
-            case: result.case_id,
-            time: format_time(result.result_ms),
-            deleted: false,
-        };
-        if let Some(existing) = merged.iter_mut().find(|existing| existing.id == stored.id) {
-            *existing = stored;
+pub fn merge_remote_results(
+    existing: Vec<StoredResult>,
+    incoming: Vec<ResultSync>,
+) -> Vec<StoredResult> {
+    if incoming.is_empty() {
+        return existing;
+    }
+    let mut by_id: HashMap<String, StoredResult> = existing
+        .into_iter()
+        .map(|item| (item.id.clone(), item))
+        .collect();
+    for result in incoming {
+        if result.deleted {
+            by_id.remove(&result.id);
         } else {
-            merged.push(stored);
+            let stored = StoredResult {
+                id: result.id.clone(),
+                datetime: result.datetime,
+                ms: result.result_ms,
+                case: result.case_id,
+                time: format_time(result.result_ms),
+                deleted: false,
+                updated_at: Some(result.updated_at),
+            };
+            by_id.insert(result.id, stored);
         }
     }
+    let mut merged: Vec<StoredResult> = by_id.into_values().collect();
     merged.sort_by(compare_results);
     merged
 }
@@ -253,6 +264,7 @@ mod tests {
                 case: "1".to_owned(),
                 time: "0.002".to_owned(),
                 deleted: false,
+                updated_at: None,
             },
             StoredResult {
                 id: "a".to_owned(),
@@ -261,6 +273,7 @@ mod tests {
                 case: "1".to_owned(),
                 time: "0.001".to_owned(),
                 deleted: false,
+                updated_at: None,
             },
         ];
         results.sort_by(compare_results);
@@ -283,6 +296,7 @@ mod tests {
             case: "1".to_owned(),
             time: "1.00".to_owned(),
             deleted: false,
+            updated_at: None,
         };
         let tombstone = ResultSync {
             id: result.id.clone(),
@@ -294,7 +308,61 @@ mod tests {
             deleted: true,
         };
 
-        assert!(merge_remote_result(vec![result], tombstone).is_empty());
+        assert!(merge_remote_results(vec![result], vec![tombstone]).is_empty());
+    }
+
+    #[test]
+    fn batch_merge_applies_inserts_updates_and_tombstones() {
+        let existing = vec![
+            StoredResult {
+                id: "keep".to_owned(),
+                datetime: "2026-01-01T00:00:00Z".to_owned(),
+                ms: 1000,
+                case: "1".to_owned(),
+                time: "1.00".to_owned(),
+                deleted: false,
+                updated_at: None,
+            },
+            StoredResult {
+                id: "remove".to_owned(),
+                datetime: "2026-01-01T00:00:01Z".to_owned(),
+                ms: 2000,
+                case: "1".to_owned(),
+                time: "2.00".to_owned(),
+                deleted: false,
+                updated_at: None,
+            },
+        ];
+        let incoming = vec![
+            ResultSync {
+                id: "remove".to_owned(),
+                datetime: "2026-01-01T00:00:01Z".to_owned(),
+                result_ms: 2000,
+                trainer_id: "trainer".to_owned(),
+                case_id: "1".to_owned(),
+                updated_at: "2026-01-02T00:00:00Z".to_owned(),
+                deleted: true,
+            },
+            ResultSync {
+                id: "added".to_owned(),
+                datetime: "2026-01-01T00:00:02Z".to_owned(),
+                result_ms: 1500,
+                trainer_id: "trainer".to_owned(),
+                case_id: "2".to_owned(),
+                updated_at: "2026-01-02T00:00:00Z".to_owned(),
+                deleted: false,
+            },
+        ];
+
+        let merged = merge_remote_results(existing, incoming);
+        assert_eq!(
+            merged.iter().map(|r| r.id.as_str()).collect::<Vec<_>>(),
+            vec!["keep", "added"]
+        );
+        assert_eq!(
+            merged[1].updated_at.as_deref(),
+            Some("2026-01-02T00:00:00Z")
+        );
     }
 
     #[test]
@@ -320,6 +388,7 @@ mod tests {
                 case: "c".to_owned(),
                 time: "1.00".to_owned(),
                 deleted: false,
+                updated_at: None,
             },
             StoredResult {
                 id: "2".to_owned(),
@@ -328,6 +397,7 @@ mod tests {
                 case: "c".to_owned(),
                 time: "3.00".to_owned(),
                 deleted: false,
+                updated_at: None,
             },
         ];
         let refs = items.iter().collect::<Vec<_>>();

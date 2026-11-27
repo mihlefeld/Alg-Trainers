@@ -7,6 +7,7 @@ edition = "2021"
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
+alg-trainers-shared = { path = "../shared" }
 yew = { version = "0.21", features = ["csr"] }
 yew-router = "0.18"
 gloo-net = "0.6"

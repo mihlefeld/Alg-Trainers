@@ -7,6 +7,8 @@ pub struct Model {
     pub id: Uuid,
     #[sea_orm(unique)]
     pub email: String,
+    #[sea_orm(unique)]
+    pub wca_user_id: Option<i64>,
     pub wca_id: Option<String>,
     pub created_at: DateTimeUtc,
 }
@@ -19,6 +21,8 @@ pub enum Relation {
     Result,
     #[sea_orm(has_many = "super::user_alg::Entity")]
     UserAlg,
+    #[sea_orm(has_many = "super::user_selection::Entity")]
+    UserSelection,
     #[sea_orm(has_many = "super::sync_revision::Entity")]
     SyncRevision,
 }
@@ -38,6 +42,12 @@ impl Related<super::result::Entity> for Entity {
 impl Related<super::user_alg::Entity> for Entity {
     fn to() -> RelationDef {
         Relation::UserAlg.def()
+    }
+}
+
+impl Related<super::user_selection::Entity> for Entity {
+    fn to() -> RelationDef {
+        Relation::UserSelection.def()
     }
 }
 

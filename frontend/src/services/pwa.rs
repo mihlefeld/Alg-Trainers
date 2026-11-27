@@ -80,6 +80,57 @@ export function applyPwaUpdate() {
   return true;
 }
 
+export async function checkForPwaUpdate() {
+  if (!("serviceWorker" in navigator)) {
+    return "unsupported";
+  }
+  if (navigator.onLine === false) {
+    return "offline";
+  }
+  try {
+    let registration = swRegistration || (await navigator.serviceWorker.getRegistration());
+    if (!registration) {
+      registration = await navigator.serviceWorker.register("/sw.js", { updateViaCache: "none" });
+    }
+    swRegistration = registration;
+    if (registration.waiting) {
+      notifyUpdateAvailable();
+      return "available";
+    }
+    await registration.update();
+    if (registration.waiting) {
+      notifyUpdateAvailable();
+      return "available";
+    }
+    const installing = registration.installing;
+    if (installing) {
+      trackInstallingWorker(installing);
+      const result = await new Promise((resolve) => {
+        const onStateChange = () => {
+          if (installing.state === "installed") {
+            installing.removeEventListener("statechange", onStateChange);
+            if (navigator.serviceWorker.controller) {
+              notifyUpdateAvailable();
+              resolve("available");
+            } else {
+              resolve("up-to-date");
+            }
+          } else if (installing.state === "redundant") {
+            installing.removeEventListener("statechange", onStateChange);
+            resolve("error");
+          }
+        };
+        installing.addEventListener("statechange", onStateChange);
+      });
+      return result;
+    }
+    return "up-to-date";
+  } catch (error) {
+    console.warn("Update check failed:", error);
+    return navigator.onLine === false ? "offline" : "error";
+  }
+}
+
 export function isNavigatorOnline() {
   return typeof navigator === "undefined" ? true : navigator.onLine !== false;
 }
@@ -87,5 +138,7 @@ export function isNavigatorOnline() {
 extern "C" {
     pub fn initPwa(on_update_available: &Closure<dyn FnMut()>);
     pub fn applyPwaUpdate() -> bool;
+    #[wasm_bindgen(catch)]
+    pub fn checkForPwaUpdate() -> Result<js_sys::Promise, JsValue>;
     pub fn isNavigatorOnline() -> bool;
 }
