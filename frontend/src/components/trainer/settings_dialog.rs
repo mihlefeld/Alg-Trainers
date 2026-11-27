@@ -129,6 +129,7 @@ pub fn settings_dialog(props: &SettingsDialogProps) -> Html {
 
             <SettingsSection title="Behavior">
                 <div class="colFlex">
+                    <div class="trainerScrambleHelp">{"Hold down delay is specific to this device."}</div>
                     {for BEHAVIOR_TOGGLES.into_iter().map(|(key, label)| {
                         let checked = settings
                             .get(key)
@@ -192,6 +193,7 @@ pub fn settings_dialog(props: &SettingsDialogProps) -> Html {
 
             <SettingsSection title="Styling">
                 <div class="colFlex">
+                    <div class="trainerScrambleHelp">{"Sizes are specific to this device."}</div>
                     {for SIZE_SETTINGS.into_iter().map(|(key, label)| {
                         let next_inc = settings.clone();
                         let next_dec = settings.clone();

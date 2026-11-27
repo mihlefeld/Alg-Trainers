@@ -1,5 +1,5 @@
 use crate::logic::{cube_schemes, theme};
-use crate::services::storage::{load_settings, save_settings_async};
+use crate::services::storage::{load_settings, save_settings_async, syncable_settings};
 use std::rc::Rc;
 use wasm_bindgen_futures::spawn_local;
 use yew::prelude::*;
@@ -43,9 +43,11 @@ pub fn settings_provider(props: &SettingsProviderProps) -> Html {
     let update = {
         let settings = settings.clone();
         Callback::from(move |next: serde_json::Value| {
+            let device_only =
+                syncable_settings((**settings).clone()) == syncable_settings(next.clone());
             theme::apply_settings(&next);
             settings.set(Rc::new(next.clone()));
-            save_settings_async(next);
+            save_settings_async(next, device_only);
         })
     };
 

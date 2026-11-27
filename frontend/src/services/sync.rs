@@ -6,7 +6,7 @@ use crate::models::{
 use crate::services::api::save_cached_account;
 use crate::services::storage::{
     get_stored, metadataGet, metadataPut, put_stored, put_stored_if_clean, storageAll,
-    storageClearDirtyIfUnchanged, SETTINGS_KEY,
+    storageClearDirtyIfUnchanged, syncable_settings, SETTINGS_KEY,
 };
 use gloo_net::http::Request;
 use gloo_timers::callback::{Interval, Timeout};
@@ -399,7 +399,7 @@ async fn sync_once(force: bool) -> SyncOutcome {
         if key == SETTINGS_KEY {
             if let Ok(settings_json) = serde_json::from_str(value) {
                 bundle.settings = Some(SettingsSync {
-                    settings_json,
+                    settings_json: syncable_settings(settings_json),
                     updated_at: updated_at.clone(),
                 });
             }

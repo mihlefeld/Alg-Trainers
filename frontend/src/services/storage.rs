@@ -5,6 +5,20 @@ use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::{spawn_local, JsFuture};
 
 pub const SETTINGS_KEY: &str = "ALLGSettings";
+const DEVICE_SETTINGS_KEYS: &[&str] = &["enableHoldDelay", "baseSize", "timerSize", "scrambleSize"];
+
+pub fn syncable_settings(mut settings: serde_json::Value) -> serde_json::Value {
+    if let Some(object) = settings.as_object_mut() {
+        for key in DEVICE_SETTINGS_KEYS {
+            object.remove(*key);
+        }
+    }
+    settings
+}
+
+fn device_settings_keys_json() -> String {
+    serde_json::to_string(DEVICE_SETTINGS_KEYS).expect("setting keys are serializable")
+}
 
 #[wasm_bindgen(inline_js = r#"
 function openStorage() {
@@ -67,31 +81,93 @@ export async function storageGet(key) {
     request.onerror = () => reject(request.error);
   });
 }
-export async function storagePut(key, value) {
+function sharedSettings(value, deviceKeys) {
+  const settings = JSON.parse(value);
+  if (!settings || typeof settings !== "object" || Array.isArray(settings)) {
+    throw new Error("Invalid settings");
+  }
+  for (const key of deviceKeys) delete settings[key];
+  return settings;
+}
+export async function storagePut(key, value, deviceKeysJson, deviceOnly) {
   const db = await openStorage();
+  const deviceKeys = JSON.parse(deviceKeysJson);
+  let changed = true;
   await new Promise((resolve, reject) => {
     const tx = db.transaction(["data", "dirty"], "readwrite");
-    tx.objectStore("data").put(value, key);
-    tx.objectStore("dirty").put(Date.now(), key);
+    const data = tx.objectStore("data");
+    if (key === "ALLGSettings") {
+      const previous = data.get(key);
+      previous.onsuccess = () => {
+        try {
+          const nextShared = sharedSettings(value, deviceKeys);
+          if (deviceOnly && previous.result !== undefined) {
+            const current = JSON.parse(previous.result);
+            const next = JSON.parse(value);
+            for (const deviceKey of deviceKeys) {
+              if (Object.hasOwn(next, deviceKey)) current[deviceKey] = next[deviceKey];
+              else delete current[deviceKey];
+            }
+            data.put(JSON.stringify(current), key);
+            changed = false;
+          } else {
+            changed = previous.result === undefined ||
+              JSON.stringify(sharedSettings(previous.result, deviceKeys)) !== JSON.stringify(nextShared);
+            data.put(value, key);
+          }
+          if (changed) tx.objectStore("dirty").put(Date.now(), key);
+        } catch (error) {
+          tx.abort();
+          reject(error);
+        }
+      };
+    } else {
+      data.put(value, key);
+      tx.objectStore("dirty").put(Date.now(), key);
+    }
     tx.oncomplete = resolve;
     tx.onerror = () => reject(tx.error);
+    tx.onabort = () => reject(tx.error || new Error("Unable to save settings"));
   });
-  window.dispatchEvent(new CustomEvent("alg-trainers-change", { detail: { key, value } }));
+  if (changed) window.dispatchEvent(new CustomEvent("alg-trainers-change", { detail: { key, value } }));
 }
-export async function storagePutIfClean(key, value) {
+export async function storagePutIfClean(key, value, deviceKeysJson) {
   const db = await openStorage();
+  const deviceKeys = JSON.parse(deviceKeysJson);
   return await new Promise((resolve, reject) => {
     const tx = db.transaction(["data", "dirty"], "readwrite");
     const dirtyReq = tx.objectStore("dirty").get(key);
     let written = false;
     dirtyReq.onsuccess = () => {
       if (dirtyReq.result === undefined) {
-        tx.objectStore("data").put(value, key);
-        written = true;
+        const data = tx.objectStore("data");
+        if (key === "ALLGSettings") {
+          const previous = data.get(key);
+          previous.onsuccess = () => {
+            try {
+              const incoming = sharedSettings(value, deviceKeys);
+              if (previous.result !== undefined) {
+                const local = JSON.parse(previous.result);
+                for (const deviceKey of deviceKeys) {
+                  if (Object.hasOwn(local, deviceKey)) incoming[deviceKey] = local[deviceKey];
+                }
+              }
+              data.put(JSON.stringify(incoming), key);
+              written = true;
+            } catch (error) {
+              tx.abort();
+              reject(error);
+            }
+          };
+        } else {
+          data.put(value, key);
+          written = true;
+        }
       }
     };
     tx.oncomplete = () => resolve(written);
     tx.onerror = () => reject(tx.error);
+    tx.onabort = () => reject(tx.error || new Error("Unable to update storage"));
   });
 }
 export async function storageAll(storeName) {
@@ -275,9 +351,18 @@ extern "C" {
     #[wasm_bindgen(catch)]
     pub fn storageGet(key: &str) -> Result<js_sys::Promise, JsValue>;
     #[wasm_bindgen(catch)]
-    pub fn storagePut(key: &str, value: &str) -> Result<js_sys::Promise, JsValue>;
+    pub fn storagePut(
+        key: &str,
+        value: &str,
+        device_keys_json: &str,
+        device_only: bool,
+    ) -> Result<js_sys::Promise, JsValue>;
     #[wasm_bindgen(catch)]
-    pub fn storagePutIfClean(key: &str, value: &str) -> Result<js_sys::Promise, JsValue>;
+    pub fn storagePutIfClean(
+        key: &str,
+        value: &str,
+        device_keys_json: &str,
+    ) -> Result<js_sys::Promise, JsValue>;
     #[wasm_bindgen(catch)]
     pub fn storageAll(store_name: &str) -> Result<js_sys::Promise, JsValue>;
     #[wasm_bindgen(catch)]
@@ -324,8 +409,8 @@ pub async fn get_stored(key: &str) -> Option<String> {
     }
 }
 
-pub async fn put_stored(key: String, value: String) {
-    let result = match storagePut(&key, &value) {
+async fn put_stored_with_scope(key: String, value: String, device_only: bool) {
+    let result = match storagePut(&key, &value, &device_settings_keys_json(), device_only) {
         Ok(promise) => JsFuture::from(promise).await.map(|_| ()),
         Err(error) => Err(error),
     };
@@ -339,8 +424,12 @@ pub async fn put_stored(key: String, value: String) {
     }
 }
 
+pub async fn put_stored(key: String, value: String) {
+    put_stored_with_scope(key, value, false).await;
+}
+
 pub async fn put_stored_if_clean(key: String, value: String) -> bool {
-    let result = match storagePutIfClean(&key, &value) {
+    let result = match storagePutIfClean(&key, &value, &device_settings_keys_json()) {
         Ok(promise) => JsFuture::from(promise).await,
         Err(error) => Err(error),
     };
@@ -411,9 +500,9 @@ pub async fn load_settings(persist_migration: bool) -> serde_json::Value {
     settings
 }
 
-pub fn save_settings_async(settings: serde_json::Value) {
+pub fn save_settings_async(settings: serde_json::Value, device_only: bool) {
     spawn_local(async move {
-        put_stored(SETTINGS_KEY.to_owned(), settings.to_string()).await;
+        put_stored_with_scope(SETTINGS_KEY.to_owned(), settings.to_string(), device_only).await;
     });
 }
 
@@ -531,4 +620,27 @@ pub async fn read_file_text(
         .map_err(|_| err_msg)?
         .as_string()
         .ok_or(err_msg)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_json::json;
+
+    #[test]
+    fn syncable_settings_excludes_device_preferences() {
+        let settings = json!({
+            "enableHoldDelay": false,
+            "baseSize": 0.7,
+            "timerSize": 5,
+            "scrambleSize": 2,
+            "weightedChoice": true,
+            "colors": {"--text": "white"}
+        });
+
+        assert_eq!(
+            syncable_settings(settings),
+            json!({"weightedChoice": true, "colors": {"--text": "white"}})
+        );
+    }
 }

@@ -62,6 +62,8 @@ IP-aware rate limits.
 - Browser state remains in IndexedDB under the existing trainer storage keys.
   A debounced, rate-limited sync engine sends dirty settings, selections,
   presets, custom algorithms, and times to `/api/sync`.
+  Hold down delay and base, timer, and scramble sizes stay on each device
+  instead of syncing; they are still included in backups.
 - The runtime image does not expose the previous JavaScript trainer routes.
 
 ## Cube colors
