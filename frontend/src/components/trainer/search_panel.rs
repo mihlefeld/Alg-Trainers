@@ -220,9 +220,9 @@ pub fn search_panel(props: &SearchPanelProps) -> Html {
                         ))
                     }}
                 >
-                    <option value="" selected={props.active_query.is_empty()}>{"No filter"}</option>
+                    <option value="">{"No filter"}</option>
                     {for props.saved_queries.keys().map(|name| html! {
-                        <option value={name.clone()} selected={props.active_query == *name}>
+                        <option value={name.clone()}>
                             {name}
                         </option>
                     })}
