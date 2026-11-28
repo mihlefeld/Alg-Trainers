@@ -76,7 +76,7 @@ dependencies = [
 
 [[package]]
 name = "alg-trainers-server"
-version = "0.1.0"
+version = "0.5.0"
 dependencies = [
  "alg-trainers-migration",
  "alg-trainers-shared",
