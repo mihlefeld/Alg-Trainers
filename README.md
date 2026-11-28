@@ -67,6 +67,8 @@ IP-aware rate limits.
 - Trainers can save named text and diagram search queries in synced settings.
   A per-trainer default query activates automatically when the trainer opens;
   the built-in "No filter" option represents the unfiltered state.
+- Trainer case groups are grouped beneath their algset headers and can be
+  switched to a compact, wrapping row layout in Styling settings.
 - The home page can be edited to reorder or hide puzzle sections and trainers.
   Its personalized layout is stored with synced settings, and the edit control
   indicates newly added trainers until editing is opened.

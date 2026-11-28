@@ -231,7 +231,6 @@ pub fn compute_selection_metrics(
         .iter()
         .filter(|id| !visible_case_ids.contains(id))
         .count();
-    let visible_case_id_set = visible_case_ids.iter().collect::<BTreeSet<_>>();
     let widest_group_cases = bundle
         .groups
         .iter()
@@ -244,13 +243,7 @@ pub fn compute_selection_metrics(
                         .unwrap_or(algset.selected)
             })
         })
-        .map(|group| {
-            group
-                .cases
-                .iter()
-                .filter(|id| visible_case_id_set.contains(id))
-                .count()
-        })
+        .map(|group| group.cases.len())
         .max()
         .unwrap_or(0);
     let selection_columns = widest_group_cases
@@ -377,8 +370,14 @@ mod tests {
         let visible =
             ordered_visible_case_ids(&bundle, &BTreeMap::new(), "", &BTreeMap::new(), true);
         assert_eq!(visible, vec!["1", "2", "10", "3"]);
-        assert_eq!(step_visible_case_id(&visible, "2", 1), Some("10".to_owned()));
-        assert_eq!(step_visible_case_id(&visible, "10", -1), Some("2".to_owned()));
+        assert_eq!(
+            step_visible_case_id(&visible, "2", 1),
+            Some("10".to_owned())
+        );
+        assert_eq!(
+            step_visible_case_id(&visible, "10", -1),
+            Some("2".to_owned())
+        );
         assert_eq!(step_visible_case_id(&visible, "1", -1), None);
         assert_eq!(step_visible_case_id(&visible, "3", 1), None);
     }
@@ -401,5 +400,18 @@ mod tests {
         assert_eq!(visible, vec!["1", "2", "10"]);
         assert_eq!(step_visible_case_id(&visible, "1", 1), Some("2".to_owned()));
         assert_eq!(step_visible_case_id(&visible, "10", 1), None);
+    }
+
+    #[test]
+    fn search_results_do_not_change_selection_width() {
+        let bundle = sample_bundle();
+        let unfiltered =
+            compute_selection_metrics(&bundle, &[], &BTreeMap::new(), "", &BTreeMap::new(), true);
+        let filtered =
+            compute_selection_metrics(&bundle, &[], &BTreeMap::new(), "T", &BTreeMap::new(), true);
+
+        assert_eq!(filtered.selection_columns, unfiltered.selection_columns);
+        assert_eq!(filtered.widest_group_cases, unfiltered.widest_group_cases);
+        assert!(filtered.visible_case_ids.len() < unfiltered.visible_case_ids.len());
     }
 }

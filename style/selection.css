@@ -167,12 +167,31 @@ div#modeButtons {
     box-sizing: border-box;
 }
 
+.algsetSection {
+    display: flex;
+    flex-direction: column;
+    gap: 0.2em;
+    width: 100%;
+}
+
+.algsetGroups {
+    display: flex;
+    flex-direction: column;
+    gap: 0.2em;
+    width: 100%;
+}
+
+.algsetGroupsCompact {
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: flex-start;
+}
+
 .caseGroup {
     display: flex;
     flex-direction: column;
     gap: 0.2em;
     width: fit-content;
-    min-width: min(100%, 26em);
     max-width: 100%;
     align-self: flex-start;
 }
@@ -192,10 +211,11 @@ div#modeButtons {
     overflow-wrap: anywhere;
 }
 
-.caseGroup > .rowFlex {
+.caseGroup > .caseGroupCases {
     width: 100%;
     max-width: 100%;
     gap: var(--case-gap);
+    flex-wrap: wrap;
 }
 
 .algsetSelectors > button.itemSel {

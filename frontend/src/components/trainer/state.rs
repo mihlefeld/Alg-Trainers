@@ -134,7 +134,7 @@ pub fn use_trainer_controller(bundle: Rc<TrainerBundle>) -> TrainerController {
         .default_query
         .as_ref()
         .and_then(|name| saved_searches.queries.get(name).map(|query| (name, query)));
-    let search_open = use_state(|| initial_search.is_some());
+    let search_open = use_state(|| false);
     let search_query = use_state(|| {
         initial_search
             .map(|(_, query)| query.query.clone())
@@ -183,7 +183,7 @@ pub fn use_trainer_controller(bundle: Rc<TrainerBundle>) -> TrainerController {
             let saved = search::saved_queries(&settings, &trainer_id);
             if let Some(name) = saved.default_query {
                 if let Some(query) = saved.queries.get(&name) {
-                    search_open.set(true);
+                    search_open.set(false);
                     search_query.set(query.query.clone());
                     search_cells.set(query.cells.clone());
                     search_all_angles.set(query.all_angles);

@@ -125,6 +125,11 @@ pub fn selection_view(props: &SelectionViewProps) -> Html {
     let include_name = bundle.title.contains("PLL")
         || bundle.title.contains("BLD")
         || bundle.title.contains("Square-1");
+    let compact_group_layout = props
+        .settings
+        .get("compactCaseGroupLayout")
+        .and_then(serde_json::Value::as_bool)
+        .unwrap_or(false);
 
     let on_open_settings = {
         let cb = props.on_open_settings.clone();
@@ -138,8 +143,6 @@ pub fn selection_view(props: &SelectionViewProps) -> Html {
         let cb = props.on_toggle_search_open.clone();
         Callback::from(move |_| cb.emit(()))
     };
-
-    let mut displayed_algsets = BTreeSet::new();
 
     html! {
         <div
@@ -314,94 +317,103 @@ pub fn selection_view(props: &SelectionViewProps) -> Html {
                     />
                 }
 
-                { for bundle.groups.iter().map(|group| {
-                    let visible_cases = group.cases.iter()
-                        .filter_map(|id| props.cases_by_id.get(id))
-                        .filter(|case| case_matches_search(
-                            case,
-                            bundle,
-                            &search_needle,
-                            &props.search_cells,
-                            props.search_all_angles,
-                        ))
-                        .map(|case| case.case_id.clone())
-                        .collect::<Vec<_>>();
-                    if metrics.search_active && visible_cases.is_empty() {
-                        return Html::default();
-                    }
-                    let group_enabled = bundle.algsets.iter().any(|algset| {
-                        algset.groups.contains(&group.name)
-                            && props.selected_algsets
-                                .get(&algset.name)
-                                .copied()
-                                .unwrap_or(algset.selected)
-                    });
-                    if !group_enabled {
-                        return Html::default();
-                    }
-                    let group_selected = group.cases.iter().all(|id| props.selected.contains(id));
-                    let algset_headers = bundle.algsets.iter()
-                        .filter(|algset| algset.groups.contains(&group.name)
-                            && props.selected_algsets
-                                .get(&algset.name)
-                                .copied()
-                                .unwrap_or(algset.selected))
-                        .filter(|algset| displayed_algsets.insert(algset.name.clone()))
-                        .map(|algset| algset.name.clone())
-                        .collect::<Vec<_>>();
-                    let on_toggle_group = {
-                        let cb = props.on_toggle_case_group.clone();
-                        let targets = if metrics.search_active {
-                            visible_cases.clone()
-                        } else {
-                            group.cases.clone()
-                        };
-                        Callback::from(move |_| cb.emit(targets.clone()))
-                    };
-
-                    html! {
-                        <>
-                            {for algset_headers.iter().map(|name| html! {
-                                <div class="borderedContainer pad algsetNameHeader"><b>{name}</b></div>
-                            })}
-                            <section class={classes!(
-                                "caseGroup",
-                                (visible_cases.len() == metrics.widest_group_cases).then_some("widestCaseGroup")
-                            )}>
-                                <div
-                                    class={classes!(
-                                        "borderedContainer",
-                                        "pad",
-                                        "groupNameDiv",
-                                        if group_selected { "itemSel" } else { "itemUnsel" }
-                                    )}
-                                    style="text-align:center;"
-                                    onclick={on_toggle_group}
-                                >
-                                    <b>{&group.name}</b>
-                                </div>
-                                <div class="rowFlex" style="flex-wrap: wrap;">
-                                    { for visible_cases.iter().filter_map(|id| props.cases_by_id.get(id)).map(|case| {
-                                        let probability = show_probabilities
-                                            .then(|| props.probabilities.get(&case.case_id).copied())
-                                            .flatten();
-                                        html! {
-                                            <CaseCard
-                                                case={case.clone()}
-                                                selected={props.selected.contains(&case.case_id)}
-                                                {include_name}
-                                                cube_colors={props.cube_colors.clone()}
-                                                {probability}
-                                                on_toggle={props.on_toggle_case.clone()}
-                                                on_open_hint={props.on_open_hint.clone()}
-                                            />
-                                        }
-                                    }) }
-                                </div>
-                            </section>
-                        </>
-                    }
-                }) }
+                <>
+                            { for bundle.algsets.iter()
+                                .filter(|algset| {
+                                    props.selected_algsets
+                                        .get(&algset.name)
+                                        .copied()
+                                        .unwrap_or(algset.selected)
+                                })
+                                .map(|algset| {
+                                    let groups = bundle.groups.iter()
+                                        .filter(|group| algset.groups.contains(&group.name))
+                                        .filter_map(|group| {
+                                            let visible_cases = group.cases.iter()
+                                                .filter_map(|id| props.cases_by_id.get(id))
+                                                .filter(|case| case_matches_search(
+                                                    case,
+                                                    bundle,
+                                                    &search_needle,
+                                                    &props.search_cells,
+                                                    props.search_all_angles,
+                                                ))
+                                                .map(|case| case.case_id.clone())
+                                                .collect::<Vec<_>>();
+                                            if metrics.search_active && visible_cases.is_empty() {
+                                                None
+                                            } else {
+                                                Some((group, visible_cases))
+                                            }
+                                        })
+                                        .collect::<Vec<_>>();
+                                    if metrics.search_active && groups.is_empty() {
+                                        return Html::default();
+                                    }
+                                    html! {
+                                        <section class="algsetSection">
+                                            <div class="borderedContainer pad algsetNameHeader">
+                                                <b>{&algset.name}</b>
+                                            </div>
+                                            <div class={classes!(
+                                                "algsetGroups",
+                                                compact_group_layout.then_some("algsetGroupsCompact")
+                                            )}>
+                                                { for groups.into_iter().map(|(group, visible_cases)| {
+                                                    let group_selected = group.cases.iter().all(|id| props.selected.contains(id));
+                                                    let on_toggle_group = {
+                                                        let cb = props.on_toggle_case_group.clone();
+                                                        let targets = if metrics.search_active {
+                                                            visible_cases.clone()
+                                                        } else {
+                                                            group.cases.clone()
+                                                        };
+                                                        Callback::from(move |_| cb.emit(targets.clone()))
+                                                    };
+                                                    html! {
+                                                        <section class={classes!(
+                                                            "caseGroup",
+                                                            (visible_cases.len() == metrics.widest_group_cases).then_some("widestCaseGroup")
+                                                        )}>
+                                                            <div
+                                                                class={classes!(
+                                                                    "borderedContainer",
+                                                                    "pad",
+                                                                    "groupNameDiv",
+                                                                    if group_selected { "itemSel" } else { "itemUnsel" }
+                                                                )}
+                                                                style="text-align:center;"
+                                                                onclick={on_toggle_group}
+                                                            >
+                                                                <b>{&group.name}</b>
+                                                            </div>
+                                                            <div class="rowFlex caseGroupCases">
+                                                                { for visible_cases.iter().filter_map(|id| props.cases_by_id.get(id)).map(|case| {
+                                                                    let probability = show_probabilities
+                                                                        .then(|| props.probabilities.get(&case.case_id).copied())
+                                                                        .flatten();
+                                                                    html! {
+                                                                        <CaseCard
+                                                                            case={case.clone()}
+                                                                            selected={props.selected.contains(&case.case_id)}
+                                                                            {include_name}
+                                                                            cube_colors={props.cube_colors.clone()}
+                                                                            {probability}
+                                                                            on_toggle={props.on_toggle_case.clone()}
+                                                                            on_open_hint={props.on_open_hint.clone()}
+                                                                        />
+                                                                    }
+                                                                }) }
+                                                            </div>
+                                                        </section>
+                                                    }
+                                                }) }
+                                            </div>
+                                        </section>
+                                    }
+                                })
+                            }
+                </>
             </div>
         </div>
     }

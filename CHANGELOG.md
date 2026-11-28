@@ -11,3 +11,4 @@
 ### Changed
 
 - Algset bulk actions now operate on visible results while a trainer search is active.
+- Trainer case groups can use a compact row-wrapped layout from the Styling settings.

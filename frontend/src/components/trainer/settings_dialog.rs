@@ -198,6 +198,24 @@ pub fn settings_dialog(props: &SettingsDialogProps) -> Html {
             <SettingsSection title="Styling">
                 <div class="colFlex">
                     <div class="trainerScrambleHelp">{"Sizes are specific to this device."}</div>
+                    if !props.home_page {
+                        <ToggleSetting
+                            label="Compact case group layout"
+                            checked={settings
+                                .get("compactCaseGroupLayout")
+                                .and_then(serde_json::Value::as_bool)
+                                .unwrap_or(false)}
+                            on_change={{
+                                let next = settings.clone();
+                                let on_update = on_update.clone();
+                                Callback::from(move |value: bool| {
+                                    let mut next = next.clone();
+                                    next["compactCaseGroupLayout"] = value.into();
+                                    on_update.emit(next);
+                                })
+                            }}
+                        />
+                    }
                     {for SIZE_SETTINGS.into_iter().map(|(key, label)| {
                         let next_inc = settings.clone();
                         let next_dec = settings.clone();
