@@ -15,12 +15,13 @@ use crate::components::trainer::hint_dialog::HintDialog;
 use crate::components::trainer::hotkeys_dialog::HotkeysDialog;
 use crate::components::trainer::practice_view::PracticeView;
 use crate::components::trainer::selection_view::SelectionView;
-use crate::components::trainer::settings_dialog::SettingsDialog;
 use crate::components::trainer::state::use_trainer_controller;
 use crate::components::trainer::stats_dialog::StatsDialog;
 use crate::models::{Dialog, Mode, TrainerBundle};
 use std::rc::Rc;
 use yew::prelude::*;
+
+pub use settings_dialog::SettingsDialog;
 
 #[derive(Properties, PartialEq)]
 pub struct LoadedTrainerProps {

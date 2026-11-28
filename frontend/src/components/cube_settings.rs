@@ -13,6 +13,8 @@ use yew::prelude::*;
 pub struct Props {
     pub settings: Value,
     pub on_change: Callback<Value>,
+    #[prop_or(true)]
+    pub show_trainer_overrides: bool,
 }
 
 fn options(settings: &Value, fallback: Option<&str>, selected: &str) -> Vec<Html> {
@@ -281,6 +283,7 @@ pub fn cube_settings(props: &Props) -> Html {
                                 on_change.emit(next);
                             })}>{for options(settings, Some("Use global scheme"), &puzzle_value)}</select>
                             </label>
+                            if props.show_trainer_overrides {
                             {for trainers.into_iter().map(|trainer| {
                                 let value = settings.get("trainerCubeSchemes").and_then(|v| v.get(&trainer.trainer_id))
                                     .and_then(Value::as_str).unwrap_or("").to_owned();
@@ -303,6 +306,7 @@ pub fn cube_settings(props: &Props) -> Html {
                                     </label>
                                 }
                             })}
+                            }
                         </div>
                     </details>
                     }

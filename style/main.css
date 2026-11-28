@@ -178,6 +178,143 @@ dialog:focus {
     height: 1.4em;
 }
 
+.home-page {
+    align-items: center;
+    width: 100%;
+    min-height: 100%;
+    background-color: var(--backgroundDarker);
+}
+
+.home-toolbar {
+    justify-content: center;
+    align-items: center;
+    width: min(80vw, 62em);
+    flex-wrap: wrap;
+}
+
+.home-account {
+    flex-grow: 1;
+    justify-content: center;
+    flex-wrap: wrap;
+}
+
+.home-actions {
+    margin-left: auto;
+}
+
+.home-edit-button {
+    position: relative;
+}
+
+.home-unread-dot {
+    position: absolute;
+    top: 0.15em;
+    right: 0.15em;
+    width: 0.55em;
+    height: 0.55em;
+    border-radius: 50%;
+    background: var(--accent);
+    box-shadow: 0 0 0 0.12em var(--backgroundDarker);
+}
+
+.home-edit-help {
+    max-width: min(80vw, 62em);
+    margin-bottom: 0.2em;
+    text-align: center;
+    flex-wrap: wrap;
+    justify-content: center;
+}
+
+.home-edit-help .abutton {
+    white-space: nowrap;
+}
+
+.home-reset-button svg {
+    width: 1.2em;
+    height: 1.2em;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+
+#algtrainer-selections.home-editing > .home-puzzle {
+    cursor: grab;
+}
+
+.home-puzzle[draggable="true"]:active,
+.home-trainer[draggable="true"]:active {
+    cursor: grabbing;
+}
+
+.home-trainer-list {
+    flex-wrap: wrap;
+}
+
+.home-trainer {
+    position: relative;
+}
+
+.home-puzzle {
+    position: relative;
+}
+
+.home-drop-before::before {
+    content: "";
+    position: absolute;
+    z-index: 2;
+    top: 0;
+    bottom: 0;
+    left: -0.35em;
+    width: 0.13em;
+    border-radius: 999px;
+    background: var(--accent);
+    box-shadow: 0 0 0.2em var(--accent);
+    pointer-events: none;
+}
+
+.home-drag-label {
+    display: flex;
+    align-items: center;
+    min-width: 0;
+}
+
+.home-drag-handle {
+    cursor: grab;
+    font-size: 1em;
+    opacity: 0.65;
+}
+
+.home-hidden {
+    opacity: 0.4;
+}
+
+.home-hidden:hover,
+.home-hidden:focus-within {
+    opacity: 0.7;
+}
+
+.home-visibility-button {
+    border: 0;
+    margin: 0 0 0 0.3em;
+    padding: 0.1em;
+    color: var(--text);
+    background: transparent;
+    cursor: pointer;
+    font: inherit;
+    flex: 0 0 auto;
+    line-height: 1;
+}
+
+.puzzle-header > .home-visibility-button {
+    color: var(--text);
+}
+
+.home-trainer > .home-visibility-button {
+    color: var(--primaryText);
+}
+
 html {
     height: 100%;
 }

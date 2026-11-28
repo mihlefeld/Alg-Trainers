@@ -20,6 +20,8 @@ pub struct SettingsDialogProps {
     pub selection_key: String,
     pub on_update_settings: Callback<serde_json::Value>,
     pub on_close: Callback<()>,
+    #[prop_or_default]
+    pub home_page: bool,
 }
 
 const BEHAVIOR_TOGGLES: [(&str, &str); 5] = [
@@ -127,6 +129,7 @@ pub fn settings_dialog(props: &SettingsDialogProps) -> Html {
         <ModalDialog id="settings" class="colFlex borderedContainer" on_close={props.on_close.clone()}>
             <AccountSettings />
 
+            if !props.home_page {
             <SettingsSection title="Behavior">
                 <div class="colFlex">
                     <div class="trainerScrambleHelp">{"Hold down delay is specific to this device."}</div>
@@ -190,6 +193,7 @@ pub fn settings_dialog(props: &SettingsDialogProps) -> Html {
                     })}
                 </div>
             </SettingsSection>
+            }
 
             <SettingsSection title="Styling">
                 <div class="colFlex">
@@ -272,12 +276,17 @@ pub fn settings_dialog(props: &SettingsDialogProps) -> Html {
 
             <SettingsSection title="Cube colors">
                 if props.settings_ready {
-                    <CubeSettings settings={settings.clone()} on_change={on_update.clone()} />
+                    <CubeSettings
+                        settings={settings.clone()}
+                        on_change={on_update.clone()}
+                        show_trainer_overrides={!props.home_page}
+                    />
                 } else {
                     <div>{"Loading settings..."}</div>
                 }
             </SettingsSection>
 
+            if !props.home_page {
             <SettingsSection title="Blind trainer behavior">
                 <div class="colFlex">
                     {for BLD_SCHEMES.into_iter().map(|(key, label)| {
@@ -341,6 +350,7 @@ pub fn settings_dialog(props: &SettingsDialogProps) -> Html {
                     </div>
                 </div>
             </SettingsSection>
+            }
 
             <SettingsSection title="Import / Export">
                 <div class="colFlex">
