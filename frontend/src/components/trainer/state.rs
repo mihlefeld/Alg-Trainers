@@ -2,8 +2,8 @@ use crate::components::modal::take_modal_history_pop;
 use crate::components::trainer::timer::{use_trainer_timer, TrainerTimer};
 use crate::logic::{algs, cube_schemes, results, scramble, search, selection, theme};
 use crate::models::{
-    Dialog, DisplayAlg, Mode, SelectionPreset, StoredResult, TrainerBundle, TrainerCase,
-    UserAlgState,
+    Dialog, DisplayAlg, Mode, SavedSearchQuery, SelectionPreset, StoredResult, TrainerBundle,
+    TrainerCase, UserAlgState,
 };
 use crate::services::settings::use_settings;
 use crate::services::storage::{
@@ -42,6 +42,9 @@ pub struct TrainerController {
     pub search_cells: BTreeMap<usize, String>,
     pub search_color: String,
     pub search_all_angles: bool,
+    pub saved_search_queries: BTreeMap<String, SavedSearchQuery>,
+    pub active_search_query: String,
+    pub default_search_query: Option<String>,
     pub settings: serde_json::Value,
     pub settings_ready: bool,
     pub presets: BTreeMap<String, SelectionPreset>,
@@ -92,6 +95,10 @@ pub struct TrainerController {
     pub on_search_cells_change: Callback<BTreeMap<usize, String>>,
     pub on_search_color_change: Callback<String>,
     pub on_search_all_angles_change: Callback<bool>,
+    pub on_save_search_query: Callback<(String, bool)>,
+    pub on_use_search_query: Callback<String>,
+    pub on_set_default_search_query: Callback<(String, bool)>,
+    pub on_delete_search_query: Callback<String>,
 }
 
 #[hook]
@@ -119,14 +126,36 @@ pub fn use_trainer_controller(bundle: Rc<TrainerBundle>) -> TrainerController {
     let mode = use_state(|| Mode::Select);
     let stored_results = use_state(Vec::<StoredResult>::new);
     let dialog = use_state(|| Dialog::None);
-    let search_open = use_state(|| false);
-    let search_query = use_state(String::new);
-    let search_cells = use_state(BTreeMap::<usize, String>::new);
-    let search_color = use_state(|| search::search_color_names()[0].to_owned());
-    let search_all_angles = use_state(|| true);
     let settings_ctx = use_settings();
     let settings = settings_ctx.settings.clone();
     let settings_ready = settings_ctx.ready;
+    let saved_searches = search::saved_queries(&settings, &bundle.trainer_id);
+    let initial_search = saved_searches
+        .default_query
+        .as_ref()
+        .and_then(|name| saved_searches.queries.get(name).map(|query| (name, query)));
+    let search_open = use_state(|| initial_search.is_some());
+    let search_query = use_state(|| {
+        initial_search
+            .map(|(_, query)| query.query.clone())
+            .unwrap_or_default()
+    });
+    let search_cells = use_state(|| {
+        initial_search
+            .map(|(_, query)| query.cells.clone())
+            .unwrap_or_default()
+    });
+    let search_color = use_state(|| search::search_color_names()[0].to_owned());
+    let search_all_angles = use_state(|| {
+        initial_search
+            .map(|(_, query)| query.all_angles)
+            .unwrap_or(true)
+    });
+    let active_search_query = use_state(|| {
+        initial_search
+            .map(|(name, _)| name.clone())
+            .unwrap_or_default()
+    });
     let settings_ref = use_mut_ref(|| settings.clone());
     *settings_ref.borrow_mut() = settings.clone();
     let presets = use_state(BTreeMap::<String, SelectionPreset>::new);
@@ -141,6 +170,35 @@ pub fn use_trainer_controller(bundle: Rc<TrainerBundle>) -> TrainerController {
     let trainer_id = bundle.trainer_id.clone();
     let selection_storage_key = bundle.selection_key.clone();
     let times_storage_key = bundle.times_key.clone();
+
+    {
+        let search_open = search_open.clone();
+        let search_query = search_query.clone();
+        let search_cells = search_cells.clone();
+        let search_all_angles = search_all_angles.clone();
+        let active_search_query = active_search_query.clone();
+        let settings = settings.clone();
+        let trainer_id = trainer_id.clone();
+        use_effect_with(trainer_id.clone(), move |_| {
+            let saved = search::saved_queries(&settings, &trainer_id);
+            if let Some(name) = saved.default_query {
+                if let Some(query) = saved.queries.get(&name) {
+                    search_open.set(true);
+                    search_query.set(query.query.clone());
+                    search_cells.set(query.cells.clone());
+                    search_all_angles.set(query.all_angles);
+                    active_search_query.set(name);
+                }
+            } else {
+                search_open.set(false);
+                search_query.set(String::new());
+                search_cells.set(BTreeMap::new());
+                search_all_angles.set(true);
+                active_search_query.set(String::new());
+            }
+            || ()
+        });
+    }
 
     // Load persisted trainer state from IndexedDB when trainer changes.
     {
@@ -157,7 +215,7 @@ pub fn use_trainer_controller(bundle: Rc<TrainerBundle>) -> TrainerController {
         let recap_remaining = recap_remaining.clone();
         let active_case = active_case.clone();
         let current_scramble = current_scramble.clone();
-        use_effect_with(trainer_id, move |_| {
+        use_effect_with(trainer_id.clone(), move |_| {
             spawn_local(async move {
                 let mut loaded_selected = vec!["1".to_owned(), "2".to_owned()];
                 if let Some(value) = get_stored(&selection_key).await {
@@ -1084,11 +1142,19 @@ pub fn use_trainer_controller(bundle: Rc<TrainerBundle>) -> TrainerController {
     };
     let on_search_query_change = {
         let search_query = search_query.clone();
-        Callback::from(move |value| search_query.set(value))
+        let active_search_query = active_search_query.clone();
+        Callback::from(move |value| {
+            search_query.set(value);
+            active_search_query.set(String::new());
+        })
     };
     let on_search_cells_change = {
         let search_cells = search_cells.clone();
-        Callback::from(move |value| search_cells.set(value))
+        let active_search_query = active_search_query.clone();
+        Callback::from(move |value| {
+            search_cells.set(value);
+            active_search_query.set(String::new());
+        })
     };
     let on_search_color_change = {
         let search_color = search_color.clone();
@@ -1096,7 +1162,100 @@ pub fn use_trainer_controller(bundle: Rc<TrainerBundle>) -> TrainerController {
     };
     let on_search_all_angles_change = {
         let search_all_angles = search_all_angles.clone();
-        Callback::from(move |value| search_all_angles.set(value))
+        let active_search_query = active_search_query.clone();
+        Callback::from(move |value| {
+            search_all_angles.set(value);
+            active_search_query.set(String::new());
+        })
+    };
+    let on_save_search_query = {
+        let settings_ref = settings_ref.clone();
+        let on_update_settings = on_update_settings.clone();
+        let trainer_id = trainer_id.clone();
+        let search_query = search_query.clone();
+        let search_cells = search_cells.clone();
+        let search_all_angles = search_all_angles.clone();
+        let active_search_query = active_search_query.clone();
+        Callback::from(move |(name, make_default): (String, bool)| {
+            let mut next_settings = settings_ref.borrow().as_ref().clone();
+            let mut saved = search::saved_queries(&next_settings, &trainer_id);
+            saved.queries.insert(
+                name.clone(),
+                SavedSearchQuery {
+                    query: (*search_query).clone(),
+                    cells: (*search_cells).clone(),
+                    all_angles: *search_all_angles,
+                },
+            );
+            if make_default {
+                saved.default_query = Some(name.clone());
+            }
+            search::store_saved_queries(&mut next_settings, &trainer_id, saved);
+            on_update_settings.emit(next_settings);
+            active_search_query.set(name);
+        })
+    };
+    let on_use_search_query = {
+        let settings_ref = settings_ref.clone();
+        let trainer_id = trainer_id.clone();
+        let search_query = search_query.clone();
+        let search_cells = search_cells.clone();
+        let search_all_angles = search_all_angles.clone();
+        let active_search_query = active_search_query.clone();
+        Callback::from(move |name: String| {
+            if name.is_empty() {
+                search_query.set(String::new());
+                search_cells.set(BTreeMap::new());
+                search_all_angles.set(true);
+                active_search_query.set(String::new());
+                return;
+            }
+            let saved = search::saved_queries(&settings_ref.borrow(), &trainer_id);
+            if let Some(query) = saved.queries.get(&name) {
+                search_query.set(query.query.clone());
+                search_cells.set(query.cells.clone());
+                search_all_angles.set(query.all_angles);
+                active_search_query.set(name);
+            } else {
+                active_search_query.set(String::new());
+            }
+        })
+    };
+    let on_set_default_search_query = {
+        let settings_ref = settings_ref.clone();
+        let on_update_settings = on_update_settings.clone();
+        let trainer_id = trainer_id.clone();
+        Callback::from(move |(name, is_default): (String, bool)| {
+            let mut next_settings = settings_ref.borrow().as_ref().clone();
+            let mut saved = search::saved_queries(&next_settings, &trainer_id);
+            if !name.is_empty() && !saved.queries.contains_key(&name) {
+                return;
+            }
+            saved.default_query = if is_default && !name.is_empty() {
+                Some(name)
+            } else {
+                None
+            };
+            search::store_saved_queries(&mut next_settings, &trainer_id, saved);
+            on_update_settings.emit(next_settings);
+        })
+    };
+    let on_delete_search_query = {
+        let settings_ref = settings_ref.clone();
+        let on_update_settings = on_update_settings.clone();
+        let on_use_search_query = on_use_search_query.clone();
+        let trainer_id = trainer_id.clone();
+        Callback::from(move |name: String| {
+            let mut next_settings = settings_ref.borrow().as_ref().clone();
+            let mut saved = search::saved_queries(&next_settings, &trainer_id);
+            saved.queries.remove(&name);
+            if saved.default_query.as_deref() == Some(name.as_str()) {
+                saved.default_query = None;
+            }
+            search::store_saved_queries(&mut next_settings, &trainer_id, saved);
+            on_update_settings.emit(next_settings);
+            on_use_search_query.emit(String::new());
+        })
     };
 
     TrainerController {
@@ -1114,6 +1273,9 @@ pub fn use_trainer_controller(bundle: Rc<TrainerBundle>) -> TrainerController {
         search_cells: (*search_cells).clone(),
         search_color: (*search_color).clone(),
         search_all_angles: *search_all_angles,
+        saved_search_queries: search::saved_queries(&settings, &trainer_id).queries,
+        active_search_query: (*active_search_query).clone(),
+        default_search_query: search::saved_queries(&settings, &trainer_id).default_query,
         settings: (*settings).clone(),
         settings_ready,
         presets: (*presets).clone(),
@@ -1164,6 +1326,10 @@ pub fn use_trainer_controller(bundle: Rc<TrainerBundle>) -> TrainerController {
         on_search_cells_change,
         on_search_color_change,
         on_search_all_angles_change,
+        on_save_search_query,
+        on_use_search_query,
+        on_set_default_search_query,
+        on_delete_search_query,
     }
 }
 

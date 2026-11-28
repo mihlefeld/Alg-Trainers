@@ -53,6 +53,30 @@ pub struct SelectionPreset {
     pub selected_alg_sets: BTreeMap<String, bool>,
 }
 
+#[derive(Clone, Debug, Default, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct SavedSearchQuery {
+    #[serde(default)]
+    pub query: String,
+    #[serde(default)]
+    pub cells: BTreeMap<usize, String>,
+    #[serde(default = "default_true")]
+    pub all_angles: bool,
+}
+
+#[derive(Clone, Debug, Default, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct SavedSearchQueries {
+    #[serde(default)]
+    pub queries: BTreeMap<String, SavedSearchQuery>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub default_query: Option<String>,
+}
+
+fn default_true() -> bool {
+    true
+}
+
 #[derive(Clone, Copy, PartialEq)]
 pub enum Mode {
     Select,

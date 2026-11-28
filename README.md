@@ -64,6 +64,9 @@ IP-aware rate limits.
   presets, custom algorithms, and times to `/api/sync`.
   Hold down delay and base, timer, and scramble sizes stay on each device
   instead of syncing; they are still included in backups.
+- Trainers can save named text and diagram search queries in synced settings.
+  A per-trainer default query activates automatically when the trainer opens;
+  the built-in "No filter" option represents the unfiltered state.
 - The home page can be edited to reorder or hide puzzle sections and trainers.
   Its personalized layout is stored with synced settings, and the edit control
   indicates newly added trainers until editing is opened.

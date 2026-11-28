@@ -3,12 +3,11 @@ use crate::components::trainer::presets_panel::PresetsPanel;
 use crate::components::trainer::search_panel::SearchPanel;
 use crate::logic::search::case_matches_search;
 use crate::logic::selection::compute_selection_metrics;
-use crate::models::{Dialog, SelectionPreset, TrainerBundle, TrainerCase};
+use crate::models::{Dialog, SavedSearchQuery, SelectionPreset, TrainerBundle, TrainerCase};
 use crate::Route;
-use gloo_timers::callback::Timeout;
 use std::collections::{BTreeMap, BTreeSet};
 use std::rc::Rc;
-use web_sys::{MouseEvent, PointerEvent};
+use web_sys::MouseEvent;
 use yew::prelude::*;
 use yew_router::prelude::*;
 
@@ -79,6 +78,9 @@ pub struct SelectionViewProps {
     pub search_cells: BTreeMap<usize, String>,
     pub search_color: String,
     pub search_all_angles: bool,
+    pub saved_search_queries: BTreeMap<String, SavedSearchQuery>,
+    pub active_search_query: String,
+    pub default_search_query: Option<String>,
     pub on_open_settings: Callback<()>,
     pub on_start_training: Callback<()>,
     pub on_open_dialog: Callback<Dialog>,
@@ -97,6 +99,10 @@ pub struct SelectionViewProps {
     pub on_search_cells_change: Callback<BTreeMap<usize, String>>,
     pub on_search_color_change: Callback<String>,
     pub on_search_all_angles_change: Callback<bool>,
+    pub on_save_search_query: Callback<(String, bool)>,
+    pub on_use_search_query: Callback<String>,
+    pub on_set_default_search_query: Callback<(String, bool)>,
+    pub on_delete_search_query: Callback<String>,
 }
 
 #[function_component(SelectionView)]
@@ -191,10 +197,13 @@ pub fn selection_view(props: &SelectionViewProps) -> Html {
                     <div class="rowFlex algsetSelectors" style="flex-wrap:wrap;">
                         { for bundle.algsets.iter().map(|algset| {
                             let on_toggle_algset = props.on_toggle_algset.clone();
+                            let on_toggle_case_group = props.on_toggle_case_group.clone();
+                            let search_active = metrics.search_active;
                             let case_ids = bundle.groups.iter()
                                 .filter(|group| algset.groups.contains(&group.name))
                                 .flat_map(|group| group.cases.clone())
                                 .filter(|id| props.cases_by_id.contains_key(id))
+                                .filter(|id| !metrics.search_active || metrics.visible_case_ids.contains(id))
                                 .collect::<BTreeSet<_>>()
                                 .into_iter()
                                 .collect::<Vec<_>>();
@@ -204,7 +213,9 @@ pub fn selection_view(props: &SelectionViewProps) -> Html {
                                 .unwrap_or(algset.selected);
                             let selected_count = case_ids.iter().filter(|id| props.selected.contains(id)).count();
                             let count = if enabled { selected_count.to_string() } else { "-".to_owned() };
-                            let fully_selected = enabled && !case_ids.is_empty() && selected_count == case_ids.len();
+                            let fully_selected = enabled
+                                && !case_ids.is_empty()
+                                && selected_count == case_ids.len();
                             let label = format!("{} ({}/{})", algset.name, count, case_ids.len());
                             let name = algset.name.clone();
                             html! {
@@ -215,7 +226,14 @@ pub fn selection_view(props: &SelectionViewProps) -> Html {
                                         if fully_selected { "itemSel" } else { "itemUnsel" },
                                         (!enabled).then_some("algsetDisabled")
                                     )}
-                                    onclick={Callback::from(move |_| on_toggle_algset.emit((name.clone(), case_ids.clone())))}
+                                    disabled={search_active && case_ids.is_empty()}
+                                    onclick={Callback::from(move |_| {
+                                        if search_active {
+                                            on_toggle_case_group.emit(case_ids.clone());
+                                        } else {
+                                            on_toggle_algset.emit((name.clone(), case_ids.clone()));
+                                        }
+                                    })}
                                 >
                                     {label}
                                 </button>
@@ -282,10 +300,17 @@ pub fn selection_view(props: &SelectionViewProps) -> Html {
                         cells={props.search_cells.clone()}
                         active_color={props.search_color.clone()}
                         all_angles={props.search_all_angles}
+                        saved_queries={props.saved_search_queries.clone()}
+                        active_query={props.active_search_query.clone()}
+                        default_query={props.default_search_query.clone()}
                         on_query_change={props.on_search_query_change.clone()}
                         on_cells_change={props.on_search_cells_change.clone()}
                         on_color_change={props.on_search_color_change.clone()}
                         on_all_angles_change={props.on_search_all_angles_change.clone()}
+                        on_save_query={props.on_save_search_query.clone()}
+                        on_use_query={props.on_use_search_query.clone()}
+                        on_set_default_query={props.on_set_default_search_query.clone()}
+                        on_delete_query={props.on_delete_search_query.clone()}
                     />
                 }
 

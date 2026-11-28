@@ -55,6 +55,9 @@ pub fn loaded_trainer(props: &LoadedTrainerProps) -> Html {
                     search_cells={ctrl.search_cells}
                     search_color={ctrl.search_color}
                     search_all_angles={ctrl.search_all_angles}
+                    saved_search_queries={ctrl.saved_search_queries}
+                    active_search_query={ctrl.active_search_query}
+                    default_search_query={ctrl.default_search_query}
                     on_open_settings={ctrl.on_open_settings}
                     on_start_training={ctrl.on_start_training}
                     on_open_dialog={ctrl.on_open_dialog}
@@ -73,6 +76,10 @@ pub fn loaded_trainer(props: &LoadedTrainerProps) -> Html {
                     on_search_cells_change={ctrl.on_search_cells_change}
                     on_search_color_change={ctrl.on_search_color_change}
                     on_search_all_angles_change={ctrl.on_search_all_angles_change}
+                    on_save_search_query={ctrl.on_save_search_query}
+                    on_use_search_query={ctrl.on_use_search_query}
+                    on_set_default_search_query={ctrl.on_set_default_search_query}
+                    on_delete_search_query={ctrl.on_delete_search_query}
                 />
             } else {
                 <PracticeView

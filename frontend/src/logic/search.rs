@@ -1,6 +1,40 @@
 use crate::logic::theme::default_cube_colors;
-use crate::models::{TrainerBundle, TrainerCase};
+use crate::models::{SavedSearchQueries, TrainerBundle, TrainerCase};
+use serde_json::Value;
 use std::collections::{BTreeMap, BTreeSet};
+
+const SAVED_SEARCHES_SETTING: &str = "trainerSearchQueries";
+
+pub fn saved_queries(settings: &Value, trainer_id: &str) -> SavedSearchQueries {
+    let mut saved: SavedSearchQueries = settings
+        .get(SAVED_SEARCHES_SETTING)
+        .and_then(|trainers| trainers.get(trainer_id))
+        .cloned()
+        .and_then(|value| serde_json::from_value::<SavedSearchQueries>(value).ok())
+        .unwrap_or_default();
+    if saved
+        .default_query
+        .as_ref()
+        .is_some_and(|name| !saved.queries.contains_key(name))
+    {
+        saved.default_query = None;
+    }
+    saved
+}
+
+pub fn store_saved_queries(settings: &mut Value, trainer_id: &str, saved: SavedSearchQueries) {
+    if !settings.is_object() {
+        *settings = serde_json::json!({});
+    }
+    if !settings
+        .get(SAVED_SEARCHES_SETTING)
+        .is_some_and(Value::is_object)
+    {
+        settings[SAVED_SEARCHES_SETTING] = serde_json::json!({});
+    }
+    settings[SAVED_SEARCHES_SETTING][trainer_id] =
+        serde_json::to_value(saved).unwrap_or_else(|_| serde_json::json!({}));
+}
 
 pub fn case_matches_search(
     case: &TrainerCase,
@@ -258,5 +292,27 @@ mod tests {
     fn fuzzy_match_ignores_whitespace() {
         assert!(fuzzy_matches("ru'", "r u r' u'"));
         assert!(!fuzzy_matches("xyz", "r u r' u'"));
+    }
+
+    #[test]
+    fn saved_queries_round_trip_and_ignore_missing_defaults() {
+        let query = crate::models::SavedSearchQuery {
+            query: "T perm".to_owned(),
+            cells: BTreeMap::from([(2, "red".to_owned())]),
+            all_angles: false,
+        };
+        let saved = SavedSearchQueries {
+            queries: BTreeMap::from([("T".to_owned(), query.clone())]),
+            default_query: Some("T".to_owned()),
+        };
+        let mut settings = serde_json::json!({"baseSize": 1.2});
+        store_saved_queries(&mut settings, "pll", saved);
+
+        let loaded = saved_queries(&settings, "pll");
+        assert_eq!(loaded.queries["T"], query);
+        assert_eq!(loaded.default_query.as_deref(), Some("T"));
+
+        settings[SAVED_SEARCHES_SETTING]["pll"]["defaultQuery"] = serde_json::json!("missing");
+        assert_eq!(saved_queries(&settings, "pll").default_query, None);
     }
 }

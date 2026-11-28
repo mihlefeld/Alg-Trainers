@@ -431,19 +431,58 @@ html {
     width: 100%;
 }
 
+.searchPanel .searchOptions {
+    width: 100%;
+    align-items: center;
+    justify-content: center;
+    flex-wrap: wrap;
+    gap: 0.8em;
+}
+
+.searchPanel .searchAngleToggle,
+.searchPanel .savedSearchDefault {
+    align-items: center;
+    gap: 0.25em;
+    white-space: nowrap;
+}
+
 .searchPanel .searchTextRow {
     align-items: center;
-    gap: 0.2em;
+    gap: 0.15em;
 }
 
 .searchPanel .searchTextRow input {
     min-width: 0;
     flex: 1;
-    padding: 0.5em;
+    height: 2.2em;
+    padding: 0.3em 0.4em;
     border: var(--borderWidth) solid var(--secondary);
     background: var(--background);
     color: var(--text);
     font: inherit;
+}
+
+.searchPanel .savedSearchRow {
+    width: 100%;
+    align-items: center;
+    gap: 0.2em;
+}
+
+.searchPanel .savedSearchRow select {
+    min-width: 0;
+    flex: 1;
+    height: 2.2em;
+    padding: 0.25em 0.4em;
+    border: var(--borderWidth) solid var(--secondary);
+    background: var(--background);
+    color: var(--text);
+    font: inherit;
+}
+
+.searchPanel .compactButton {
+    width: 2em !important;
+    height: 2em;
+    padding: 0.2em !important;
 }
 
 .searchDiagram {
